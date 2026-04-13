@@ -1,6 +1,12 @@
+---
+layout: default
+title: HELIOS Platform
+description: Enterprise Windows Optimization & Automation System
+---
+
 # HELIOS Platform - Complete Documentation
 
-Welcome to the HELIOS Platform documentation site. 
+Welcome to the HELIOS Platform documentation site – your complete guide to enterprise-grade Windows workstation optimization, security, and automation.
 
 ## 🚀 Quick Start
 
