@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>HELIOS.Platform</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>M0nado</Authors>
+    <Company>M0nado</Company>
+    <Description>HELIOS Platform - Complete Windows Optimization Ecosystem with 7 phases, 6 agents, 8 security layers, 12+ AI services, and 42 validation tests</Description>
+    <PackageTags>helios;platform;automation;optimization;security;ai;windows;deployment</PackageTags>
+    <RepositoryUrl>https://github.com/M0nado/helios-platform</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <License>MIT</License>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <ReadmeFile>README.md</ReadmeFile>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+  </ItemGroup>
+
+</Project>
