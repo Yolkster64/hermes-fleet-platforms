@@ -1,0 +1,23 @@
+# Build results
+bin/
+obj/
+dist/
+
+# Azure
+.env
+local.settings.json
+
+# Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Dependencies
+node_modules/
+packages/

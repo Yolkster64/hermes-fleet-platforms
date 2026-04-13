@@ -1,0 +1,66 @@
+{
+  "name": "HELIOS-DevContainer",
+  "image": "mcr.microsoft.com/devcontainers/universal:latest",
+  "features": {
+    "ghcr.io/devcontainers/features/azure-cli:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/powershell:1": {},
+    "ghcr.io/devcontainers/features/dotnet:1": {
+      "version": "8"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.powershell",
+        "ms-azure-tools.vscode-azurefunctions",
+        "ms-azure-tools.vscode-azuretools",
+        "ms-azure-tools.vscode-cosmosdb",
+        "ms-azure-tools.vscode-docker",
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.vscode-dotnet-runtime",
+        "GitHub.Copilot",
+        "eamodio.gitlens",
+        "ms-python.python",
+        "charliermarsh.ruff"
+      ],
+      "settings": {
+        "terminal.defaultProfile": "PowerShell",
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "[powershell]": {
+          "editor.defaultFormatter": "ms-vscode.powershell",
+          "editor.formatOnSave": true
+        }
+      }
+    }
+  },
+  "remoteEnv": {
+    "HELIOS_ENV": "development",
+    "AZURE_SUBSCRIPTION_ID": "${localEnv:AZURE_SUBSCRIPTION_ID}",
+    "AZURE_TENANT_ID": "${localEnv:AZURE_TENANT_ID}"
+  },
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached",
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.azure,target=/home/vscode/.azure,type=bind,consistency=cached"
+  ],
+  "forwardPorts": [3000, 5000, 5432, 8080, 8443],
+  "portsAttributes": {
+    "3000": {
+      "label": "Web UI",
+      "onAutoForward": "notify"
+    },
+    "5000": {
+      "label": "API Server",
+      "onAutoForward": "notify"
+    },
+    "8080": {
+      "label": "Dashboard",
+      "onAutoForward": "notify"
+    }
+  },
+  "postCreateCommand": "pwsh -Command 'Write-Host \"🚀 HELIOS DevContainer Ready\" -ForegroundColor Cyan; Write-Host \"📦 Installing dependencies...\" -ForegroundColor Yellow; npm install; dotnet restore; pip install -r requirements.txt 2>/dev/null || true; Write-Host \"✅ Setup complete\" -ForegroundColor Green'",
+  "postStartCommand": "pwsh -Command 'Write-Host \"Welcome back to HELIOS Development!\" -ForegroundColor Green'"
+}
