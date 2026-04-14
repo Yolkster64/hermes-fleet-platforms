@@ -1,34 +1,44 @@
 /**
- * HELIOS Modules - Final Consolidated Architecture
- * 3 Core Components unified in single system
+ * HELIOS Modules - 6-Module Production Architecture
+ * GUI + Security + Pattern Learning + AI + USB + Build Agents
  * v7.0 - Production Ready
  */
 
 const { GUIDashboard } = require('./gui-dashboard');
-const { SystemCore, TOOLS } = require('./system-core');
-const { InfrastructureHub } = require('./infrastructure-hub');
+const { SecuritySystem } = require('./security-system');
+const { PatternLearning } = require('./pattern-learning');
+const { AIOrchestrator } = require('./ai-orchestrator');
+const { USBInstaller, TOOLS } = require('./usb-installer');
+const { BuildAgents } = require('./build-agents');
 
 class HELIOS {
   constructor(config = {}) {
     this.version = '7.0';
     this.config = config;
     
-    // Initialize 3 core modules
+    // Initialize 6 core modules
     this.gui = new GUIDashboard(config.gui);
-    this.system = new SystemCore(config.system);
-    this.infrastructure = new InfrastructureHub(config.infrastructure);
+    this.security = new SecuritySystem(config.security);
+    this.patterns = new PatternLearning(config.patterns);
+    this.ai = new AIOrchestrator(config.ai);
+    this.usb = new USBInstaller(config.usb);
+    this.build = new BuildAgents(config.build);
   }
 
   /**
-   * Get comprehensive system status (3 modules)
+   * Get comprehensive system status (all 6 modules)
    */
   getSystemStatus() {
     return {
       version: this.version,
-      modules: {
+      modules: 6,
+      status: {
         gui: this.gui.getMetrics(),
-        system: this.system.getMetrics(),
-        infrastructure: this.infrastructure.getMetrics(),
+        security: this.security.getMetrics(),
+        patterns: this.patterns.getMetrics(),
+        ai: this.ai.getMetrics(),
+        usb: this.usb.getMetrics(),
+        build: this.build.getMetrics(),
       },
       timestamp: Date.now(),
     };
@@ -41,11 +51,14 @@ class HELIOS {
     return {
       status: 'initialized',
       version: this.version,
-      modules: 3,
+      modules: 6,
       core_modules: [
         'gui-dashboard',
-        'system-core',
-        'infrastructure-hub',
+        'security-system',
+        'pattern-learning',
+        'ai-orchestrator',
+        'usb-installer',
+        'build-agents',
       ],
       timestamp: Date.now(),
     };
@@ -58,12 +71,15 @@ class HELIOS {
     const deployments = [];
     
     deployments.push({ component: 'gui', deployed: true });
-    deployments.push({ component: 'system', deployed: true });
-    deployments.push({ component: 'infrastructure', deployed: true });
+    deployments.push({ component: 'security', deployed: true });
+    deployments.push({ component: 'patterns', deployed: true });
+    deployments.push({ component: 'ai', deployed: true });
+    deployments.push({ component: 'usb', deployed: true });
+    deployments.push({ component: 'build', deployed: true });
 
     return {
       status: 'deployment_complete',
-      total_modules: 3,
+      total_modules: 6,
       deployments,
       timestamp: Date.now(),
     };
@@ -84,7 +100,10 @@ class HELIOS {
 module.exports = {
   HELIOS,
   GUIDashboard,
-  SystemCore,
-  InfrastructureHub,
+  SecuritySystem,
+  PatternLearning,
+  AIOrchestrator,
+  USBInstaller,
+  BuildAgents,
   TOOLS,
 };
