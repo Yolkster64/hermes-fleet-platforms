@@ -1,0 +1,40 @@
+{
+  "name": "helios-v4-optimization",
+  "version": "4.0.0",
+  "description": "Performance & Optimization for HELIOS v4.0",
+  "main": "src/index.js",
+  "scripts": {
+    "benchmark": "node tests/benchmark.test.js",
+    "test": "node tests/benchmark.test.js",
+    "build": "webpack --mode production",
+    "dev": "webpack --mode development --watch",
+    "analyze": "ANALYZE=true webpack --mode production"
+  },
+  "keywords": [
+    "helios",
+    "optimization",
+    "performance",
+    "caching",
+    "database",
+    "monitoring"
+  ],
+  "author": "HELIOS Team",
+  "license": "MIT",
+  "dependencies": {
+    "node-cache": "^5.1.2",
+    "zlib": "^1.0.5"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.22.0",
+    "@babel/preset-env": "^7.22.0",
+    "@babel/preset-react": "^7.22.0",
+    "babel-loader": "^9.1.0",
+    "terser-webpack-plugin": "^5.3.0",
+    "webpack": "^5.88.0",
+    "webpack-bundle-analyzer": "^4.9.0",
+    "webpack-cli": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
