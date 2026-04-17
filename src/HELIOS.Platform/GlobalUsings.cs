@@ -27,3 +27,11 @@ global using HELIOS.Platform.Core.ML.Services;
 // HELIOS Phase 3 Observability Services
 global using HELIOS.Platform.Core.Observability.Interfaces;
 global using HELIOS.Platform.Core.Observability.Services;
+
+// HELIOS Phase 3 API & Web Services
+global using HELIOS.Platform.Core.API.Interfaces;
+global using HELIOS.Platform.Core.API.Services;
+
+// HELIOS Phase 3 Production Hardening
+global using HELIOS.Platform.Core.Production.Interfaces;
+global using HELIOS.Platform.Core.Production.Services;

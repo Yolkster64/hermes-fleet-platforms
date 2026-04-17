@@ -73,7 +73,6 @@ namespace HELIOS.Platform
                 var remoteFileTransferService = new RemoteFileTransferService();
                 var remoteCommandExecutor = new RemoteCommandExecutor();
                 var failoverManager = new FailoverManager();
-                var loadBalancer = new LoadBalancer();
                 var replicationService = new ReplicationService();
                 var autoScalingService = new AutoScalingService();
                 var clusterManager = new ClusterManager();
@@ -85,18 +84,7 @@ namespace HELIOS.Platform
                 var resourcePlanner = new ResourcePlanner();
                 var capacityPlanner = new CapacityPlanner();
                 var dataShardingService = new DataShardingEngine();
-                var queryOptimizer = new QueryOptimizer();
                 var distributedCache = new DistributedCacheEngine();
-                var integrationTestService = new IntegrationTestEngine();
-                var performanceValidator = new PerformanceValidator();
-                var systemValidator = new SystemValidator();
-                var documentationService = new DocumentationEngine();
-                var apiDocService = new APIDocumentationEngine();
-                var packageService = new PackagingService();
-                
-                // Phase 2 Batch 16: Integration & Validation Services
-                var phase2Orchestrator = new Phase2OrchestrationService();
-                var productionReadinessValidator = new ProductionReadinessValidator();
                 
                 // Optimization & Resilience Services (Phase 2+ Enhancements)
                 var serviceFactory = new ServiceFactory();
@@ -143,7 +131,6 @@ namespace HELIOS.Platform
                 ServiceContainer.Instance.RegisterSingleton<IRemoteFileTransferService>(remoteFileTransferService);
                 ServiceContainer.Instance.RegisterSingleton<IRemoteCommandExecutor>(remoteCommandExecutor);
                 ServiceContainer.Instance.RegisterSingleton<IFailoverManager>(failoverManager);
-                ServiceContainer.Instance.RegisterSingleton<ILoadBalancer>(loadBalancer);
                 ServiceContainer.Instance.RegisterSingleton<IReplicationService>(replicationService);
                 ServiceContainer.Instance.RegisterSingleton<IAutoScalingService>(autoScalingService);
                 ServiceContainer.Instance.RegisterSingleton<IClusterManager>(clusterManager);
@@ -155,18 +142,20 @@ namespace HELIOS.Platform
                 ServiceContainer.Instance.RegisterSingleton<IPredictiveResourcePlanning>(resourcePlanner);
                 ServiceContainer.Instance.RegisterSingleton<ICapacityPlanningService>(capacityPlanner);
                 ServiceContainer.Instance.RegisterSingleton<IDataShardingService>(dataShardingService);
-                ServiceContainer.Instance.RegisterSingleton<IQueryOptimizationService>(queryOptimizer);
-                ServiceContainer.Instance.RegisterSingleton<IDistributedCachingService>(distributedCache);
-                ServiceContainer.Instance.RegisterSingleton<IIntegrationTestService>(integrationTestService);
-                ServiceContainer.Instance.RegisterSingleton<IPerformanceValidationService>(performanceValidator);
-                ServiceContainer.Instance.RegisterSingleton<ISystemValidationService>(systemValidator);
-                ServiceContainer.Instance.RegisterSingleton<IDocumentationService>(documentationService);
-                ServiceContainer.Instance.RegisterSingleton<IAPIDocumentationService>(apiDocService);
-                ServiceContainer.Instance.RegisterSingleton<IDeploymentPackageService>(packageService);
+                // QueryOptimizer, IntegrationTestService, PerformanceValidator, SystemValidator,  
+                // DocumentationService, APIDocService, PackageService removed - not in current build
+                // ServiceContainer.Instance.RegisterSingleton<IQueryOptimizationService>(queryOptimizer);
+                // ServiceContainer.Instance.RegisterSingleton<IDistributedCachingService>(distributedCache);
+                // ServiceContainer.Instance.RegisterSingleton<IIntegrationTestService>(integrationTestService);
+                // ServiceContainer.Instance.RegisterSingleton<IPerformanceValidationService>(performanceValidator);
+                // ServiceContainer.Instance.RegisterSingleton<ISystemValidationService>(systemValidator);
+                // ServiceContainer.Instance.RegisterSingleton<IDocumentationService>(documentationService);
+                // ServiceContainer.Instance.RegisterSingleton<IAPIDocumentationService>(apiDocService);
+                // ServiceContainer.Instance.RegisterSingleton<IDeploymentPackageService>(packageService);
                 
                 // Phase 2 Batch 16: Integration & Validation Service Registrations
-                ServiceContainer.Instance.RegisterSingleton<IPhase2OrchestrationService>(phase2Orchestrator);
-                ServiceContainer.Instance.RegisterSingleton<IProductionReadinessValidator>(productionReadinessValidator);
+                // ServiceContainer.Instance.RegisterSingleton<IPhase2OrchestrationService>(phase2Orchestrator);
+                // ServiceContainer.Instance.RegisterSingleton<IProductionReadinessValidator>(productionReadinessValidator);
                 
                 // Phase 2+ Enhancements: Service Factory, Batch Operations, Caching, Resilience
                 ServiceContainer.Instance.RegisterSingleton<IServiceFactory>(serviceFactory);
