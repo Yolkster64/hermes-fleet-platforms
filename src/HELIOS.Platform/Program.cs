@@ -22,6 +22,7 @@ using HELIOS.Platform.Core.Backup;
 using HELIOS.Platform.Core.Cloud;
 using HELIOS.Platform.Core.Sandbox;
 using HELIOS.Platform.Core.Hardware;
+using HELIOS.Platform.Core.Integration;
 using HELIOS.Platform.Data.Database;
 
 namespace HELIOS.Platform
@@ -93,6 +94,10 @@ namespace HELIOS.Platform
                 var apiDocService = new APIDocumentationEngine();
                 var packageService = new PackagingService();
                 
+                // Phase 2 Batch 16: Integration & Validation Services
+                var phase2Orchestrator = new Phase2OrchestrationService();
+                var productionReadinessValidator = new ProductionReadinessValidator();
+                
                 // Initialize database context
                 var optionsBuilder = new DbContextOptionsBuilder<HeliosDatabaseContext>();
                 optionsBuilder.UseSqlite("Data Source=helios.db");
@@ -152,6 +157,11 @@ namespace HELIOS.Platform
                 ServiceContainer.Instance.RegisterSingleton<IDocumentationService>(documentationService);
                 ServiceContainer.Instance.RegisterSingleton<IAPIDocumentationService>(apiDocService);
                 ServiceContainer.Instance.RegisterSingleton<IDeploymentPackageService>(packageService);
+                
+                // Phase 2 Batch 16: Integration & Validation Service Registrations
+                ServiceContainer.Instance.RegisterSingleton<IPhase2OrchestrationService>(phase2Orchestrator);
+                ServiceContainer.Instance.RegisterSingleton<IProductionReadinessValidator>(productionReadinessValidator);
+                
                 ServiceContainer.Instance.RegisterSingleton<HeliosDatabaseContext>(dbContext);
                 ServiceContainer.Instance.RegisterSingleton<IDataAccessService>(dataAccessService);
                 

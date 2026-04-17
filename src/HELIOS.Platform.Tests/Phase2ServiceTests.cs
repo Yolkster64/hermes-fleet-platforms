@@ -11,6 +11,7 @@ using HELIOS.Platform.Core.Configuration;
 using HELIOS.Platform.Core.Administration;
 using HELIOS.Platform.Core.Sandbox;
 using HELIOS.Platform.Core.Hardware;
+using HELIOS.Platform.Core.Integration;
 
 namespace HELIOS.Platform.Tests;
 
@@ -2314,6 +2315,137 @@ public class Phase2ServiceTests
         
         var updated = await sandboxService.GetEnvironmentAsync(env.EnvironmentId);
         Assert.Equal(50, updated.CpuLimitPercent);
+    }
+
+    // ============ BATCH 16: PHASE 2 INTEGRATION & VALIDATION TESTS ============
+    
+    [Fact]
+    public async Task Phase2Orchestration_ExecuteWorkflow_SucceedsWithValidWorkflow()
+    {
+        using var logger = new HELIOS.Platform.Core.Logging.ConsoleLogger();
+        var orchestrator = new HELIOS.Platform.Core.Integration.Phase2OrchestrationService();
+        
+        await orchestrator.RegisterWorkflowAsync("test-workflow", async (params) =>
+        {
+            await Task.CompletedTask;
+            return new HELIOS.Platform.Core.Integration.WorkflowResult
+            {
+                Success = true,
+                Data = "workflow-executed"
+            };
+        });
+        
+        var result = await orchestrator.ExecuteIntegratedWorkflowAsync("test-workflow", new());
+        
+        Assert.True(result.Success);
+        Assert.NotEmpty(result.WorkflowId);
+        Assert.True(result.ExecutionTimeMs > 0);
+    }
+
+    [Fact]
+    public async Task Phase2Orchestration_ValidateServices_ReturnsHealthyStatus()
+    {
+        var orchestrator = new HELIOS.Platform.Core.Integration.Phase2OrchestrationService();
+        
+        var report = await orchestrator.ValidateAllServicesAsync();
+        
+        Assert.True(report.OverallHealthy);
+        Assert.NotEmpty(report.Services);
+        Assert.All(report.Services, s => Assert.True(s.IsHealthy));
+    }
+
+    [Fact]
+    public async Task Phase2Orchestration_RegisterMultipleWorkflows_AllExecuteSuccessfully()
+    {
+        var orchestrator = new HELIOS.Platform.Core.Integration.Phase2OrchestrationService();
+        
+        for (int i = 0; i < 5; i++)
+        {
+            await orchestrator.RegisterWorkflowAsync($"workflow-{i}", async (p) =>
+            {
+                await Task.Delay(10);
+                return new HELIOS.Platform.Core.Integration.WorkflowResult { Success = true, Data = i };
+            });
+        }
+        
+        var result1 = await orchestrator.ExecuteIntegratedWorkflowAsync("workflow-0", new());
+        var result2 = await orchestrator.ExecuteIntegratedWorkflowAsync("workflow-4", new());
+        
+        Assert.True(result1.Success);
+        Assert.True(result2.Success);
+    }
+
+    [Fact]
+    public async Task Phase2Orchestration_ExecuteNonexistentWorkflow_ReturnsFailed()
+    {
+        var orchestrator = new HELIOS.Platform.Core.Integration.Phase2OrchestrationService();
+        
+        var result = await orchestrator.ExecuteIntegratedWorkflowAsync("nonexistent", new());
+        
+        Assert.False(result.Success);
+        Assert.Contains("not found", result.Error);
+    }
+
+    [Fact]
+    public async Task Phase2Orchestration_GetMetrics_ReturnsExecutionData()
+    {
+        var orchestrator = new HELIOS.Platform.Core.Integration.Phase2OrchestrationService();
+        
+        await orchestrator.RegisterWorkflowAsync("metric-test", async (p) =>
+        {
+            await Task.CompletedTask;
+            return new HELIOS.Platform.Core.Integration.WorkflowResult { Success = true };
+        });
+        
+        var result = await orchestrator.ExecuteIntegratedWorkflowAsync("metric-test", new());
+        var metrics = await orchestrator.GetMetricsAsync(result.WorkflowId);
+        
+        Assert.NotNull(metrics);
+    }
+
+    [Fact]
+    public async Task ProductionReadiness_ValidatePhase2_ReportsReadiness()
+    {
+        var validator = new HELIOS.Platform.Core.Integration.ProductionReadinessValidator();
+        
+        var report = await validator.ValidatePhase2ReadinessAsync();
+        
+        Assert.NotNull(report);
+        Assert.NotEmpty(report.ChecksPerformed);
+        Assert.True(report.PassedChecks >= 0);
+    }
+
+    [Fact]
+    public async Task ProductionReadiness_IdentifyMissingDependencies_ReturnsEmptyList()
+    {
+        var validator = new HELIOS.Platform.Core.Integration.ProductionReadinessValidator();
+        
+        var dependencies = await validator.IdentifyMissingDependenciesAsync();
+        
+        Assert.NotNull(dependencies);
+        Assert.IsType<List<string>>(dependencies);
+    }
+
+    [Fact]
+    public async Task ProductionReadiness_IdentifySecurityIssues_ReturnsEmptyList()
+    {
+        var validator = new HELIOS.Platform.Core.Integration.ProductionReadinessValidator();
+        
+        var issues = await validator.IdentifySecurityIssuesAsync();
+        
+        Assert.NotNull(issues);
+        Assert.IsType<List<string>>(issues);
+    }
+
+    [Fact]
+    public async Task ProductionReadiness_IdentifyPerformanceIssues_ReturnsEmptyList()
+    {
+        var validator = new HELIOS.Platform.Core.Integration.ProductionReadinessValidator();
+        
+        var issues = await validator.IdentifyPerformanceIssuesAsync();
+        
+        Assert.NotNull(issues);
+        Assert.IsType<List<string>>(issues);
     }
 
     [Fact]
