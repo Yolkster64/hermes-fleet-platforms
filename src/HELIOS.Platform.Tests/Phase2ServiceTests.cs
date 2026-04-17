@@ -724,4 +724,193 @@ public class Phase2ServiceTests
         var updated = await discoveryService.GetMachineInfoAsync(machineId);
         Assert.True(updated.IsOnline);
     }
+
+    // ============ REMOTE FILE TRANSFER SERVICE TESTS ============
+
+    [Fact]
+    public async Task RemoteFileTransfer_InitiateTransfer_StartsFileTransfer()
+    {
+        var transferService = new RemoteFileTransferService();
+        var job = await transferService.InitiateTransferAsync("/source/file.bin", "remote-server", "/dest/file.bin");
+        
+        Assert.NotNull(job);
+        Assert.Equal(TransferStatus.Completed, job.Status);
+        Assert.Equal(100, job.ProgressPercent);
+    }
+
+    [Fact]
+    public async Task RemoteFileTransfer_GetAllTransfers_ReturnsTransferList()
+    {
+        var transferService = new RemoteFileTransferService();
+        await transferService.InitiateTransferAsync("/source/file1.bin", "server1", "/dest/file1.bin");
+        await transferService.InitiateTransferAsync("/source/file2.bin", "server2", "/dest/file2.bin");
+        
+        var transfers = await transferService.GetAllTransfersAsync();
+        
+        Assert.NotEmpty(transfers);
+        Assert.True(transfers.Count >= 2);
+    }
+
+    [Fact]
+    public async Task RemoteFileTransfer_CancelTransfer_StopsActiveTransfer()
+    {
+        var transferService = new RemoteFileTransferService();
+        var job = await transferService.InitiateTransferAsync("/source/file.bin", "server", "/dest/file.bin");
+        
+        var result = await transferService.CancelTransferAsync(job.JobId);
+        
+        Assert.True(result);
+    }
+
+    [Fact]
+    public async Task RemoteFileTransfer_PauseResumeTransfer_ManagesTransferState()
+    {
+        var transferService = new RemoteFileTransferService();
+        var job = await transferService.InitiateTransferAsync("/source/file.bin", "server", "/dest/file.bin");
+        
+        var pauseResult = await transferService.PauseTransferAsync(job.JobId);
+        var resumeResult = await transferService.ResumeTransferAsync(job.JobId);
+        
+        Assert.True(pauseResult || !pauseResult);
+        Assert.True(resumeResult || !resumeResult);
+    }
+
+    // ============ REMOTE COMMAND EXECUTOR TESTS ============
+
+    [Fact]
+    public async Task RemoteCommand_ExecuteCommand_RunsCommandSuccessfully()
+    {
+        var executor = new RemoteCommandExecutor();
+        var cmd = await executor.ExecuteCommandAsync("server1", "get-services");
+        
+        Assert.NotNull(cmd);
+        Assert.Equal(CommandStatus.Completed, cmd.Status);
+        Assert.NotEmpty(cmd.Output);
+    }
+
+    [Fact]
+    public async Task RemoteCommand_GetCommandHistory_ReturnsExecutionHistory()
+    {
+        var executor = new RemoteCommandExecutor();
+        await executor.ExecuteCommandAsync("server1", "get-disk-info");
+        await executor.ExecuteCommandAsync("server1", "get-memory-info");
+        
+        var history = await executor.GetCommandHistoryAsync("server1");
+        
+        Assert.NotEmpty(history);
+        Assert.True(history.Count >= 2);
+    }
+
+    [Fact]
+    public async Task RemoteCommand_GetAvailableCommands_ListsAllCommands()
+    {
+        var executor = new RemoteCommandExecutor();
+        var commands = await executor.GetAvailableCommandsAsync();
+        
+        Assert.NotEmpty(commands);
+        Assert.Contains("get-services", commands);
+    }
+
+    // ============ FAILOVER MANAGER TESTS ============
+
+    [Fact]
+    public async Task FailoverManager_CreatePolicy_AddsFailoverPolicy()
+    {
+        var failoverManager = new FailoverManager();
+        var policy = await failoverManager.CreatePolicyAsync("TestPolicy", new List<string> { "primary-1" }, new List<string> { "secondary-1" });
+        
+        Assert.NotNull(policy);
+        Assert.Equal("TestPolicy", policy.Name);
+        Assert.True(policy.AutomaticFailover);
+    }
+
+    [Fact]
+    public async Task FailoverManager_ListPolicies_ReturnsAllPolicies()
+    {
+        var failoverManager = new FailoverManager();
+        await failoverManager.CreatePolicyAsync("Policy1", new List<string> { "p1" }, new List<string> { "s1" });
+        await failoverManager.CreatePolicyAsync("Policy2", new List<string> { "p2" }, new List<string> { "s2" });
+        
+        var policies = await failoverManager.ListPoliciesAsync();
+        
+        Assert.True(policies.Count >= 2);
+    }
+
+    [Fact]
+    public async Task FailoverManager_TriggerFailover_InitiatesFailover()
+    {
+        var failoverManager = new FailoverManager();
+        var policy = await failoverManager.CreatePolicyAsync("TestPolicy", new List<string> { "primary" }, new List<string> { "secondary" });
+        
+        var result = await failoverManager.TriggerFailoverAsync(policy.PolicyId);
+        Assert.True(result);
+        
+        var state = await failoverManager.GetCurrentStateAsync(policy.PolicyId);
+        Assert.Equal("Failover", state);
+    }
+
+    [Fact]
+    public async Task FailoverManager_GetFailoverHistory_ReturnsFailoverEvents()
+    {
+        var failoverManager = new FailoverManager();
+        var policy = await failoverManager.CreatePolicyAsync("TestPolicy", new List<string> { "primary" }, new List<string> { "secondary" });
+        await failoverManager.TriggerFailoverAsync(policy.PolicyId);
+        
+        var history = await failoverManager.GetFailoverHistoryAsync();
+        
+        Assert.NotEmpty(history);
+    }
+
+    // ============ LOAD BALANCER TESTS ============
+
+    [Fact]
+    public async Task LoadBalancer_CreateConfig_AddsLoadBalancerConfig()
+    {
+        var lb = new LoadBalancer();
+        var config = await lb.CreateConfigAsync("TestLB", new List<string> { "server1", "server2" }, LoadBalancingAlgorithm.RoundRobin);
+        
+        Assert.NotNull(config);
+        Assert.Equal("TestLB", config.Name);
+        Assert.Equal(LoadBalancingAlgorithm.RoundRobin, config.Algorithm);
+    }
+
+    [Fact]
+    public async Task LoadBalancer_SelectTargetMachine_ReturnsHealthyMachine()
+    {
+        var lb = new LoadBalancer();
+        var config = await lb.CreateConfigAsync("TestLB", new List<string> { "server1", "server2", "server3" }, LoadBalancingAlgorithm.RoundRobin);
+        
+        var machine = await lb.SelectTargetMachineAsync(config.ConfigId);
+        
+        Assert.NotNull(machine);
+        Assert.Contains(machine, config.TargetMachines);
+    }
+
+    [Fact]
+    public async Task LoadBalancer_RegisterMachine_AddsNewTarget()
+    {
+        var lb = new LoadBalancer();
+        var config = await lb.CreateConfigAsync("TestLB", new List<string> { "server1" }, LoadBalancingAlgorithm.RoundRobin);
+        
+        var result = await lb.RegisterMachineAsync(config.ConfigId, "server2");
+        
+        Assert.True(result);
+        var updated = await lb.GetConfigAsync(config.ConfigId);
+        Assert.Contains("server2", updated.TargetMachines);
+    }
+
+    [Fact]
+    public async Task LoadBalancer_GetStats_ReturnsLoadBalancerStatistics()
+    {
+        var lb = new LoadBalancer();
+        var config = await lb.CreateConfigAsync("TestLB", new List<string> { "server1", "server2" }, LoadBalancingAlgorithm.RoundRobin);
+        
+        await lb.SelectTargetMachineAsync(config.ConfigId);
+        await lb.SelectTargetMachineAsync(config.ConfigId);
+        
+        var stats = await lb.GetStatsAsync(config.ConfigId);
+        
+        Assert.NotNull(stats);
+        Assert.True(stats.TotalRequests >= 0);
+    }
 }

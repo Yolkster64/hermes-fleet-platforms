@@ -69,6 +69,10 @@ namespace HELIOS.Platform
                 var securityComplianceService = new SecurityComplianceService();
                 var serverAutomationService = new ServerAutomationService();
                 var machineDiscoveryService = new MachineDiscoveryService();
+                var remoteFileTransferService = new RemoteFileTransferService();
+                var remoteCommandExecutor = new RemoteCommandExecutor();
+                var failoverManager = new FailoverManager();
+                var loadBalancer = new LoadBalancer();
                 
                 // Initialize database context
                 var optionsBuilder = new DbContextOptionsBuilder<HeliosDatabaseContext>();
@@ -106,6 +110,10 @@ namespace HELIOS.Platform
                 ServiceContainer.Instance.RegisterSingleton<ISecurityComplianceService>(securityComplianceService);
                 ServiceContainer.Instance.RegisterSingleton<IServerAutomationService>(serverAutomationService);
                 ServiceContainer.Instance.RegisterSingleton<IMachineDiscoveryService>(machineDiscoveryService);
+                ServiceContainer.Instance.RegisterSingleton<IRemoteFileTransferService>(remoteFileTransferService);
+                ServiceContainer.Instance.RegisterSingleton<IRemoteCommandExecutor>(remoteCommandExecutor);
+                ServiceContainer.Instance.RegisterSingleton<IFailoverManager>(failoverManager);
+                ServiceContainer.Instance.RegisterSingleton<ILoadBalancer>(loadBalancer);
                 ServiceContainer.Instance.RegisterSingleton<HeliosDatabaseContext>(dbContext);
                 ServiceContainer.Instance.RegisterSingleton<IDataAccessService>(dataAccessService);
                 
