@@ -1266,4 +1266,163 @@ public class Phase2ServiceTests
         var updated = await eventService.GetEventHandlerAsync(handler.HandlerId);
         Assert.False(updated.IsEnabled);
     }
+
+    // ============ SERVICE HEALTH MONITOR TESTS ============
+
+    [Fact]
+    public async Task ServiceHealth_RegisterService_TracksService()
+    {
+        var healthMonitor = new ServiceDependencyMonitor();
+        var result = await healthMonitor.RegisterServiceAsync("AuthService", new List<string> { "Database" });
+        
+        Assert.True(result);
+        var dependencies = await healthMonitor.GetServiceDependenciesAsync();
+        Assert.Contains(dependencies, d => d.ServiceName == "AuthService");
+    }
+
+    [Fact]
+    public async Task ServiceHealth_CheckHealth_ReturnsServiceStatus()
+    {
+        var healthMonitor = new ServiceDependencyMonitor();
+        await healthMonitor.RegisterServiceAsync("WebService", new List<string>());
+        
+        var health = await healthMonitor.CheckServiceHealthAsync("WebService");
+        
+        Assert.NotNull(health);
+        Assert.Equal(ServiceHealthStatus.Healthy, health.Status);
+        Assert.True(health.ResponseTimeMs > 0);
+    }
+
+    [Fact]
+    public async Task ServiceHealth_CheckAllServices_ReturnsAllStatuses()
+    {
+        var healthMonitor = new ServiceDependencyMonitor();
+        await healthMonitor.RegisterServiceAsync("Service1", new List<string>());
+        await healthMonitor.RegisterServiceAsync("Service2", new List<string>());
+        
+        var health = await healthMonitor.CheckAllServicesAsync();
+        
+        Assert.True(health.Count >= 2);
+    }
+
+    [Fact]
+    public async Task ServiceHealth_GetStatusSummary_ReturnsAllServiceStates()
+    {
+        var healthMonitor = new ServiceDependencyMonitor();
+        await healthMonitor.RegisterServiceAsync("Service1", new List<string>());
+        
+        var summary = await healthMonitor.GetServiceStatusSummaryAsync();
+        
+        Assert.NotEmpty(summary);
+        Assert.Contains("Service1", summary.Keys);
+    }
+
+    [Fact]
+    public async Task ServiceHealth_GetHistory_ReturnsServiceMetrics()
+    {
+        var healthMonitor = new ServiceDependencyMonitor();
+        await healthMonitor.RegisterServiceAsync("Service1", new List<string>());
+        await healthMonitor.CheckServiceHealthAsync("Service1");
+        
+        var history = await healthMonitor.GetHistoryAsync("Service1");
+        
+        Assert.NotEmpty(history);
+        Assert.All(history, h => Assert.NotNull(h.CheckedAt));
+    }
+
+    [Fact]
+    public async Task ServiceHealth_RestartUnhealthy_RecoversServices()
+    {
+        var healthMonitor = new ServiceDependencyMonitor();
+        await healthMonitor.RegisterServiceAsync("BadService", new List<string>());
+        
+        var result = await healthMonitor.RestartUnhealthyServicesAsync();
+        
+        Assert.NotNull(result);
+    }
+
+    // ============ ANOMALY DETECTION SERVICE TESTS ============
+
+    [Fact]
+    public async Task Anomaly_DetectAnomaly_IdentifiesOutliers()
+    {
+        var anomalyService = new AnomalyDetectionEngine();
+        
+        var result = await anomalyService.DetectAnomalyAsync("CPUUsage", 85.0, 40.0);
+        
+        Assert.NotNull(result);
+        Assert.True(result.Deviation > 20);
+        Assert.False(result.IsResolved);
+    }
+
+    [Fact]
+    public async Task Anomaly_GetActiveAnomalies_ReturnsPendingIssues()
+    {
+        var anomalyService = new AnomalyDetectionEngine();
+        await anomalyService.DetectAnomalyAsync("CPUUsage", 85.0, 40.0);
+        
+        var active = await anomalyService.GetActiveAnomaliesAsync();
+        
+        Assert.NotEmpty(active);
+    }
+
+    [Fact]
+    public async Task Anomaly_ResolveAnomaly_MarksAsFixed()
+    {
+        var anomalyService = new AnomalyDetectionEngine();
+        var anomaly = await anomalyService.DetectAnomalyAsync("CPUUsage", 85.0, 40.0);
+        
+        var result = await anomalyService.ResolveAnomalyAsync(anomaly.AnomalyId);
+        
+        Assert.True(result);
+        var updated = await anomalyService.GetActiveAnomaliesAsync();
+        Assert.DoesNotContain(updated, a => a.AnomalyId == anomaly.AnomalyId);
+    }
+
+    [Fact]
+    public async Task Anomaly_ExecuteRemediation_AttemptsRecovery()
+    {
+        var anomalyService = new AnomalyDetectionEngine();
+        var anomaly = await anomalyService.DetectAnomalyAsync("MemoryUsage", 90.0, 50.0);
+        
+        var action = await anomalyService.ExecuteRemediationAsync(anomaly.AnomalyId, "GarbageCollection");
+        
+        Assert.NotNull(action);
+        Assert.Equal(anomaly.AnomalyId, action.AnomalyId);
+    }
+
+    [Fact]
+    public async Task Anomaly_CalculateBaseline_ComputeAverageMetric()
+    {
+        var anomalyService = new AnomalyDetectionEngine();
+        await anomalyService.DetectAnomalyAsync("CPUUsage", 50.0, 45.0);
+        
+        var baseline = await anomalyService.CalculateBaselineAsync("CPUUsage");
+        
+        Assert.True(baseline > 0);
+    }
+
+    [Fact]
+    public async Task Anomaly_GetAnomalySummary_ReturnsStatistics()
+    {
+        var anomalyService = new AnomalyDetectionEngine();
+        await anomalyService.DetectAnomalyAsync("CPUUsage", 80.0, 40.0);
+        
+        var summary = await anomalyService.GetAnomalySummaryAsync();
+        
+        Assert.NotEmpty(summary);
+        Assert.Contains("Total", summary.Keys);
+    }
+
+    [Fact]
+    public async Task Anomaly_GetRemediationHistory_TracksActions()
+    {
+        var anomalyService = new AnomalyDetectionEngine();
+        var anomaly = await anomalyService.DetectAnomalyAsync("CPUUsage", 85.0, 40.0);
+        await anomalyService.ExecuteRemediationAsync(anomaly.AnomalyId, "ScaleUp");
+        
+        var history = await anomalyService.GetRemediationHistoryAsync();
+        
+        Assert.NotEmpty(history);
+    }
 }
