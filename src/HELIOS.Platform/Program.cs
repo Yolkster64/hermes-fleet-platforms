@@ -38,6 +38,7 @@ namespace HELIOS.Platform
                 var dashboardTracker = new DashboardHistoryTracker();
                 var systemManagement = new SystemManagementService();
                 var cliExecutor = new CliCommandExecutor(orchestrator, systemManagement);
+                var hardeningService = new WindowsHardeningService(logger, systemManagement);
                 
                 // Initialize database context
                 var optionsBuilder = new DbContextOptionsBuilder<HeliosDatabaseContext>();
@@ -54,6 +55,7 @@ namespace HELIOS.Platform
                 ServiceContainer.Instance.RegisterSingleton<IDashboardHistoryTracker>(dashboardTracker);
                 ServiceContainer.Instance.RegisterSingleton<ISystemManagementService>(systemManagement);
                 ServiceContainer.Instance.RegisterSingleton<ICommandExecutor>(cliExecutor);
+                ServiceContainer.Instance.RegisterSingleton<IWindowsHardeningService>(hardeningService);
                 ServiceContainer.Instance.RegisterSingleton<HeliosDatabaseContext>(dbContext);
                 ServiceContainer.Instance.RegisterSingleton<IDataAccessService>(dataAccessService);
                 

@@ -519,4 +519,75 @@ public class Phase1ServiceTests
             Assert.True(false, $"Service initialization failed: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// Windows Hardening Service Tests
+    /// </summary>
+    [Fact]
+    public async Task WindowsHardeningService_ApplyHardeningAsync_ReturnsReport()
+    {
+        // Arrange
+        var logger = new ConsoleLogger();
+        var service = new WindowsHardeningService(logger);
+
+        // Act
+        var report = await service.ApplyHardeningAsync();
+
+        // Assert
+        Assert.NotNull(report);
+        Assert.NotNull(report.AppliedSettings);
+        Assert.True(report.CompletedAt > DateTime.MinValue);
+    }
+
+    [Fact]
+    public async Task WindowsHardeningService_GetHardeningStatusAsync_ReturnsStatus()
+    {
+        // Arrange
+        var logger = new ConsoleLogger();
+        var service = new WindowsHardeningService(logger);
+
+        // Act
+        var status = await service.GetHardeningStatusAsync();
+
+        // Assert
+        Assert.NotNull(status);
+        Assert.NotNull(status.OverallStatus);
+        Assert.NotNull(status.SuspiciousServices);
+        Assert.True(status.OpenPorts >= 0);
+    }
+
+    [Fact]
+    public async Task WindowsHardeningService_VerifyHardeningAsync_ReturnsIssuesList()
+    {
+        // Arrange
+        var logger = new ConsoleLogger();
+        var service = new WindowsHardeningService(logger);
+
+        // Act
+        var issues = await service.VerifyHardeningAsync();
+
+        // Assert
+        Assert.NotNull(issues);
+        Assert.IsType<List<HardeningIssue>>(issues);
+    }
+
+    [Fact]
+    public async Task WindowsHardeningService_HardeningStatusCategories_AreValid()
+    {
+        // Arrange
+        var logger = new ConsoleLogger();
+        var service = new WindowsHardeningService(logger);
+
+        // Act
+        var status = await service.GetHardeningStatusAsync();
+
+        // Assert
+        Assert.True(
+            status.OverallStatus == "Secure" ||
+            status.OverallStatus == "Warning" ||
+            status.OverallStatus == "Critical" ||
+            status.OverallStatus == "Error",
+            $"Invalid status: {status.OverallStatus}"
+        );
+    }
 }
