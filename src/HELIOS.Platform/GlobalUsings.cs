@@ -35,3 +35,6 @@ global using HELIOS.Platform.Core.API.Services;
 // HELIOS Phase 3 Production Hardening
 global using HELIOS.Platform.Core.Production.Interfaces;
 global using HELIOS.Platform.Core.Production.Services;
+
+// HELIOS Phase 4 Performance Optimization
+global using HELIOS.Platform.Core.Performance;
