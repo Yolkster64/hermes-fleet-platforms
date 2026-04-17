@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using HELIOS.Platform.Core;
 using HELIOS.Platform.BackendServices.ServerManagement;
@@ -7,6 +8,7 @@ using HELIOS.Platform.Core.Diagnostics;
 using HELIOS.Platform.Core.Storage;
 using HELIOS.Platform.Core.Configuration;
 using HELIOS.Platform.Core.Security;
+using HELIOS.Platform.Core.Monitoring;
 
 namespace HELIOS.Platform
 {
@@ -29,6 +31,7 @@ namespace HELIOS.Platform
                 var storage = new StorageManager();
                 var config = new Core.Configuration.ConfigurationManager();
                 var encryption = new EncryptionManager();
+                var dashboardTracker = new DashboardHistoryTracker();
                 
                 ServiceContainer.Instance.RegisterSingleton<Core.Logging.ILogger>(logger);
                 ServiceContainer.Instance.RegisterSingleton<IServiceOrchestrator>(orchestrator);
@@ -36,6 +39,7 @@ namespace HELIOS.Platform
                 ServiceContainer.Instance.RegisterSingleton<StorageManager>(storage);
                 ServiceContainer.Instance.RegisterSingleton<Core.Configuration.ConfigurationManager>(config);
                 ServiceContainer.Instance.RegisterSingleton<EncryptionManager>(encryption);
+                ServiceContainer.Instance.RegisterSingleton<IDashboardHistoryTracker>(dashboardTracker);
                 
                 logger.Info("HELIOS Platform initialized successfully");
                 
@@ -118,28 +122,140 @@ namespace HELIOS.Platform
         {
             Console.Clear();
             Console.WriteLine("╔════════════════════════════════════════════════════════════════╗");
-            Console.WriteLine("║                        DASHBOARD                               ║");
+            Console.WriteLine("║                     DASHBOARD (Real-Time)                      ║");
+            Console.WriteLine("║                   Press ESC to return to menu                  ║");
             Console.WriteLine("╚════════════════════════════════════════════════════════════════╝\n");
 
-            try
-            {
-                var orchestrator = ServiceContainer.Instance.GetService<IServiceOrchestrator>();
-                var resources = await orchestrator.GetSystemResourcesAsync();
-                
-                Console.WriteLine($"CPU Usage:        {resources?.CpuUsagePercent:F1}%");
-                Console.WriteLine($"Memory Usage:     {resources?.MemoryUsageMB} MB");
-                Console.WriteLine($"System Uptime:    {resources?.SystemUptimeSeconds} seconds");
-                Console.WriteLine($"Active Services:  {resources?.ActiveServices}");
-            }
-            catch (Exception ex)
+            var orchestrator = ServiceContainer.Instance.GetService<IServiceOrchestrator>();
+            var dashboardTracker = ServiceContainer.Instance.GetService<IDashboardHistoryTracker>();
+            
+            if (orchestrator == null || dashboardTracker == null)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"[ERROR] {ex.Message}");
+                Console.WriteLine("[ERROR] Dashboard services not initialized");
                 Console.ResetColor();
+                Console.ReadKey();
+                return;
             }
 
-            Console.WriteLine("\nPress any key to return to main menu...");
-            Console.ReadKey();
+            // Enable real-time updates with refresh
+            using (var cts = new CancellationTokenSource())
+            {
+                try
+                {
+                    // Start background metric collection task
+                    var collectionTask = Task.Run(async () =>
+                    {
+                        while (!cts.Token.IsCancellationRequested)
+                        {
+                            try
+                            {
+                                var resources = await orchestrator.GetSystemResourcesAsync();
+                                await dashboardTracker.RecordMetricAsync(resources);
+                                await Task.Delay(1000, cts.Token); // Collect every second
+                            }
+                            catch { }
+                        }
+                    }, cts.Token);
+
+                    // Display loop
+                    while (true)
+                    {
+                        if (Console.KeyAvailable)
+                        {
+                            var key = Console.ReadKey(true);
+                            if (key.Key == ConsoleKey.Escape)
+                            {
+                                cts.Cancel();
+                                break;
+                            }
+                        }
+
+                        Console.Clear();
+                        Console.WriteLine("╔════════════════════════════════════════════════════════════════╗");
+                        Console.WriteLine("║                     DASHBOARD (Real-Time)                      ║");
+                        Console.WriteLine("║                   Press ESC to return to menu                  ║");
+                        Console.WriteLine("╚════════════════════════════════════════════════════════════════╝\n");
+
+                        try
+                        {
+                            // Get current resources
+                            var resources = await orchestrator.GetSystemResourcesAsync();
+                            
+                            // Display current metrics
+                            Console.ForegroundColor = ConsoleColor.Cyan;
+                            Console.WriteLine("┌─ CURRENT METRICS ─────────────────────────────────────────────┐");
+                            Console.ResetColor();
+                            Console.WriteLine($"  CPU Usage:            {resources.CpuUsagePercent:F1}%");
+                            Console.WriteLine($"  Memory Usage:         {resources.MemoryUsageMB} MB / {resources.AvailableMemoryMB + resources.MemoryUsageMB} MB");
+                            Console.WriteLine($"  Disk Usage:           {resources.DiskUsagePercent}%");
+                            Console.WriteLine($"  System Uptime:        {FormatUptime(resources.SystemUptimeSeconds)}");
+                            Console.WriteLine($"  Active Services:      {resources.ActiveServices}");
+                            Console.WriteLine($"  Total Processes:      {resources.TotalProcesses}");
+                            Console.WriteLine("└───────────────────────────────────────────────────────────────┘\n");
+
+                            // Get and display statistics
+                            var stats = await dashboardTracker.GetDashboardStatsAsync();
+                            
+                            Console.ForegroundColor = ConsoleColor.Yellow;
+                            Console.WriteLine("┌─ STATISTICS (Last Hour) ──────────────────────────────────────┐");
+                            Console.ResetColor();
+                            Console.WriteLine($"  CPU:    Avg: {stats.CpuAverage:F1}%  │  Peak: {stats.CpuPeak:F1}%  │  Min: {stats.CpuMin:F1}%");
+                            Console.WriteLine($"  Memory: Avg: {stats.MemoryAverage:F0} MB  │  Peak: {stats.MemoryPeak} MB  │  Min: {stats.MemoryMin} MB");
+                            Console.WriteLine($"  Disk:   Avg: {stats.DiskAverage}%");
+                            Console.WriteLine("└───────────────────────────────────────────────────────────────┘\n");
+
+                            // Display health status and alerts
+                            Console.ForegroundColor = stats.HealthStatus.StartsWith("✓") ? ConsoleColor.Green :
+                                                     stats.HealthStatus.StartsWith("⚠") ? ConsoleColor.Yellow : ConsoleColor.Red;
+                            Console.WriteLine($"HEALTH STATUS: {stats.HealthStatus}");
+                            Console.ResetColor();
+
+                            if (stats.Alerts.Count > 0)
+                            {
+                                Console.ForegroundColor = ConsoleColor.Yellow;
+                                Console.WriteLine("\nALERTS:");
+                                foreach (var alert in stats.Alerts)
+                                {
+                                    Console.WriteLine($"  {alert}");
+                                }
+                                Console.ResetColor();
+                            }
+
+                            Console.WriteLine("\n[Refreshing every second... Press ESC to return]");
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine($"[ERROR] {ex.Message}");
+                            Console.ResetColor();
+                        }
+
+                        await Task.Delay(1000); // Update display every second
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"[ERROR] Dashboard error: {ex.Message}");
+                    Console.ResetColor();
+                    Console.ReadKey();
+                }
+            }
+        }
+
+        static string FormatUptime(long seconds)
+        {
+            var days = seconds / 86400;
+            var hours = (seconds % 86400) / 3600;
+            var minutes = (seconds % 3600) / 60;
+            var secs = seconds % 60;
+            
+            if (days > 0)
+                return $"{days}d {hours}h {minutes}m";
+            if (hours > 0)
+                return $"{hours}h {minutes}m {secs}s";
+            return $"{minutes}m {secs}s";
         }
 
         static async Task ShowSystemManagement()
