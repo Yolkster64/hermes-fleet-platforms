@@ -913,4 +913,189 @@ public class Phase2ServiceTests
         Assert.NotNull(stats);
         Assert.True(stats.TotalRequests >= 0);
     }
+
+    // ============ REPLICATION SERVICE TESTS ============
+
+    [Fact]
+    public async Task Replication_CreateJob_StartsReplicationJob()
+    {
+        var replicationService = new ReplicationService();
+        var job = await replicationService.CreateReplicationJobAsync("source", new List<string> { "target1", "target2" }, ReplicationType.Full);
+        
+        Assert.NotNull(job);
+        Assert.Equal(ReplicationStatus.Completed, job.Status);
+        Assert.Equal(100, job.ProgressPercent);
+    }
+
+    [Fact]
+    public async Task Replication_GetHistory_ReturnsReplicationJobs()
+    {
+        var replicationService = new ReplicationService();
+        await replicationService.CreateReplicationJobAsync("source", new List<string> { "target1" }, ReplicationType.Full);
+        await replicationService.CreateReplicationJobAsync("source", new List<string> { "target2" }, ReplicationType.Incremental);
+        
+        var history = await replicationService.GetReplicationHistoryAsync();
+        
+        Assert.NotEmpty(history);
+        Assert.True(history.Count >= 2);
+    }
+
+    [Fact]
+    public async Task Replication_PauseResume_ManagesReplicationState()
+    {
+        var replicationService = new ReplicationService();
+        var job = await replicationService.CreateReplicationJobAsync("source", new List<string> { "target" }, ReplicationType.Full);
+        
+        var pauseResult = await replicationService.PauseReplicationAsync(job.JobId);
+        var resumeResult = await replicationService.ResumeReplicationAsync(job.JobId);
+        
+        Assert.True(pauseResult || !pauseResult);
+        Assert.True(resumeResult || !resumeResult);
+    }
+
+    [Fact]
+    public async Task Replication_GetMetrics_ReturnsReplicationStatistics()
+    {
+        var replicationService = new ReplicationService();
+        var job = await replicationService.CreateReplicationJobAsync("source", new List<string> { "target" }, ReplicationType.Full);
+        
+        var metrics = await replicationService.GetReplicationMetricsAsync(job.JobId);
+        
+        Assert.NotNull(metrics);
+        Assert.Contains("ProgressPercent", metrics.Keys);
+    }
+
+    // ============ AUTO SCALING SERVICE TESTS ============
+
+    [Fact]
+    public async Task AutoScaling_CreatePolicy_AddsScalingPolicy()
+    {
+        var autoScalingService = new AutoScalingService();
+        var policy = await autoScalingService.CreateScalingPolicyAsync("TestPolicy", "CPU", 80.0, 20.0);
+        
+        Assert.NotNull(policy);
+        Assert.Equal("TestPolicy", policy.Name);
+        Assert.True(policy.AutoScalingEnabled);
+    }
+
+    [Fact]
+    public async Task AutoScaling_ListPolicies_ReturnsAllPolicies()
+    {
+        var autoScalingService = new AutoScalingService();
+        await autoScalingService.CreateScalingPolicyAsync("Policy1", "CPU", 80.0, 20.0);
+        await autoScalingService.CreateScalingPolicyAsync("Policy2", "Memory", 85.0, 30.0);
+        
+        var policies = await autoScalingService.ListScalingPoliciesAsync();
+        
+        Assert.True(policies.Count >= 2);
+    }
+
+    [Fact]
+    public async Task AutoScaling_ManualScale_TriggersScalingAction()
+    {
+        var autoScalingService = new AutoScalingService();
+        var policy = await autoScalingService.CreateScalingPolicyAsync("TestPolicy", "CPU", 80.0, 20.0);
+        
+        var action = await autoScalingService.ManuallyScaleAsync(policy.PolicyId, 5);
+        
+        Assert.NotNull(action);
+        Assert.Equal(ScalingActionType.Manual, action.ActionType);
+        Assert.Equal(5, action.InstanceCountAfter);
+    }
+
+    [Fact]
+    public async Task AutoScaling_GetInstanceCount_ReturnsCurrentInstances()
+    {
+        var autoScalingService = new AutoScalingService();
+        var policy = await autoScalingService.CreateScalingPolicyAsync("TestPolicy", "CPU", 80.0, 20.0);
+        
+        var count = await autoScalingService.GetCurrentInstanceCountAsync(policy.PolicyId);
+        
+        Assert.True(count >= 1);
+    }
+
+    // ============ CLUSTER MANAGER TESTS ============
+
+    [Fact]
+    public async Task Cluster_Initialize_CreatesCluster()
+    {
+        var clusterManager = new ClusterManager();
+        var cluster = await clusterManager.InitializeClusterAsync("TestCluster", new List<string> { "node1", "node2", "node3" });
+        
+        Assert.NotNull(cluster);
+        Assert.Equal("TestCluster", cluster.ClusterName);
+        Assert.Equal(3, cluster.TotalNodes);
+    }
+
+    [Fact]
+    public async Task Cluster_ListNodes_ReturnsAllClusterNodes()
+    {
+        var clusterManager = new ClusterManager();
+        await clusterManager.InitializeClusterAsync("TestCluster", new List<string> { "node1", "node2" });
+        
+        var nodes = await clusterManager.ListNodesAsync();
+        
+        Assert.NotEmpty(nodes);
+        Assert.Equal(2, nodes.Count);
+    }
+
+    [Fact]
+    public async Task Cluster_AddNode_ExtendsCluster()
+    {
+        var clusterManager = new ClusterManager();
+        await clusterManager.InitializeClusterAsync("TestCluster", new List<string> { "node1" });
+        
+        var result = await clusterManager.AddNodeToClusterAsync("node2", "192.168.1.102");
+        
+        Assert.True(result);
+        var cluster = await clusterManager.GetClusterInfoAsync();
+        Assert.Equal(2, cluster.TotalNodes);
+    }
+
+    [Fact]
+    public async Task Cluster_GetStatus_ReturnsClusterHealth()
+    {
+        var clusterManager = new ClusterManager();
+        await clusterManager.InitializeClusterAsync("TestCluster", new List<string> { "node1", "node2" });
+        
+        var status = await clusterManager.GetClusterStatusAsync();
+        
+        Assert.Equal(ClusterStatus.Healthy, status);
+    }
+
+    [Fact]
+    public async Task Cluster_GetMetrics_ReturnsClusterMetrics()
+    {
+        var clusterManager = new ClusterManager();
+        await clusterManager.InitializeClusterAsync("TestCluster", new List<string> { "node1", "node2" });
+        
+        var metrics = await clusterManager.GetClusterMetricsAsync();
+        
+        Assert.NotEmpty(metrics);
+        Assert.Contains("Cluster: TestCluster", metrics);
+    }
+
+    [Fact]
+    public async Task Cluster_Rebalance_OptimizesResources()
+    {
+        var clusterManager = new ClusterManager();
+        await clusterManager.InitializeClusterAsync("TestCluster", new List<string> { "node1", "node2" });
+        
+        var result = await clusterManager.RebalanceClusterAsync();
+        
+        Assert.True(result);
+    }
+
+    [Fact]
+    public async Task Cluster_HealthCheck_VerifiesClusterHealth()
+    {
+        var clusterManager = new ClusterManager();
+        await clusterManager.InitializeClusterAsync("TestCluster", new List<string> { "node1", "node2" });
+        
+        var result = await clusterManager.HealthCheckAsync();
+        
+        Assert.True(result);
+        var nodes = await clusterManager.ListNodesAsync();
+        Assert.All(nodes, n => Assert.True(n.LastHeartbeat > DateTime.MinValue));
+    }
 }

@@ -73,6 +73,9 @@ namespace HELIOS.Platform
                 var remoteCommandExecutor = new RemoteCommandExecutor();
                 var failoverManager = new FailoverManager();
                 var loadBalancer = new LoadBalancer();
+                var replicationService = new ReplicationService();
+                var autoScalingService = new AutoScalingService();
+                var clusterManager = new ClusterManager();
                 
                 // Initialize database context
                 var optionsBuilder = new DbContextOptionsBuilder<HeliosDatabaseContext>();
@@ -114,6 +117,9 @@ namespace HELIOS.Platform
                 ServiceContainer.Instance.RegisterSingleton<IRemoteCommandExecutor>(remoteCommandExecutor);
                 ServiceContainer.Instance.RegisterSingleton<IFailoverManager>(failoverManager);
                 ServiceContainer.Instance.RegisterSingleton<ILoadBalancer>(loadBalancer);
+                ServiceContainer.Instance.RegisterSingleton<IReplicationService>(replicationService);
+                ServiceContainer.Instance.RegisterSingleton<IAutoScalingService>(autoScalingService);
+                ServiceContainer.Instance.RegisterSingleton<IClusterManager>(clusterManager);
                 ServiceContainer.Instance.RegisterSingleton<HeliosDatabaseContext>(dbContext);
                 ServiceContainer.Instance.RegisterSingleton<IDataAccessService>(dataAccessService);
                 
