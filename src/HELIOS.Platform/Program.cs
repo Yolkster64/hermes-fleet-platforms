@@ -80,6 +80,9 @@ namespace HELIOS.Platform
                 var eventDrivenOrchestration = new EventDrivenOrchestration();
                 var serviceHealthMonitor = new ServiceDependencyMonitor();
                 var anomalyDetectionService = new AnomalyDetectionEngine();
+                var mlService = new MachineLearningEngine();
+                var resourcePlanner = new ResourcePlanner();
+                var capacityPlanner = new CapacityPlanner();
                 
                 // Initialize database context
                 var optionsBuilder = new DbContextOptionsBuilder<HeliosDatabaseContext>();
@@ -128,6 +131,9 @@ namespace HELIOS.Platform
                 ServiceContainer.Instance.RegisterSingleton<IEventDrivenOrchestration>(eventDrivenOrchestration);
                 ServiceContainer.Instance.RegisterSingleton<IServiceHealthMonitor>(serviceHealthMonitor);
                 ServiceContainer.Instance.RegisterSingleton<IAnomalyDetectionService>(anomalyDetectionService);
+                ServiceContainer.Instance.RegisterSingleton<IMachineLearningService>(mlService);
+                ServiceContainer.Instance.RegisterSingleton<IPredictiveResourcePlanning>(resourcePlanner);
+                ServiceContainer.Instance.RegisterSingleton<ICapacityPlanningService>(capacityPlanner);
                 ServiceContainer.Instance.RegisterSingleton<HeliosDatabaseContext>(dbContext);
                 ServiceContainer.Instance.RegisterSingleton<IDataAccessService>(dataAccessService);
                 

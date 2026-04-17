@@ -1425,4 +1425,188 @@ public class Phase2ServiceTests
         
         Assert.NotEmpty(history);
     }
+
+    // ============ MACHINE LEARNING SERVICE TESTS ============
+
+    [Fact]
+    public async Task ML_TrainModel_CreatesNewModel()
+    {
+        var mlService = new MachineLearningEngine();
+        var trainingData = new List<Dictionary<string, double>>
+        {
+            new() { { "feature1", 1.0 }, { "feature2", 2.0 } },
+            new() { { "feature1", 2.0 }, { "feature2", 4.0 } }
+        };
+        
+        var model = await mlService.TrainModelAsync("CPUPredictor", "regression", trainingData);
+        
+        Assert.NotNull(model);
+        Assert.Equal("CPUPredictor", model.ModelName);
+        Assert.True(model.Accuracy > 0);
+    }
+
+    [Fact]
+    public async Task ML_ListModels_ReturnsAllModels()
+    {
+        var mlService = new MachineLearningEngine();
+        var trainingData = new List<Dictionary<string, double>> { new() { { "f", 1.0 } } };
+        
+        await mlService.TrainModelAsync("Model1", "regression", trainingData);
+        await mlService.TrainModelAsync("Model2", "classification", trainingData);
+        
+        var models = await mlService.ListModelsAsync();
+        
+        Assert.True(models.Count >= 2);
+    }
+
+    [Fact]
+    public async Task ML_ActivateModel_SetsModelAsActive()
+    {
+        var mlService = new MachineLearningEngine();
+        var trainingData = new List<Dictionary<string, double>> { new() { { "f", 1.0 } } };
+        var model = await mlService.TrainModelAsync("TestModel", "regression", trainingData);
+        
+        var result = await mlService.ActivateModelAsync(model.ModelId);
+        
+        Assert.True(result);
+        var updated = await mlService.GetModelAsync(model.ModelId);
+        Assert.True(updated.IsActive);
+    }
+
+    [Fact]
+    public async Task ML_MakePrediction_ReturnsAccuratePrediction()
+    {
+        var mlService = new MachineLearningEngine();
+        var trainingData = new List<Dictionary<string, double>> { new() { { "f", 1.0 } } };
+        var model = await mlService.TrainModelAsync("TestModel", "regression", trainingData);
+        await mlService.ActivateModelAsync(model.ModelId);
+        
+        var prediction = await mlService.MakePredictionAsync(model.ModelId, new Dictionary<string, double> { { "f", 2.0 } });
+        
+        Assert.NotNull(prediction);
+        Assert.Equal(model.ModelId, prediction.ModelId);
+    }
+
+    [Fact]
+    public async Task ML_GetPredictionHistory_ReturnsAllPredictions()
+    {
+        var mlService = new MachineLearningEngine();
+        var trainingData = new List<Dictionary<string, double>> { new() { { "f", 1.0 } } };
+        var model = await mlService.TrainModelAsync("TestModel", "regression", trainingData);
+        await mlService.ActivateModelAsync(model.ModelId);
+        await mlService.MakePredictionAsync(model.ModelId, new Dictionary<string, double> { { "f", 1.0 } });
+        
+        var history = await mlService.GetPredictionHistoryAsync(model.ModelId);
+        
+        Assert.NotEmpty(history);
+    }
+
+    [Fact]
+    public async Task ML_GetModelAccuracy_ReturnsAccuracyScore()
+    {
+        var mlService = new MachineLearningEngine();
+        var trainingData = new List<Dictionary<string, double>> { new() { { "f", 1.0 } } };
+        var model = await mlService.TrainModelAsync("TestModel", "regression", trainingData);
+        
+        var accuracy = await mlService.GetModelAccuracyAsync(model.ModelId);
+        
+        Assert.True(accuracy > 0.8 && accuracy <= 1.0);
+    }
+
+    // ============ PREDICTIVE RESOURCE PLANNING TESTS ============
+
+    [Fact]
+    public async Task ResourcePlanning_AnalyzeWorkload_IdentifiesPatterns()
+    {
+        var planner = new ResourcePlanner();
+        var loadHistory = new List<double> { 10, 20, 30, 50, 40, 35 };
+        
+        var pattern = await planner.AnalyzeWorkloadAsync("WebApp", loadHistory);
+        
+        Assert.NotNull(pattern);
+        Assert.Equal("WebApp", pattern.WorkloadName);
+        Assert.True(pattern.AverageLoad > 0);
+    }
+
+    [Fact]
+    public async Task ResourcePlanning_PredictResourceNeeds_RecommendAllocation()
+    {
+        var planner = new ResourcePlanner();
+        var pattern = await planner.AnalyzeWorkloadAsync("WebApp", new List<double> { 10, 20, 30, 50 });
+        
+        var allocation = await planner.PredictResourceNeedsAsync(pattern.PatternId);
+        
+        Assert.NotNull(allocation);
+        Assert.True(allocation.RecommendedCPU > 0);
+    }
+
+    [Fact]
+    public async Task ResourcePlanning_ApplyAllocation_UpdatesResourceConfig()
+    {
+        var planner = new ResourcePlanner();
+        var pattern = await planner.AnalyzeWorkloadAsync("WebApp", new List<double> { 10, 20, 30 });
+        var allocation = await planner.PredictResourceNeedsAsync(pattern.PatternId);
+        
+        var result = await planner.ApplyAllocationAsync(allocation.AllocationId);
+        
+        Assert.True(result);
+    }
+
+    [Fact]
+    public async Task ResourcePlanning_GetResourceUtilization_ReturnsMetrics()
+    {
+        var planner = new ResourcePlanner();
+        
+        var utilization = await planner.GetResourceUtilizationAsync();
+        
+        Assert.NotEmpty(utilization);
+        Assert.Contains("CPU", utilization.Keys);
+    }
+
+    // ============ CAPACITY PLANNING SERVICE TESTS ============
+
+    [Fact]
+    public async Task Capacity_PredictCapacity_ForecastsUsage()
+    {
+        var planner = new CapacityPlanner();
+        
+        var prediction = await planner.PredictCapacityAsync(30);
+        
+        Assert.NotEmpty(prediction);
+        Assert.Contains("CPU", prediction.Keys);
+    }
+
+    [Fact]
+    public async Task Capacity_GetCapacityWarnings_IdentifiesBottlenecks()
+    {
+        var planner = new CapacityPlanner();
+        
+        var warnings = await planner.GetCapacityWarningsAsync();
+        
+        Assert.NotNull(warnings);
+    }
+
+    [Fact]
+    public async Task Capacity_TriggerExpansion_IncreasesCapacity()
+    {
+        var planner = new CapacityPlanner();
+        var currentCapacity = await planner.GetCurrentCapacityAsync();
+        var cpuBefore = currentCapacity["CPU"];
+        
+        await planner.TriggerCapacityExpansionAsync();
+        
+        var newCapacity = await planner.GetCurrentCapacityAsync();
+        Assert.True(newCapacity["CPU"] > cpuBefore);
+    }
+
+    [Fact]
+    public async Task Capacity_GetGrowthTrends_ReturnsGrowthRates()
+    {
+        var planner = new CapacityPlanner();
+        
+        var trends = await planner.GetGrowthTrendsAsync();
+        
+        Assert.NotEmpty(trends);
+        Assert.Contains("CPU_Growth", trends.Keys);
+    }
 }
