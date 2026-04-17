@@ -59,6 +59,7 @@ namespace HELIOS.Platform
                 var backupService = new BackupService(logger);
                 var monitoringService = new ServerMonitoringService(logger);
                 var cloudService = new CloudIntegrationService(logger);
+                var advancedConfigManager = new AdvancedConfigManager();
                 
                 // Initialize database context
                 var optionsBuilder = new DbContextOptionsBuilder<HeliosDatabaseContext>();
@@ -88,6 +89,7 @@ namespace HELIOS.Platform
                 ServiceContainer.Instance.RegisterSingleton<IBackupService>(backupService);
                 ServiceContainer.Instance.RegisterSingleton<IServerMonitoringService>(monitoringService);
                 ServiceContainer.Instance.RegisterSingleton<ICloudIntegrationService>(cloudService);
+                ServiceContainer.Instance.RegisterSingleton<IAdvancedConfigManager>(advancedConfigManager);
                 ServiceContainer.Instance.RegisterSingleton<HeliosDatabaseContext>(dbContext);
                 ServiceContainer.Instance.RegisterSingleton<IDataAccessService>(dataAccessService);
                 
