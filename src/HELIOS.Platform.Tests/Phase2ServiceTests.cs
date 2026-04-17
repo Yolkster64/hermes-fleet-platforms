@@ -1098,4 +1098,172 @@ public class Phase2ServiceTests
         var nodes = await clusterManager.ListNodesAsync();
         Assert.All(nodes, n => Assert.True(n.LastHeartbeat > DateTime.MinValue));
     }
+
+    // ============ CONTAINER ORCHESTRATION SERVICE TESTS ============
+
+    [Fact]
+    public async Task Container_PullImage_DownloadsContainerImage()
+    {
+        var containerService = new ContainerOrchestrationService();
+        var image = await containerService.PullImageAsync("myapp", "1.0");
+        
+        Assert.NotNull(image);
+        Assert.Equal("myapp", image.ImageName);
+        Assert.Equal("1.0", image.Tag);
+    }
+
+    [Fact]
+    public async Task Container_ListImages_ReturnsAllImages()
+    {
+        var containerService = new ContainerOrchestrationService();
+        var images = await containerService.ListImagesAsync();
+        
+        Assert.NotEmpty(images);
+    }
+
+    [Fact]
+    public async Task Container_CreateInstance_StartsContainer()
+    {
+        var containerService = new ContainerOrchestrationService();
+        var images = await containerService.ListImagesAsync();
+        var imageId = images.First().ImageId;
+        
+        var container = await containerService.CreateContainerAsync(imageId, "test-container", new Dictionary<string, string>());
+        
+        Assert.NotNull(container);
+        Assert.Equal("test-container", container.ContainerName);
+    }
+
+    [Fact]
+    public async Task Container_StartStop_ManagesContainerLifecycle()
+    {
+        var containerService = new ContainerOrchestrationService();
+        var images = await containerService.ListImagesAsync();
+        var container = await containerService.CreateContainerAsync(images.First().ImageId, "test", new Dictionary<string, string>());
+        
+        var startResult = await containerService.StartContainerAsync(container.ContainerId);
+        var stopResult = await containerService.StopContainerAsync(container.ContainerId);
+        
+        Assert.True(startResult);
+        Assert.True(stopResult);
+    }
+
+    [Fact]
+    public async Task Container_GetLogs_ReturnsContainerOutput()
+    {
+        var containerService = new ContainerOrchestrationService();
+        var images = await containerService.ListImagesAsync();
+        var container = await containerService.CreateContainerAsync(images.First().ImageId, "test", new Dictionary<string, string>());
+        
+        var logs = await containerService.GetContainerLogsAsync(container.ContainerId);
+        
+        Assert.NotEmpty(logs);
+        Assert.Contains("listening", logs);
+    }
+
+    [Fact]
+    public async Task Container_RestartContainer_RestartsSuccessfully()
+    {
+        var containerService = new ContainerOrchestrationService();
+        var images = await containerService.ListImagesAsync();
+        var container = await containerService.CreateContainerAsync(images.First().ImageId, "test", new Dictionary<string, string>());
+        await containerService.StartContainerAsync(container.ContainerId);
+        
+        var result = await containerService.RestartContainerAsync(container.ContainerId);
+        
+        Assert.True(result);
+    }
+
+    // ============ EVENT DRIVEN ORCHESTRATION TESTS ============
+
+    [Fact]
+    public async Task EventDriven_RegisterHandler_CreatesEventHandler()
+    {
+        var eventService = new EventDrivenOrchestration();
+        var handler = await eventService.RegisterEventHandlerAsync(
+            "SystemAlert",
+            new List<string> { "CPUHigh", "MemoryHigh" },
+            new List<string> { "NotifyAdmin", "ScaleUp" }
+        );
+        
+        Assert.NotNull(handler);
+        Assert.Equal("SystemAlert", handler.EventType);
+        Assert.True(handler.IsEnabled);
+    }
+
+    [Fact]
+    public async Task EventDriven_ListHandlers_ReturnsAllHandlers()
+    {
+        var eventService = new EventDrivenOrchestration();
+        await eventService.RegisterEventHandlerAsync("Event1", new List<string> { "Trigger1" }, new List<string> { "Action1" });
+        await eventService.RegisterEventHandlerAsync("Event2", new List<string> { "Trigger2" }, new List<string> { "Action2" });
+        
+        var handlers = await eventService.ListEventHandlersAsync();
+        
+        Assert.True(handlers.Count >= 2);
+    }
+
+    [Fact]
+    public async Task EventDriven_TriggerEvent_ExecutesHandlers()
+    {
+        var eventService = new EventDrivenOrchestration();
+        await eventService.RegisterEventHandlerAsync("SystemAlert", new List<string> { "CPU" }, new List<string> { "Scale" });
+        
+        var @event = new SystemEvent
+        {
+            EventType = "SystemAlert",
+            Source = "Monitor",
+            Severity = "High",
+            Message = "CPU usage high"
+        };
+        
+        var result = await eventService.TriggerEventAsync(@event);
+        
+        Assert.True(result);
+    }
+
+    [Fact]
+    public async Task EventDriven_GetEventHistory_ReturnsEvents()
+    {
+        var eventService = new EventDrivenOrchestration();
+        await eventService.RegisterEventHandlerAsync("SystemAlert", new List<string> { "CPU" }, new List<string> { "Scale" });
+        
+        var @event1 = new SystemEvent { EventType = "SystemAlert", Source = "Monitor", Severity = "High", Message = "Alert 1" };
+        var @event2 = new SystemEvent { EventType = "SystemAlert", Source = "Monitor", Severity = "High", Message = "Alert 2" };
+        
+        await eventService.TriggerEventAsync(@event1);
+        await eventService.TriggerEventAsync(@event2);
+        
+        var history = await eventService.GetEventHistoryAsync();
+        
+        Assert.True(history.Count >= 2);
+    }
+
+    [Fact]
+    public async Task EventDriven_GetStatistics_ReturnsEventCounts()
+    {
+        var eventService = new EventDrivenOrchestration();
+        await eventService.RegisterEventHandlerAsync("SystemAlert", new List<string> { "CPU" }, new List<string> { "Scale" });
+        
+        var @event = new SystemEvent { EventType = "SystemAlert", Source = "Monitor", Severity = "High", Message = "Test" };
+        await eventService.TriggerEventAsync(@event);
+        
+        var stats = await eventService.GetEventStatisticsAsync();
+        
+        Assert.NotEmpty(stats);
+        Assert.Contains("SystemAlert", stats.Keys);
+    }
+
+    [Fact]
+    public async Task EventDriven_DisableHandler_StopsExecution()
+    {
+        var eventService = new EventDrivenOrchestration();
+        var handler = await eventService.RegisterEventHandlerAsync("SystemAlert", new List<string> { "CPU" }, new List<string> { "Scale" });
+        
+        var result = await eventService.DisableEventHandlerAsync(handler.HandlerId);
+        
+        Assert.True(result);
+        var updated = await eventService.GetEventHandlerAsync(handler.HandlerId);
+        Assert.False(updated.IsEnabled);
+    }
 }

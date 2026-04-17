@@ -76,6 +76,8 @@ namespace HELIOS.Platform
                 var replicationService = new ReplicationService();
                 var autoScalingService = new AutoScalingService();
                 var clusterManager = new ClusterManager();
+                var containerOrchestration = new ContainerOrchestrationService();
+                var eventDrivenOrchestration = new EventDrivenOrchestration();
                 
                 // Initialize database context
                 var optionsBuilder = new DbContextOptionsBuilder<HeliosDatabaseContext>();
@@ -120,6 +122,8 @@ namespace HELIOS.Platform
                 ServiceContainer.Instance.RegisterSingleton<IReplicationService>(replicationService);
                 ServiceContainer.Instance.RegisterSingleton<IAutoScalingService>(autoScalingService);
                 ServiceContainer.Instance.RegisterSingleton<IClusterManager>(clusterManager);
+                ServiceContainer.Instance.RegisterSingleton<IContainerOrchestrationService>(containerOrchestration);
+                ServiceContainer.Instance.RegisterSingleton<IEventDrivenOrchestration>(eventDrivenOrchestration);
                 ServiceContainer.Instance.RegisterSingleton<HeliosDatabaseContext>(dbContext);
                 ServiceContainer.Instance.RegisterSingleton<IDataAccessService>(dataAccessService);
                 
