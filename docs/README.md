@@ -1,8 +1,8 @@
-# {{PROJECT_NAME}} - Complete Documentation
+# HELIOS Platform - Complete Documentation
 
-**Template Version:** 1.0  
-**Last Updated:** {{LAST_UPDATED}}  
-**Maintainer:** {{MAINTAINER_NAME}} <{{MAINTAINER_EMAIL}}>
+**Version:** 1.0  
+**Last Updated:** 2026-04-16  
+**Maintainer:** HELIOS Platform Team
 
 ---
 
@@ -10,15 +10,12 @@
 
 | Section | Purpose | Audience |
 |---------|---------|----------|
-| [Architecture](./ARCHITECTURE.md) | System design & component relationships | Architects, Senior Developers |
-| [Quick Start](./QUICK_START.md) | Get running in 5 minutes | New Users, Developers |
-| [API Documentation](./API.md) | Complete function & endpoint reference | Developers, Integrators |
-| [Contributing Guide](./CONTRIBUTING.md) | How to extend & contribute | Contributors |
-| [Troubleshooting](./TROUBLESHOOTING.md) | Common issues & solutions | All Users |
-| [FAQ](./FAQ.md) | Frequently asked questions | All Users |
-| [Glossary](./GLOSSARY.md) | Technical terminology | All Users |
-| [Roadmap](./ROADMAP.md) | Future plans & vision | Product Team, Stakeholders |
-| [Release Notes](./RELEASE_NOTES.md) | Version history & changes | All Users |
+| [Getting Started](./guides/GETTING_STARTED.md) | Quick start guide (5 minutes) | New Users, Developers |
+| [User Guides](./user-guides/README.md) | Comprehensive usage guides | End Users, Administrators |
+| [Architecture](./architecture/README.md) | System design & components | Architects, Senior Developers |
+| [API Reference](./api/README.md) | Complete API documentation | Developers, Integrators |
+| [Troubleshooting](./troubleshooting/README.md) | Solutions to common issues | All Users |
+| [FAQ](./faq/README.md) | Frequently asked questions | All Users |
 
 ---
 
