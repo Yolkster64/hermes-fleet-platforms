@@ -235,7 +235,7 @@ namespace HELIOS.Platform.Core.Ecosystem
                             TimeoutSeconds = 30
                         }
                     ),
-                    SLA = new ServiceLevelAgreement
+                    SLA = new Ecosystem.Interfaces.ServiceLevelAgreement
                     {
                         UptimePercentage = 99.99,
                         AverageResponseTimeMs = 200,
