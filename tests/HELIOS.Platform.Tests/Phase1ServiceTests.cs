@@ -11,6 +11,11 @@ using HELIOS.Platform.Core.Administration;
 using HELIOS.Platform.Core.CLI;
 using HELIOS.Platform.Core.Storage;
 using HELIOS.Platform.Core.Security;
+using HELIOS.Platform.Core.Plugins;
+using HELIOS.Platform.Core.RemoteAccess;
+using HELIOS.Platform.Core.GPU;
+using HELIOS.Platform.Core.Automation;
+using HELIOS.Platform.Core.AI;
 using HELIOS.Platform.Data.Database;
 
 namespace HELIOS.Platform.Tests;
@@ -825,5 +830,80 @@ public class Phase1ServiceTests
 
         // Assert
         Assert.False(disableResult); // Plugin not in dict, so returns false
+    }
+
+    /// <summary>
+    /// Final Phase 1 Services: Remote Access, GPU, Automation, AI Learning
+    /// </summary>
+    [Fact]
+    public async Task RemoteAccessService_AuthenticateRemoteSessionAsync_CreatesSession()
+    {
+        var logger = new ConsoleLogger();
+        var service = new RemoteAccessService(logger);
+        var result = await service.AuthenticateRemoteSessionAsync("admin", "password", "client1");
+        Assert.True(result);
+        Assert.Single(service.GetActiveSessions());
+    }
+
+    [Fact]
+    public async Task GPUOptimizationService_DetectGPUsAsync_ReturnsList()
+    {
+        var logger = new ConsoleLogger();
+        var service = new GPUOptimizationService(logger);
+        var gpus = await service.DetectGPUsAsync();
+        Assert.NotEmpty(gpus);
+    }
+
+    [Fact]
+    public async Task GPUOptimizationService_GeneratePerformanceReportAsync_ReturnsReport()
+    {
+        var logger = new ConsoleLogger();
+        var service = new GPUOptimizationService(logger);
+        var report = await service.GeneratePerformanceReportAsync();
+        Assert.True(report.AverageFPS > 0);
+    }
+
+    [Fact]
+    public async Task AutomationServer_ScheduleTaskAsync_CreatesTask()
+    {
+        var logger = new ConsoleLogger();
+        var server = new AutomationServer(logger);
+        var task = new AutomationTask { Name = "Test Task" };
+        var result = await server.ScheduleTaskAsync(task);
+        Assert.True(result);
+        var tasks = await server.GetScheduledTasksAsync();
+        Assert.Single(tasks);
+    }
+
+    [Fact]
+    public async Task AILearningCoordinator_TrainModelAsync_CreatesModel()
+    {
+        var logger = new ConsoleLogger();
+        var coordinator = new AILearningCoordinator(logger);
+        var data = new List<TrainingData> { new() { Label = 1.0 } };
+        var model = await coordinator.TrainModelAsync("TestModel", data);
+        Assert.Equal("TestModel", model.Name);
+        Assert.True(model.Accuracy > 0);
+    }
+
+    [Fact]
+    public async Task AILearningCoordinator_PredictAsync_ReturnsPrediction()
+    {
+        var logger = new ConsoleLogger();
+        var coordinator = new AILearningCoordinator(logger);
+        var data = new List<TrainingData> { new() { Label = 1.0 } };
+        await coordinator.TrainModelAsync("TestModel", data);
+        var prediction = await coordinator.PredictAsync("TestModel", new Dictionary<string, object>());
+        Assert.NotNull(prediction);
+    }
+
+    [Fact]
+    public async Task AILearningCoordinator_GetPerformanceAsync_ReturnsMetrics()
+    {
+        var logger = new ConsoleLogger();
+        var coordinator = new AILearningCoordinator(logger);
+        var metrics = await coordinator.GetPerformanceAsync();
+        Assert.NotNull(metrics);
+        Assert.True(metrics.AverageAccuracy >= 0);
     }
 }

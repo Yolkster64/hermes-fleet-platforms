@@ -13,6 +13,10 @@ using HELIOS.Platform.Core.Monitoring;
 using HELIOS.Platform.Core.Administration;
 using HELIOS.Platform.Core.CLI;
 using HELIOS.Platform.Core.Plugins;
+using HELIOS.Platform.Core.RemoteAccess;
+using HELIOS.Platform.Core.GPU;
+using HELIOS.Platform.Core.Automation;
+using HELIOS.Platform.Core.AI;
 using HELIOS.Platform.Data.Database;
 
 namespace HELIOS.Platform
@@ -43,6 +47,10 @@ namespace HELIOS.Platform
                 var crossPartitionManager = new CrossPartitionManager(logger);
                 var devDriveService = new DevDriveFileService(logger);
                 var pluginManager = new PluginManager(logger);
+                var remoteAccessService = new RemoteAccessService(logger);
+                var gpuService = new GPUOptimizationService(logger);
+                var automationServer = new AutomationServer(logger);
+                var aiCoordinator = new AILearningCoordinator(logger);
                 
                 // Initialize database context
                 var optionsBuilder = new DbContextOptionsBuilder<HeliosDatabaseContext>();
@@ -63,6 +71,10 @@ namespace HELIOS.Platform
                 ServiceContainer.Instance.RegisterSingleton<ICrossPartitionManager>(crossPartitionManager);
                 ServiceContainer.Instance.RegisterSingleton<IDevDriveFileService>(devDriveService);
                 ServiceContainer.Instance.RegisterSingleton<IPluginManager>(pluginManager);
+                ServiceContainer.Instance.RegisterSingleton<IRemoteAccessService>(remoteAccessService);
+                ServiceContainer.Instance.RegisterSingleton<IGPUOptimizationService>(gpuService);
+                ServiceContainer.Instance.RegisterSingleton<IAutomationServer>(automationServer);
+                ServiceContainer.Instance.RegisterSingleton<IAILearningCoordinator>(aiCoordinator);
                 ServiceContainer.Instance.RegisterSingleton<HeliosDatabaseContext>(dbContext);
                 ServiceContainer.Instance.RegisterSingleton<IDataAccessService>(dataAccessService);
                 
