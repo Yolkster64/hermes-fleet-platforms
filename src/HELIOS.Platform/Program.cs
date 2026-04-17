@@ -1,6 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using HELIOS.Platform.Core;
+using HELIOS.Platform.BackendServices.ServerManagement;
+using HELIOS.Platform.Core.Logging;
 
 namespace HELIOS.Platform
 {
@@ -16,8 +18,9 @@ namespace HELIOS.Platform
                 Console.WriteLine("╚════════════════════════════════════════════════════════════════╝");
                 Console.WriteLine();
                 
-                // Initialize service container
-                ServiceContainer.Instance.RegisterSingleton<IServiceOrchestrator>(new MockServiceOrchestrator());
+                // Initialize service container with real services
+                ServiceContainer.Instance.RegisterSingleton<IServiceOrchestrator>(new ServiceOrchestrator());
+                ServiceContainer.Instance.RegisterSingleton<Core.Logging.ILogger>(new ConsoleLogger());
                 
                 // Show main menu
                 await ShowMainMenu();
@@ -253,34 +256,6 @@ namespace HELIOS.Platform
 
             Console.WriteLine("\nPress any key to return to main menu...");
             Console.ReadKey();
-        }
-    }
-
-    // Minimal mock interfaces for compilation
-    public interface IServiceOrchestrator
-    {
-        Task<SystemResources> GetSystemResourcesAsync();
-    }
-
-    public class SystemResources
-    {
-        public double CpuUsagePercent { get; set; }
-        public long MemoryUsageMB { get; set; }
-        public long SystemUptimeSeconds { get; set; }
-        public int ActiveServices { get; set; }
-    }
-
-    public class MockServiceOrchestrator : IServiceOrchestrator
-    {
-        public async Task<SystemResources> GetSystemResourcesAsync()
-        {
-            return new SystemResources
-            {
-                CpuUsagePercent = 12.5,
-                MemoryUsageMB = 2048,
-                SystemUptimeSeconds = 86400,
-                ActiveServices = 45
-            };
         }
     }
 }
