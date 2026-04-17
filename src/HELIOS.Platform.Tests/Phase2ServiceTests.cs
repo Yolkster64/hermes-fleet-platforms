@@ -2001,4 +2001,197 @@ public class Phase2ServiceTests
         
         Assert.NotNull(failed);
     }
+
+    // ============ DOCUMENTATION SERVICE TESTS ============
+
+    [Fact]
+    public async Task Documentation_CreateDoc_GeneratesDocumentation()
+    {
+        var docService = new DocumentationEngine();
+        
+        var doc = await docService.CreateDocumentationAsync("Getting Started", "This is a guide...", "Guides");
+        
+        Assert.NotNull(doc);
+        Assert.Equal("Getting Started", doc.Title);
+    }
+
+    [Fact]
+    public async Task Documentation_SearchDocs_FindsRelevantDocs()
+    {
+        var docService = new DocumentationEngine();
+        await docService.CreateDocumentationAsync("API Reference", "API documentation...", "Reference");
+        
+        var results = await docService.SearchDocumentationAsync("API");
+        
+        Assert.NotEmpty(results);
+    }
+
+    [Fact]
+    public async Task Documentation_GetByCategory_FiltersDocs()
+    {
+        var docService = new DocumentationEngine();
+        await docService.CreateDocumentationAsync("Guide1", "content", "Guides");
+        await docService.CreateDocumentationAsync("Guide2", "content", "Guides");
+        
+        var results = await docService.GetDocumentationByCategoryAsync("Guides");
+        
+        Assert.True(results.Count >= 2);
+    }
+
+    [Fact]
+    public async Task Documentation_PublishDoc_MakesAvailable()
+    {
+        var docService = new DocumentationEngine();
+        var doc = await docService.CreateDocumentationAsync("Guide", "content", "Guides");
+        
+        var result = await docService.PublishDocumentationAsync(doc.DocId);
+        
+        Assert.True(result);
+    }
+
+    [Fact]
+    public async Task Documentation_GetStats_ReturnsDocMetrics()
+    {
+        var docService = new DocumentationEngine();
+        await docService.CreateDocumentationAsync("Guide1", "content", "Guides");
+        
+        var stats = await docService.GetDocumentationStatsAsync();
+        
+        Assert.NotEmpty(stats);
+        Assert.Contains("Total", stats.Keys);
+    }
+
+    // ============ API DOCUMENTATION SERVICE TESTS ============
+
+    [Fact]
+    public async Task APIDoc_GenerateDoc_CreatesAPIDocumentation()
+    {
+        var apiDocService = new APIDocumentationEngine();
+        
+        var doc = await apiDocService.GenerateAPIDocAsync("UserService");
+        
+        Assert.NotNull(doc);
+        Assert.Equal("UserService", doc.ServiceName);
+    }
+
+    [Fact]
+    public async Task APIDoc_AddEndpoint_RegistersNewEndpoint()
+    {
+        var apiDocService = new APIDocumentationEngine();
+        var doc = await apiDocService.GenerateAPIDocAsync("UserService");
+        
+        var endpoint = await apiDocService.AddEndpointAsync(doc.DocId, "GET", "/users", "List all users");
+        
+        Assert.NotNull(endpoint);
+        Assert.Equal("GET", endpoint.Method);
+    }
+
+    [Fact]
+    public async Task APIDoc_GetEndpoints_ListsAllEndpoints()
+    {
+        var apiDocService = new APIDocumentationEngine();
+        var doc = await apiDocService.GenerateAPIDocAsync("UserService");
+        await apiDocService.AddEndpointAsync(doc.DocId, "GET", "/users", "List users");
+        await apiDocService.AddEndpointAsync(doc.DocId, "POST", "/users", "Create user");
+        
+        var endpoints = await apiDocService.GetEndpointsAsync(doc.DocId);
+        
+        Assert.True(endpoints.Count >= 2);
+    }
+
+    [Fact]
+    public async Task APIDoc_GenerateSwagger_CreatesOpenAPISpec()
+    {
+        var apiDocService = new APIDocumentationEngine();
+        
+        var swagger = await apiDocService.GenerateSwaggerJsonAsync("UserService");
+        
+        Assert.NotEmpty(swagger);
+        Assert.Contains("openapi", swagger);
+    }
+
+    [Fact]
+    public async Task APIDoc_GetStats_ReturnsAPIMetrics()
+    {
+        var apiDocService = new APIDocumentationEngine();
+        await apiDocService.GenerateAPIDocAsync("Service1");
+        
+        var stats = await apiDocService.GetAPIStatsAsync();
+        
+        Assert.NotEmpty(stats);
+        Assert.Contains("TotalServices", stats.Keys);
+    }
+
+    // ============ DEPLOYMENT PACKAGE SERVICE TESTS ============
+
+    [Fact]
+    public async Task Package_CreatePackage_BuildsDeploymentArtifact()
+    {
+        var packageService = new PackagingService();
+        
+        var package = await packageService.CreateDeploymentPackageAsync(
+            "HELIOS-Prod", 
+            "1.0.0", 
+            new List<string> { "Core", "Services", "UI" }
+        );
+        
+        Assert.NotNull(package);
+        Assert.Equal("HELIOS-Prod", package.PackageName);
+    }
+
+    [Fact]
+    public async Task Package_ValidatePackage_ChecksIntegrity()
+    {
+        var packageService = new PackagingService();
+        var package = await packageService.CreateDeploymentPackageAsync("Package", "1.0.0", new List<string>());
+        
+        var isValid = await packageService.ValidatePackageAsync(package.PackageId);
+        
+        Assert.True(isValid);
+    }
+
+    [Fact]
+    public async Task Package_SignPackage_GeneratesSignature()
+    {
+        var packageService = new PackagingService();
+        var package = await packageService.CreateDeploymentPackageAsync("Package", "1.0.0", new List<string>());
+        
+        var isSigned = await packageService.SignPackageAsync(package.PackageId);
+        
+        Assert.True(isSigned);
+    }
+
+    [Fact]
+    public async Task Package_ListPackages_ReturnsAllPackages()
+    {
+        var packageService = new PackagingService();
+        await packageService.CreateDeploymentPackageAsync("Pkg1", "1.0.0", new List<string>());
+        await packageService.CreateDeploymentPackageAsync("Pkg2", "2.0.0", new List<string>());
+        
+        var packages = await packageService.ListPackagesAsync();
+        
+        Assert.True(packages.Count >= 2);
+    }
+
+    [Fact]
+    public async Task Package_GetDeploymentHistory_TracksDeployments()
+    {
+        var packageService = new PackagingService();
+        await packageService.CreateDeploymentPackageAsync("Pkg1", "1.0.0", new List<string>());
+        
+        var history = await packageService.GetDeploymentHistoryAsync();
+        
+        Assert.NotEmpty(history);
+    }
+
+    [Fact]
+    public async Task Package_UploadPackage_SendsToDestination()
+    {
+        var packageService = new PackagingService();
+        var package = await packageService.CreateDeploymentPackageAsync("Pkg", "1.0.0", new List<string>());
+        
+        var isUploaded = await packageService.UploadPackageAsync(package.PackageId, "/releases");
+        
+        Assert.True(isUploaded);
+    }
 }

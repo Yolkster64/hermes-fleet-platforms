@@ -89,6 +89,9 @@ namespace HELIOS.Platform
                 var integrationTestService = new IntegrationTestEngine();
                 var performanceValidator = new PerformanceValidator();
                 var systemValidator = new SystemValidator();
+                var documentationService = new DocumentationEngine();
+                var apiDocService = new APIDocumentationEngine();
+                var packageService = new PackagingService();
                 
                 // Initialize database context
                 var optionsBuilder = new DbContextOptionsBuilder<HeliosDatabaseContext>();
@@ -146,6 +149,9 @@ namespace HELIOS.Platform
                 ServiceContainer.Instance.RegisterSingleton<IIntegrationTestService>(integrationTestService);
                 ServiceContainer.Instance.RegisterSingleton<IPerformanceValidationService>(performanceValidator);
                 ServiceContainer.Instance.RegisterSingleton<ISystemValidationService>(systemValidator);
+                ServiceContainer.Instance.RegisterSingleton<IDocumentationService>(documentationService);
+                ServiceContainer.Instance.RegisterSingleton<IAPIDocumentationService>(apiDocService);
+                ServiceContainer.Instance.RegisterSingleton<IDeploymentPackageService>(packageService);
                 ServiceContainer.Instance.RegisterSingleton<HeliosDatabaseContext>(dbContext);
                 ServiceContainer.Instance.RegisterSingleton<IDataAccessService>(dataAccessService);
                 
