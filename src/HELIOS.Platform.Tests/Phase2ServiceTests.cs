@@ -2685,4 +2685,182 @@ public class Phase2ServiceTests
         Assert.NotEmpty(stats);
         Assert.Contains("Policies", stats.Keys);
     }
+
+    // ========== Phase 2+ Enhancement Tests: Optimization Services ==========
+
+    [Fact]
+    public async Task ServiceFactory_CreateService_ReturnsValidInstance()
+    {
+        var factory = new HELIOS.Platform.Core.Administration.ServiceFactory();
+        var result = await factory.CreateServiceAsync("TestService", "1.0.0");
+        
+        Assert.NotNull(result);
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task ServiceFactory_ValidateService_ChecksServiceHealth()
+    {
+        var factory = new HELIOS.Platform.Core.Administration.ServiceFactory();
+        var service = new object();
+        var result = await factory.ValidateServiceAsync("TestService", service);
+        
+        Assert.NotNull(result);
+    }
+
+    [Fact]
+    public async Task BatchOperationService_ExecuteBatch_ProcessesAllItems()
+    {
+        var batchService = new HELIOS.Platform.Core.Administration.BatchOperationService();
+        var items = new List<int> { 1, 2, 3, 4, 5 };
+        
+        var result = await batchService.ExecuteBatchAsync(items, 
+            async (item) => { await Task.Delay(10); return true; }, 
+            "TestBatch");
+        
+        Assert.NotNull(result);
+        Assert.Equal("Completed successfully", result.Status);
+        Assert.Equal(5, result.TotalItems);
+        Assert.Equal(5, result.SuccessfulItems);
+    }
+
+    [Fact]
+    public async Task BatchOperationService_ExecuteParallelBatch_ProcessesConcurrently()
+    {
+        var batchService = new HELIOS.Platform.Core.Administration.BatchOperationService();
+        var items = new List<string> { "a", "b", "c", "d", "e" };
+        
+        var result = await batchService.ExecuteParallelBatchAsync(items, 
+            async (item) => { await Task.Delay(5); return true; }, 
+            "ParallelBatch", 
+            maxConcurrency: 3);
+        
+        Assert.NotNull(result);
+        Assert.Equal("Completed successfully", result.Status);
+        Assert.Equal(5, result.TotalItems);
+    }
+
+    [Fact]
+    public async Task BatchOperationService_CancelBatch_StopsProcessing()
+    {
+        var batchService = new HELIOS.Platform.Core.Administration.BatchOperationService();
+        
+        var result = await batchService.CancelBatchAsync("NonExistentBatch");
+        
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task BatchOperationService_GetBatchHistory_ReturnsResults()
+    {
+        var batchService = new HELIOS.Platform.Core.Administration.BatchOperationService();
+        
+        var history = await batchService.GetBatchHistoryAsync(10);
+        
+        Assert.NotNull(history);
+        Assert.IsType<List<HELIOS.Platform.Core.Administration.BatchResult>>(history);
+    }
+
+    [Fact]
+    public async Task AdvancedCacheService_GetAsync_ReturnsNullOnMiss()
+    {
+        var cacheService = new HELIOS.Platform.Core.Performance.AdvancedCacheService();
+        
+        var result = await cacheService.GetAsync<string>("NonExistentKey");
+        
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task AdvancedCacheService_SetAsync_StoresValue()
+    {
+        var cacheService = new HELIOS.Platform.Core.Performance.AdvancedCacheService();
+        
+        await cacheService.SetAsync("TestKey", "TestValue", TimeSpan.FromMinutes(1));
+        var result = await cacheService.GetAsync<string>("TestKey");
+        
+        Assert.NotNull(result);
+        Assert.Equal("TestValue", result);
+    }
+
+    [Fact]
+    public async Task AdvancedCacheService_RemoveAsync_DeletesValue()
+    {
+        var cacheService = new HELIOS.Platform.Core.Performance.AdvancedCacheService();
+        
+        await cacheService.SetAsync("TestKey", "TestValue");
+        await cacheService.RemoveAsync("TestKey");
+        var result = await cacheService.GetAsync<string>("TestKey");
+        
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task AdvancedCacheService_GetStatisticsAsync_ReturnsMetrics()
+    {
+        var cacheService = new HELIOS.Platform.Core.Performance.AdvancedCacheService();
+        
+        await cacheService.SetAsync("Key1", "Value1");
+        await cacheService.GetAsync<string>("Key1");
+        await cacheService.GetAsync<string>("NonExistent");
+        
+        var stats = await cacheService.GetStatisticsAsync();
+        
+        Assert.NotNull(stats);
+        Assert.Equal(1, stats.Hits);
+        Assert.Equal(1, stats.Misses);
+    }
+
+    [Fact]
+    public async Task ResilienceService_ExecuteWithRetryAsync_RetriesOnFailure()
+    {
+        var resilienceService = new HELIOS.Platform.Core.Administration.ResilienceService();
+        var attemptCount = 0;
+        
+        var result = await resilienceService.ExecuteWithRetryAsync(
+            async () => 
+            { 
+                attemptCount++;
+                return await Task.FromResult("Success"); 
+            },
+            maxRetries: 3,
+            initialDelayMs: 10);
+        
+        Assert.Equal("Success", result);
+        Assert.Equal(1, attemptCount);
+    }
+
+    [Fact]
+    public async Task ResilienceService_ExecuteWithCircuitBreakerAsync_OpensCircuitOnFailures()
+    {
+        var resilienceService = new HELIOS.Platform.Core.Administration.ResilienceService();
+        var failureCount = 0;
+        
+        var result = await resilienceService.ExecuteWithCircuitBreakerAsync(
+            "TestCircuit",
+            async () => 
+            { 
+                failureCount++;
+                throw new Exception("Test failure"); 
+            },
+            failureThreshold: 2);
+        
+        Assert.False(result);
+        Assert.True(failureCount > 0);
+    }
+
+    [Fact]
+    public async Task ResilienceService_ExecuteWithTimeoutAsync_ThrowsOnTimeout()
+    {
+        var resilienceService = new HELIOS.Platform.Core.Administration.ResilienceService();
+        
+        var ex = await Assert.ThrowsAsync<TimeoutException>(async () => 
+        {
+            await resilienceService.ExecuteWithTimeoutAsync(
+                async () => { await Task.Delay(5000); return "Done"; },
+                TimeSpan.FromMilliseconds(100));
+        });
+        
+        Assert.Contains("timed out", ex.Message);
+    }
 }
