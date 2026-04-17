@@ -1,6 +1,10 @@
+using HELIOS.Platform.BackendServices.ServerManagement;
+using HELIOS.Platform.Core;
+using HELIOS.Platform.Core.Performance;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
@@ -27,10 +31,20 @@ public sealed partial class DashboardPage : Page
 {
     private Timer? _refreshTimer;
     private DateTime _lastUpdate = DateTime.MinValue;
+    private readonly IServiceOrchestrator _serviceOrchestrator;
+    private readonly CpuProfiler _cpuProfiler;
+    private readonly MemoryProfiler _memoryProfiler;
+    private readonly IPerformanceProfiler _performanceProfiler;
 
     public DashboardPage()
     {
         this.InitializeComponent();
+        
+        _serviceOrchestrator = ServiceContainer.Instance.GetService<IServiceOrchestrator>() ?? new ServiceOrchestrator();
+        _cpuProfiler = ServiceContainer.Instance.GetService<CpuProfiler>() ?? new CpuProfiler();
+        _memoryProfiler = ServiceContainer.Instance.GetService<MemoryProfiler>() ?? new MemoryProfiler();
+        _performanceProfiler = ServiceContainer.Instance.GetService<IPerformanceProfiler>() ?? new PerformanceProfiler();
+        
         _ = InitializeAsync();
     }
 
@@ -65,31 +79,31 @@ public sealed partial class DashboardPage : Page
     {
         try
         {
+            using var _ = _performanceProfiler.Profile("UpdateSystemMetrics");
+            
+            var systemResources = await _serviceOrchestrator.GetSystemResourcesAsync();
+
             // CPU Usage
-            var cpuUsage = GetCpuUsage();
-            CpuPercentText.Text = $"{cpuUsage:F1}%";
-            CpuProgressBar.Value = cpuUsage;
-            CpuCoresText.Text = $"{Environment.ProcessorCount} cores";
+            CpuPercentText.Text = $"{systemResources.CpuUsagePercent:F1}%";
+            CpuProgressBar.Value = Math.Min(systemResources.CpuUsagePercent, 100);
+            CpuCoresText.Text = $"{_cpuProfiler.GetProcessorCount()} cores";
 
             // Memory Usage
-            var (usedMem, totalMem) = GetMemoryUsage();
-            var memPercent = (usedMem / (double)totalMem) * 100;
-            MemoryPercentText.Text = $"{memPercent:F1}%";
-            MemoryProgressBar.Value = memPercent;
-            MemoryUsageText.Text = $"{usedMem / 1024:F1} GB / {totalMem / 1024:F1} GB";
+            MemoryPercentText.Text = $"{systemResources.MemoryUsagePercent:F1}%";
+            MemoryProgressBar.Value = Math.Min(systemResources.MemoryUsagePercent, 100);
+            MemoryUsageText.Text = $"{systemResources.MemoryUsedMb / 1024:F1} GB / {systemResources.MemoryTotalMb / 1024:F1} GB";
 
-            // Disk Usage
+            // Disk Usage (fetch from drive info)
             var (usedDisk, totalDisk) = GetDiskUsage();
             var diskPercent = (usedDisk / (double)totalDisk) * 100;
             DiskPercentText.Text = $"{diskPercent:F1}%";
-            DiskProgressBar.Value = diskPercent;
+            DiskProgressBar.Value = Math.Min(diskPercent, 100);
             DiskUsageText.Text = $"{usedDisk / 1024:F1} GB / {totalDisk / 1024:F1} GB";
 
             // Services
-            var services = GetRunningServices();
-            ServiceCountText.Text = services.ToString();
-            ServiceProgressBar.Value = Math.Min(services * 10, 100);
-            ServiceStatusText.Text = $"{services} running";
+            ServiceCountText.Text = systemResources.ProcessCount.ToString();
+            ServiceProgressBar.Value = Math.Min(systemResources.ProcessCount * 10, 100);
+            ServiceStatusText.Text = $"{systemResources.ProcessCount} processes running";
 
             await Task.CompletedTask;
         }
@@ -103,30 +117,22 @@ public sealed partial class DashboardPage : Page
     {
         try
         {
-            var processes = Process.GetProcesses()
-                .Select(p =>
-                {
-                    try
-                    {
-                        return new ProcessDisplay
-                        {
-                            ProcessId = p.Id,
-                            Name = p.ProcessName,
-                            MemoryUsageMb = p.WorkingSet64 / (1024.0 * 1024.0),
-                            CpuUsagePercent = GetProcessCpuUsage(p.Id)
-                        };
-                    }
-                    catch
-                    {
-                        return null;
-                    }
-                })
-                .Where(p => p != null)
-                .OrderByDescending(p => p?.MemoryUsageMb)
+            using var _ = _performanceProfiler.Profile("UpdateProcesses");
+            
+            var processes = await _serviceOrchestrator.GetAllProcessesAsync();
+            var processDisplays = processes
+                .OrderByDescending(p => p.MemoryUsageMb)
                 .Take(10)
+                .Select(p => new ProcessDisplay
+                {
+                    ProcessId = p.ProcessId,
+                    Name = p.Name,
+                    MemoryUsageMb = p.MemoryUsageMb,
+                    CpuUsagePercent = p.CpuUsagePercent
+                })
                 .ToList();
 
-            ProcessesListView.ItemsSource = processes;
+            ProcessesListView.ItemsSource = processDisplays;
             await Task.CompletedTask;
         }
         catch (Exception ex)
@@ -139,14 +145,18 @@ public sealed partial class DashboardPage : Page
     {
         try
         {
+            using var _ = _performanceProfiler.Profile("UpdateSystemInfo");
+            
+            var systemResources = await _serviceOrchestrator.GetSystemResourcesAsync();
+            
             var infoItems = new[]
             {
                 new SystemInfoItem { Label = "OS", Value = GetOsName() },
                 new SystemInfoItem { Label = "Computer", Value = Environment.MachineName },
                 new SystemInfoItem { Label = "User", Value = Environment.UserName },
                 new SystemInfoItem { Label = "Uptime", Value = GetSystemUptime() },
-                new SystemInfoItem { Label = "Processes", Value = Process.GetProcesses().Length.ToString() },
-                new SystemInfoItem { Label = "Threads", Value = Process.GetCurrentProcess().Threads.Count.ToString() }
+                new SystemInfoItem { Label = "Processes", Value = systemResources.ProcessCount.ToString() },
+                new SystemInfoItem { Label = "Threads", Value = systemResources.ThreadCount.ToString() }
             };
 
             SystemInfoControl.ItemsSource = infoItems;
@@ -158,48 +168,14 @@ public sealed partial class DashboardPage : Page
         }
     }
 
-    private double GetCpuUsage()
-    {
-        try
-        {
-            using var cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
-            cpuCounter.NextValue(); // First call is always 0
-            return cpuCounter.NextValue();
-        }
-        catch
-        {
-            return 0;
-        }
-    }
-
-    private double GetProcessCpuUsage(int processId)
-    {
-        try
-        {
-            using var cpuCounter = new PerformanceCounter(
-                "Process", "% Processor Time", Process.GetProcessById(processId).ProcessName);
-            cpuCounter.NextValue();
-            return cpuCounter.NextValue() / Environment.ProcessorCount;
-        }
-        catch
-        {
-            return 0;
-        }
-    }
+    private double GetCpuUsage() => _cpuProfiler.GetCpuUsage();
 
     private (long Used, long Total) GetMemoryUsage()
     {
-        try
-        {
-            var comp = new Microsoft.VisualBasic.Devices.ComputerInfo();
-            var total = (long)(comp.TotalPhysicalMemory / (1024.0 * 1024.0));
-            var available = (long)(comp.AvailablePhysicalMemory / (1024.0 * 1024.0));
-            return (total - available, total);
-        }
-        catch
-        {
-            return (0, 1);
-        }
+        var usedPercent = _memoryProfiler.GetMemoryUsagePercent();
+        var totalMb = (long)(new Microsoft.VisualBasic.Devices.ComputerInfo().TotalPhysicalMemory / (1024.0 * 1024.0));
+        var usedMb = (long)((usedPercent / 100.0) * totalMb);
+        return (usedMb, totalMb);
     }
 
     private (long Used, long Total) GetDiskUsage()
@@ -228,28 +204,33 @@ public sealed partial class DashboardPage : Page
             return System.ServiceProcess.ServiceController.GetServices()
                 .Count(s => s.Status == System.ServiceProcess.ServiceControllerStatus.Running);
         }
-        catch
-        {
-            return 0;
-        }
+        catch { return 0; }
     }
 
     private string GetOsName()
     {
-        var ver = Environment.OSVersion;
-        return $"Windows {ver.VersionString}";
+        try
+        {
+            var winVersion = Environment.OSVersion;
+            var productName = Microsoft.Win32.Registry.GetValue(
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion", 
+                "ProductName", "Windows");
+            var releaseId = Microsoft.Win32.Registry.GetValue(
+                @"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion", 
+                "DisplayVersion", "");
+            return $"{productName} ({releaseId})";
+        }
+        catch { return Environment.OSVersion.VersionString; }
     }
 
     private string GetSystemUptime()
     {
         try
         {
-            var uptime = DateTime.Now - new DateTime(new System.Diagnostics.ProcessStartInfo()
-                .UseShellExecute = false;
             var result = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo()
             {
                 FileName = "powershell",
-                Arguments = "-Command \"(Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime\"",
+                Arguments = "-Command \"[math]::Round((Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime | % TotalSeconds)\"",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 CreateNoWindow = true
@@ -258,11 +239,12 @@ public sealed partial class DashboardPage : Page
             if (result?.WaitForExit(5000) == true)
             {
                 var output = result.StandardOutput.ReadToEnd().Trim();
-                if (TimeSpan.TryParse(output, out var timespan))
+                if (long.TryParse(output, out var seconds))
                 {
-                    var days = timespan.Days;
-                    var hours = timespan.Hours;
-                    return $"{days}d {hours}h";
+                    var days = seconds / 86400;
+                    var hours = (seconds % 86400) / 3600;
+                    var minutes = (seconds % 3600) / 60;
+                    return $"{days}d {hours}h {minutes}m";
                 }
             }
         }
