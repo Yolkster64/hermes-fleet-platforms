@@ -20,6 +20,8 @@ using HELIOS.Platform.Core.AI;
 using HELIOS.Platform.Core.Performance;
 using HELIOS.Platform.Core.Backup;
 using HELIOS.Platform.Core.Cloud;
+using HELIOS.Platform.Core.Sandbox;
+using HELIOS.Platform.Core.Hardware;
 using HELIOS.Platform.Data.Database;
 
 namespace HELIOS.Platform
@@ -60,6 +62,10 @@ namespace HELIOS.Platform
                 var monitoringService = new ServerMonitoringService(logger);
                 var cloudService = new CloudIntegrationService(logger);
                 var advancedConfigManager = new AdvancedConfigManager();
+                var sandboxEnvironment = new SandboxEnvironment();
+                var advancedQuarantineSystem = new AdvancedQuarantineSystem();
+                var driverAutoInstallService = new DriverAutoInstallService();
+                var usbAdminAccessService = new USBAdminAccessService();
                 
                 // Initialize database context
                 var optionsBuilder = new DbContextOptionsBuilder<HeliosDatabaseContext>();
@@ -90,6 +96,10 @@ namespace HELIOS.Platform
                 ServiceContainer.Instance.RegisterSingleton<IServerMonitoringService>(monitoringService);
                 ServiceContainer.Instance.RegisterSingleton<ICloudIntegrationService>(cloudService);
                 ServiceContainer.Instance.RegisterSingleton<IAdvancedConfigManager>(advancedConfigManager);
+                ServiceContainer.Instance.RegisterSingleton<ISandboxEnvironment>(sandboxEnvironment);
+                ServiceContainer.Instance.RegisterSingleton<IAdvancedQuarantineSystem>(advancedQuarantineSystem);
+                ServiceContainer.Instance.RegisterSingleton<IDriverAutoInstallService>(driverAutoInstallService);
+                ServiceContainer.Instance.RegisterSingleton<IUSBAdminAccessService>(usbAdminAccessService);
                 ServiceContainer.Instance.RegisterSingleton<HeliosDatabaseContext>(dbContext);
                 ServiceContainer.Instance.RegisterSingleton<IDataAccessService>(dataAccessService);
                 
