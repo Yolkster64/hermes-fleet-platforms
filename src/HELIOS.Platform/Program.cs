@@ -98,6 +98,12 @@ namespace HELIOS.Platform
                 var phase2Orchestrator = new Phase2OrchestrationService();
                 var productionReadinessValidator = new ProductionReadinessValidator();
                 
+                // Optimization & Resilience Services (Phase 2+ Enhancements)
+                var serviceFactory = new ServiceFactory();
+                var batchOperationService = new BatchOperationService();
+                var advancedCacheService = new AdvancedCacheService();
+                var resilienceService = new ResilienceService();
+                
                 // Initialize database context
                 var optionsBuilder = new DbContextOptionsBuilder<HeliosDatabaseContext>();
                 optionsBuilder.UseSqlite("Data Source=helios.db");
@@ -161,6 +167,12 @@ namespace HELIOS.Platform
                 // Phase 2 Batch 16: Integration & Validation Service Registrations
                 ServiceContainer.Instance.RegisterSingleton<IPhase2OrchestrationService>(phase2Orchestrator);
                 ServiceContainer.Instance.RegisterSingleton<IProductionReadinessValidator>(productionReadinessValidator);
+                
+                // Phase 2+ Enhancements: Service Factory, Batch Operations, Caching, Resilience
+                ServiceContainer.Instance.RegisterSingleton<IServiceFactory>(serviceFactory);
+                ServiceContainer.Instance.RegisterSingleton<IBatchOperationService>(batchOperationService);
+                ServiceContainer.Instance.RegisterSingleton<IAdvancedCacheService>(advancedCacheService);
+                ServiceContainer.Instance.RegisterSingleton<IResilienceService>(resilienceService);
                 
                 ServiceContainer.Instance.RegisterSingleton<HeliosDatabaseContext>(dbContext);
                 ServiceContainer.Instance.RegisterSingleton<IDataAccessService>(dataAccessService);
