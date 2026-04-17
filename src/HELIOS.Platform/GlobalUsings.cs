@@ -20,3 +20,6 @@ global using Microsoft.Extensions.Configuration;
 global using Microsoft.Extensions.DependencyInjection;
 global using Microsoft.Extensions.Logging;
 
+// HELIOS Phase 3 ML Services
+global using HELIOS.Platform.Core.ML.Interfaces;
+global using HELIOS.Platform.Core.ML.Services;
