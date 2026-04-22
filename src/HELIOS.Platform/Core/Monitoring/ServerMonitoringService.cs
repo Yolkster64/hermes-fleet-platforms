@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using HELIOS.Platform.Core.Logging;
-using HELIOS.Platform.Data.Database;
 
 namespace HELIOS.Platform.Core.Monitoring;
 
