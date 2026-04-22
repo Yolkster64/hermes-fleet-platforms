@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute(@"Complete Windows optimization ecosystem with 7 integrated components providing enterprise-grade deployment, automation, and management capabilities. Includes MonadoEngine, SecuritySystem, AIOrchestrator, GUIDashboard, BuildAgents, DevAIHub, and SoftwareStack.")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7cd319c89f3d1ad84f30f162ed06bbec5c05f949")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+725e57be49aca15a84ba16b17ef8be50bf8b33dc")]
 [assembly: System.Reflection.AssemblyProductAttribute("HELIOS.Platform")]
 [assembly: System.Reflection.AssemblyTitleAttribute("HELIOS.Platform")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
