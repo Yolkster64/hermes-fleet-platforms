@@ -112,11 +112,11 @@ namespace Helios.Security.Validation
         public class AuditItem
         {
             public int Id { get; set; }
-            public string Name { get; set; }
-            public string Description { get; set; }
-            public string Category { get; set; }
-            public string Severity { get; set; }
-            public Func<ValidationResult> ValidationMethod { get; set; }
+            public required string Name { get; set; }
+            public required string Description { get; set; }
+            public required string Category { get; set; }
+            public required string Severity { get; set; }
+            public required Func<ValidationResult> ValidationMethod { get; set; }
 
             public ValidationResult Execute()
             {
