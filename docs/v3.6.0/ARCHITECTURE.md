@@ -1,60 +1,29 @@
 # HELIOS Platform v3.6.0 - Architecture & System Design
 
 **Version**: 3.6.0  
-**Status**: Production Ready ✅
+**Status**: Production Ready ✅  
+**Last Updated**: 2026-05-15
 
-## System Architecture Overview
+## Overview
 
-HELIOS Platform v3.6.0 is built on modern cloud-native architecture providing:
-
-- Comprehensive system management
-- Cloud integration (OneDrive, Azure, AWS S3)
-- Plugin extensibility (100+ plugins)
-- AI/ML capabilities (TensorFlow, PyTorch, ONNX)
-- Real-time monitoring and dashboards
-- Enterprise-grade security
+HELIOS Platform v3.6.0 is an enterprise-grade Windows automation and management system built on modern cloud-native architecture. The platform provides comprehensive system management, cloud integration, plugin extensibility, and AI/ML capabilities.
 
 ## Core Components
 
 ### 1. Service Orchestration Layer
-Foundation for all services:
-- Dependency Injection
-- Event Bus
-- Configuration Management
-- Logging and Diagnostics
-- Health Monitoring
+The foundation for all HELIOS services providing Dependency Injection, Event Bus, Configuration Management, Logging, and Health Monitoring.
 
-### 2. CloudSync Services
-Data synchronization across cloud providers:
-- Multi-provider support
-- Change detection
-- Conflict resolution
-- Encryption (AES-256)
-- Bandwidth management
+### 2. CloudSync Services  
+Seamless data synchronization across cloud providers (OneDrive, Azure, AWS S3). Features multi-provider support, change detection, conflict resolution, encryption, and bandwidth management.
 
 ### 3. Plugin Management System
-Extensibility framework:
-- Plugin discovery and installation
-- Isolated execution (AppDomain)
-- Lifecycle management
-- Event integration
-- Marketplace (100+ plugins)
+Extensibility framework for custom functionality. Includes plugin discovery, isolated execution, lifecycle management, event integration, and marketplace integration (100+ plugins).
 
 ### 4. ML/AI Services
-Machine learning integration:
-- Model registry with versioning
-- Framework support (TensorFlow, PyTorch, ONNX)
-- Inference engines (batch and real-time)
-- Training pipeline
-- AutoML capabilities
+Machine learning integration supporting TensorFlow, PyTorch, ONNX models with inference engines, training pipeline, and AutoML capabilities.
 
 ### 5. System Monitoring
-Health and performance monitoring:
-- Metrics collection
-- Performance analysis
-- Alert management
-- Trend analysis
-- Health checks
+Comprehensive health monitoring with metrics collection, performance analysis, alert management, trend analysis, and component health checks.
 
 ## Technology Stack
 
@@ -64,77 +33,21 @@ Health and performance monitoring:
 - **Database**: SQL Server / SQLite
 - **UI**: WinUI 3 / Blazor Web
 
-## Deployment Patterns
+## Compliance
 
-### Single-Machine Deployment
-```
-Windows Server 2022
-├── HELIOS Core Service
-├── Dashboard Web Server
-├── Plugin System
-├── Local Database
-└── File Sync Cache
-```
-
-### High-Availability Deployment
-```
-Load Balancer
-├── HELIOS Instance 1
-├── HELIOS Instance 2
-└── HELIOS Instance N
-
-Shared Resources:
-├── SQL Server Cluster
-├── Cloud Storage
-├── ML Model Repository
-└── Distributed Cache
-```
+- **WCAG 2.1 Level AA**: Accessibility
+- **GDPR**: Data protection
+- **HIPAA**: Healthcare data handling
+- **SOC 2 Type II**: Security and reliability
+- **ISO 27001**: Information security
 
 ## Performance Characteristics
 
-| Operation | Throughput | Latency (P95) |
-|-----------|-----------|--------------|
-| Cloud Sync | 10-50 MB/s | 200ms |
-| Plugin Execution | 100+ ops/sec | 50ms |
-| ML Inference | 1000+ ops/sec | 100ms |
-| Dashboard | 60 fps | 50ms |
+| Operation | Throughput |
+|-----------|-----------|
+| Cloud Sync | 10-50 MB/s |
+| Plugin Execution | 100+ ops/sec |
+| ML Inference | 1000+ predictions/sec |
+| Dashboard | 60 fps |
 
-## Security Architecture
-
-### Defense in Depth
-1. **Network**: HTTPS/TLS 1.3+, Firewall
-2. **Application**: Authentication, Authorization, Input Validation
-3. **Data**: AES-256 encryption at rest and in transit
-4. **Operations**: Audit logging, Threat detection
-
-### Compliance
-- GDPR - Data protection
-- HIPAA - Healthcare data handling
-- SOC 2 Type II - Security and reliability
-- ISO 27001 - Information security
-
-## Disaster Recovery
-
-| Scenario | RTO | RPO |
-|----------|-----|-----|
-| Service Restart | 5 min | No data loss |
-| Server Failure | 30 min | <5 min |
-| Data Corruption | 2 hours | 15 min |
-| Site Failure | 4 hours | 30 min |
-
-## Scalability
-
-### Vertical Scaling
-- Add CPU cores for more throughput
-- Add memory for larger caches
-- Add disk for extended storage
-
-### Horizontal Scaling
-- Multiple HELIOS instances
-- Shared SQL Server database
-- Distributed cloud sync
-- Replicated ML cache
-
----
-
-For detailed information, see FEATURES_GUIDE.md and API_REFERENCE.md.
+For detailed component information, see [Feature Documentation](FEATURES_GUIDE.md) and [API Reference](API_REFERENCE.md).
