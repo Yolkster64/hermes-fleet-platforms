@@ -67,22 +67,20 @@ namespace HELIOS.Platform.Phase10.Vault
         /// <summary>
         /// Encrypts data using AES-256-GCM.
         /// </summary>
-        public async Task<bool> EncryptDataAsync(byte[] data, byte[] key, out byte[] encrypted)
+        public async Task<(bool Success, byte[] Encrypted)> EncryptDataAsync(byte[] data, byte[] key)
         {
-            encrypted = null;
-
             try
             {
                 if (data == null || data.Length == 0)
                 {
                     _logger.LogError("Invalid data for encryption", new ArgumentException("Data cannot be null or empty"));
-                    return false;
+                    return (false, null);
                 }
 
                 if (key == null || key.Length != 32)
                 {
                     _logger.LogError("Invalid encryption key", new ArgumentException("Key must be 256-bit"));
-                    return false;
+                    return (false, null);
                 }
 
                 using (var aes = new AesGcm(key))
@@ -99,41 +97,39 @@ namespace HELIOS.Platform.Phase10.Vault
                     aes.Encrypt(nonce, data, ciphertext, tag);
 
                     // Package: nonce (12) + tag (16) + ciphertext
-                    encrypted = new byte[nonce.Length + tag.Length + ciphertext.Length];
+                    byte[] encrypted = new byte[nonce.Length + tag.Length + ciphertext.Length];
                     Buffer.BlockCopy(nonce, 0, encrypted, 0, nonce.Length);
                     Buffer.BlockCopy(tag, 0, encrypted, nonce.Length, tag.Length);
                     Buffer.BlockCopy(ciphertext, 0, encrypted, nonce.Length + tag.Length, ciphertext.Length);
 
                     _logger.Log($"Data encrypted successfully ({data.Length} bytes -> {encrypted.Length} bytes)");
-                    return await Task.FromResult(true);
+                    return await Task.FromResult((true, encrypted));
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError($"Encryption failed: {ex.Message}", ex);
-                return false;
+                return (false, null);
             }
         }
 
         /// <summary>
         /// Decrypts data that was encrypted with EncryptDataAsync.
         /// </summary>
-        public async Task<bool> DecryptDataAsync(byte[] encrypted, byte[] key, out byte[] data)
+        public async Task<(bool Success, byte[] Data)> DecryptDataAsync(byte[] encrypted, byte[] key)
         {
-            data = null;
-
             try
             {
                 if (encrypted == null || encrypted.Length < 28) // 12 + 16
                 {
                     _logger.LogError("Invalid encrypted data", new ArgumentException("Encrypted data too short"));
-                    return false;
+                    return (false, null);
                 }
 
                 if (key == null || key.Length != 32)
                 {
                     _logger.LogError("Invalid decryption key", new ArgumentException("Key must be 256-bit"));
-                    return false;
+                    return (false, null);
                 }
 
                 // Extract components
@@ -150,15 +146,14 @@ namespace HELIOS.Platform.Phase10.Vault
                     byte[] plaintext = new byte[ciphertext.Length];
                     aes.Decrypt(nonce, ciphertext, tag, plaintext);
                     
-                    data = plaintext;
-                    _logger.Log($"Data decrypted successfully ({encrypted.Length} bytes -> {data.Length} bytes)");
-                    return await Task.FromResult(true);
+                    _logger.Log($"Data decrypted successfully ({encrypted.Length} bytes -> {plaintext.Length} bytes)");
+                    return await Task.FromResult((true, plaintext));
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError($"Decryption failed: {ex.Message}", ex);
-                return false;
+                return (false, null);
             }
         }
 

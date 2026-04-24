@@ -379,37 +379,33 @@ namespace HELIOS.Platform.Phase10.BootEnvironment
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
-Write-Host '╔══════════════════════════════════════════════════════════════╗' -ForegroundColor Cyan
-Write-Host '║  MONADO BLADE v2.5.0 - AUTO-INSTALLATION BOOTSTRAP         ║' -ForegroundColor Cyan
-Write-Host '║  Channel 3: Complete System Deployment                      ║' -ForegroundColor Cyan
-Write-Host '╚══════════════════════════════════════════════════════════════╝' -ForegroundColor Cyan
+Write-Host '[MONADO BLADE v2.5.0 - AUTO-INSTALLATION BOOTSTRAP]' -ForegroundColor Cyan
+Write-Host '[Channel 3: Complete System Deployment]' -ForegroundColor Cyan
 
 # Phase 1: Detect Hardware
-Write-Host "`n[Phase 1/5] Hardware Detection..." -ForegroundColor Green
+Write-Host 'Phase 1/5: Hardware Detection...' -ForegroundColor Green
 $hwInfo = Get-CimInstance -ClassName Win32_ComputerSystem
-Write-Host ""$hwInfo.Manufacturer"" -ForegroundColor Yellow
-Write-Host ""$hwInfo.Model"" -ForegroundColor Yellow
+Write-Host $hwInfo.Manufacturer -ForegroundColor Yellow
+Write-Host $hwInfo.Model -ForegroundColor Yellow
 
 # Phase 2: Install Drivers in Parallel
-Write-Host "`n[Phase 2/5] Installing Drivers..." -ForegroundColor Green
+Write-Host 'Phase 2/5: Installing Drivers...' -ForegroundColor Green
 & (Join-Path $PSScriptRoot 'Install-Drivers.bat')
 
 # Phase 3: Install Firmware
-Write-Host "`n[Phase 3/5] Installing Firmware..." -ForegroundColor Green
+Write-Host 'Phase 3/5: Installing Firmware...' -ForegroundColor Green
 & (Join-Path $PSScriptRoot 'Install-Firmware.bat')
 
 # Phase 4: Install Synapse & Software
-Write-Host "`n[Phase 4/5] Installing Synapse & Razer Software..." -ForegroundColor Green
+Write-Host 'Phase 4/5: Installing Synapse & Razer Software...' -ForegroundColor Green
 & (Join-Path $PSScriptRoot 'Install-Software.bat')
 
 # Phase 5: System Configuration
-Write-Host "`n[Phase 5/5] Configuring System..." -ForegroundColor Green
+Write-Host 'Phase 5/5: Configuring System...' -ForegroundColor Green
 & (Join-Path $PSScriptRoot 'Configure-System.ps1')
 
-Write-Host "`n╔══════════════════════════════════════════════════════════════╗"" -ForegroundColor Cyan
-Write-Host ""║  ✅ INSTALLATION COMPLETE                                 ║"" -ForegroundColor Cyan
-Write-Host ""║  System will restart in 10 seconds...                      ║"" -ForegroundColor Cyan
-Write-Host ""╚══════════════════════════════════════════════════════════════╝"" -ForegroundColor Cyan
+Write-Host '[INSTALLATION COMPLETE]' -ForegroundColor Cyan
+Write-Host '[System will restart in 10 seconds...]' -ForegroundColor Cyan
 
 Start-Sleep -Seconds 10
 Restart-Computer -Force
@@ -569,32 +565,33 @@ timeout /t 5 /nobreak
 # Post-Installation System Configuration
 # Monado Blade v2.5.0 - Final Setup
 
-Write-Host "`nConfiguring system..." -ForegroundColor Green
+Write-Host 'Configuring system...' -ForegroundColor Green
 
 # Enable Razer optimizations
-Write-Host ""  • Enabling performance optimizations..."
+Write-Host '  - Enabling performance optimizations...'
 Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Services\RazerService' -Name 'Start' -Value 2
 
 # Configure power settings
-Write-Host ""  • Configuring power settings...""
-powercfg /SETACTIVE 8c5e7fda-e8bf-45a6-a6cc-4b3c9b5a8e3f  # High Performance
+Write-Host '  - Configuring power settings...'
+powercfg /SETACTIVE 8c5e7fda-e8bf-45a6-a6cc-4b3c9b5a8e3f
 
 # Enable Game Mode
-Write-Host "  - Enabling Game Mode..."
-$regPath = "HKCU:\Software\Microsoft\GameBar"
+Write-Host '  - Enabling Game Mode...'
+$regPath = 'HKCU:\Software\Microsoft\GameBar'
 if (-not (Test-Path $regPath)) { New-Item -Path $regPath -Force | Out-Null }
 Set-ItemProperty -Path $regPath -Name 'AllowAutoGameMode' -Value 1
 
 # Configure NVIDIA GPU (if present)
-Write-Host "  - Optimizing GPU settings..."
-if (Test-Path "$env:ProgramFiles\NVIDIA Corporation") {
-    Write-Host "    + NVIDIA GPU optimizations applied"
+Write-Host '  - Optimizing GPU settings...'
+if (Test-Path 'C:\Program Files\NVIDIA Corporation') {
+    Write-Host '    + NVIDIA GPU optimizations applied'
 }
 
 # Final configuration
-Write-Host "  - Finalizing configuration..."
-Write-Host "`n+ System configuration complete!"
-Write-Host "+ System ready for use!"
+Write-Host '  - Finalizing configuration...'
+Write-Host ''
+Write-Host '+ System configuration complete!'
+Write-Host '+ System ready for use!'
 ";
         }
 

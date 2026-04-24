@@ -258,8 +258,8 @@ namespace HELIOS.Platform.Phase10.Vault
     public interface IVaultEncryptionManager
     {
         Task<bool> ApplyEncryptionAsync(string path);
-        Task<bool> EncryptDataAsync(byte[] data, byte[] key, out byte[] encrypted);
-        Task<bool> DecryptDataAsync(byte[] encrypted, byte[] key, out byte[] data);
+        Task<(bool Success, byte[] Encrypted)> EncryptDataAsync(byte[] data, byte[] key);
+        Task<(bool Success, byte[] Data)> DecryptDataAsync(byte[] encrypted, byte[] key);
     }
 
     public interface IVaultLogger
