@@ -62,10 +62,9 @@ jobs:
         run: |
           required_docs=(
             "README.md"
-            "00-KICKOFF-START-HERE.md"
-            "GETTING_STARTED.md"
-            "MODULAR_ARCHITECTURE.md"
-            "phases/0-foundation/README.md"
+            "docs/guides/GETTING_STARTED.md"
+            "docs/architecture/SYSTEM_ARCHITECTURE_COMPLETE_FLOW.md"
+            "docs/phases/master-deploy.ps1"
           )
           
           for doc in "${required_docs[@]}"; do
@@ -89,8 +88,8 @@ jobs:
       
       - name: Run Unit Tests
         run: |
-          if (Test-Path -Path "tests") {
-            Get-ChildItem -Path "tests" -Filter "*.tests.ps1" -Recurse | ForEach-Object {
+          if (Test-Path -Path "src/tests") {
+            Get-ChildItem -Path "src/tests" -Filter "*.tests.ps1" -Recurse | ForEach-Object {
               Write-Host "Running: $($_.FullName)" -ForegroundColor Cyan
               & $_.FullName
             }
@@ -129,12 +128,11 @@ jobs:
       - name: Validate Directory Structure
         run: |
           required_dirs=(
-            "phases"
-            "components"
+            "docs/phases"
             "scripts"
             "docs"
-            "tests"
-            "configs"
+            "src/tests"
+            "src/core"
           )
           
           for dir in "${required_dirs[@]}"; do
