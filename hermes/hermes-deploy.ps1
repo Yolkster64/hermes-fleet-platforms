@@ -6,19 +6,25 @@ param(
 )
 
 Write-Host "Detecting environment..."
-# (Pseudo) Detect environment and set variables
+$envType = & "hermes/detect-environment.ps1"
+Write-Host "Environment detected: $envType"
+& "hermes/log-event.ps1" -Message "Environment detected: $envType"
 
 Write-Host "Installing required drivers and utilities..."
-# (Pseudo) Install Steam, Synapse/Chroma, Intel Arc, NVIDIA, THX, etc.
+& "hermes/install-drivers.ps1" -EnvType $envType
+& "hermes/log-event.ps1" -Message "Drivers installed for $envType"
 
 Write-Host "Validating signatures..."
-# (Pseudo) Validate all binaries/drivers/scripts
+& "hermes/validate-signatures.ps1"
+& "hermes/log-event.ps1" -Message "Signatures validated for $envType"
 
 Write-Host "Registering with upgrade manager..."
-# (Pseudo) Register install for future upgrades/rollback
+& "hermes/register-upgrade.ps1" -EnvType $envType
+& "hermes/log-event.ps1" -Message "Upgrade manager registered for $envType"
 
 Write-Host "Migrating profiles if needed..."
-# (Pseudo) Profile migration logic
+& "hermes/migrate-profiles.ps1" -EnvType $envType
+& "hermes/log-event.ps1" -Message "Profiles migrated for $envType"
 
 Write-Host "Deployment complete. Logs saved."
-# (Pseudo) Log all actions
+& "hermes/log-event.ps1" -Message "Deployment complete for $envType"
