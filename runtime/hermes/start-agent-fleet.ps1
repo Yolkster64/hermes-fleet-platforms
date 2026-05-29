@@ -1,9 +1,11 @@
 $ErrorActionPreference = "Stop"
 
 Set-Location $PSScriptRoot
+. .\start-common.ps1
 
 Write-Host "Starting Hermes Fleet (advanced + simple mode)..."
-docker compose up -d --build
+$composeArgs = Get-HermesComposeArgs
+docker compose @composeArgs up -d --no-build --remove-orphans
 
 $gateway = "http://127.0.0.1:8788"
 $gui = "http://127.0.0.1:8501"

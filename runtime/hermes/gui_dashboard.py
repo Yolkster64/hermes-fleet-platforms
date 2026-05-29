@@ -8,6 +8,9 @@ import streamlit as st
 
 API_BASE = os.getenv("HERMES_API_BASE_URL", "http://localhost:8788")
 DEFAULT_API_KEY = os.getenv("HERMES_GUI_API_KEY", "local-hermes-ui-key")
+LOW_BANDWIDTH_MODE = os.getenv("HERMES_LOW_BANDWIDTH_MODE", "true").lower() in ("1", "true", "yes", "on")
+OFFLINE_ONLY_MODE = os.getenv("HERMES_OFFLINE_ONLY", "false").lower() in ("1", "true", "yes", "on")
+USER_ROUTED_INTERNET = os.getenv("HERMES_USER_ROUTED_INTERNET", "true").lower() in ("1", "true", "yes", "on")
 AGENT_SKILLS_25 = [
     "coding",
     "error_checking",
@@ -100,6 +103,8 @@ def build_technique_profile(
     techniques: List[str], swarm_strategy: str, micro_agents: int, gaussian_pressure: float, permanent_intelligence: bool, high_level_learning: float
 ) -> Dict[str, Any]:
     has_knaa = "KNAA/QNAA reasoning" in techniques
+    has_gnaa = "GNAA adaptive memory" in techniques
+    has_chaos = "Chaos engine trials" in techniques
     has_quant = "Quantized compression" in techniques
     has_parallel = "Multi-parallel swarm" in techniques
     has_multipolar = "Multipolar ensemble" in techniques
@@ -112,17 +117,25 @@ def build_technique_profile(
         "gaussian_pressure": gaussian_pressure,
         "permanent_intelligence": permanent_intelligence,
         "high_level_learning": learning_bias,
-        "sql_signal": min(0.98, 0.80 + (0.06 if has_knaa else 0.0) + (0.04 if has_natural else 0.0) + (learning_bias * 0.04)),
-        "internet_signal": min(0.98, 0.78 + (0.10 if has_parallel else 0.0) + (0.06 if has_multipolar else 0.0) + (learning_bias * 0.06)),
-        "llm_signal": min(0.99, 0.82 + (0.07 if has_knaa else 0.0) + (0.05 if has_quant else 0.0) + (learning_bias * 0.05)),
-        "stability_bias": min(0.96, 0.72 + (0.10 if permanent_intelligence else 0.0) + (0.06 if has_quant else 0.0) + ((1.0 - learning_bias) * 0.08)),
+        "sql_signal": min(0.98, 0.80 + (0.06 if has_knaa else 0.0) + (0.04 if has_gnaa else 0.0) + (0.04 if has_natural else 0.0) + (learning_bias * 0.04)),
+        "internet_signal": (
+            0.0
+            if OFFLINE_ONLY_MODE
+            else (
+                min(0.14, max(0.06, 0.10 + (0.02 if has_parallel else 0.0) + (learning_bias * 0.02)))
+                if USER_ROUTED_INTERNET
+                else min(0.98, (0.22 if LOW_BANDWIDTH_MODE else 0.78) + (0.06 if has_parallel else 0.0) + (0.04 if has_multipolar else 0.0) + (learning_bias * (0.03 if LOW_BANDWIDTH_MODE else 0.06)))
+            )
+        ),
+        "llm_signal": min(0.99, 0.82 + (0.07 if has_knaa else 0.0) + (0.04 if has_gnaa else 0.0) + (0.05 if has_quant else 0.0) + (learning_bias * 0.05)),
+        "stability_bias": min(0.96, 0.72 + (0.10 if permanent_intelligence else 0.0) + (0.04 if has_chaos else 0.0) + (0.06 if has_quant else 0.0) + ((1.0 - learning_bias) * 0.08)),
     }
 
 
 def run_auto_cycle(max_mode: bool, technique: Dict[str, Any]) -> Dict[str, Any]:
-    steps = 520 if max_mode else 220
-    candidates = min(500, (320 if max_mode else 140) + int(technique.get("micro_agents", 48) * 0.2))
-    sim_steps = 320 if max_mode else 120
+    steps = (280 if max_mode else 140) if LOW_BANDWIDTH_MODE else (520 if max_mode else 220)
+    candidates = min(500, ((190 if max_mode else 90) if LOW_BANDWIDTH_MODE else (320 if max_mode else 140)) + int(technique.get("micro_agents", 48) * (0.12 if LOW_BANDWIDTH_MODE else 0.2)))
+    sim_steps = (140 if max_mode else 70) if LOW_BANDWIDTH_MODE else (320 if max_mode else 120)
     specialty = f"fleet:{technique.get('swarm_strategy', 'hybrid')}"
 
     simulate, sim_err = safe_post("/simulate", {"specialty": specialty, "steps": sim_steps})
@@ -133,7 +146,7 @@ def run_auto_cycle(max_mode: bool, technique: Dict[str, Any]) -> Dict[str, Any]:
             "steps": steps,
             "candidates": candidates,
             "sql_signal": technique["sql_signal"],
-            "internet_signal": technique["internet_signal"],
+            "internet_signal": 0.0 if OFFLINE_ONLY_MODE else (min(0.14, technique["internet_signal"]) if USER_ROUTED_INTERNET else (min(0.30, technique["internet_signal"]) if LOW_BANDWIDTH_MODE else technique["internet_signal"])),
             "llm_signal": technique["llm_signal"],
             "stability_bias": max(0.60, min(0.98, technique["stability_bias"] + (technique["gaussian_pressure"] * 0.04))),
         },
@@ -144,7 +157,7 @@ def run_auto_cycle(max_mode: bool, technique: Dict[str, Any]) -> Dict[str, Any]:
         "/curate-learning",
         {
             "sql_signal": technique["sql_signal"],
-            "internet_signal": technique["internet_signal"],
+            "internet_signal": 0.0 if OFFLINE_ONLY_MODE else (min(0.14, technique["internet_signal"]) if USER_ROUTED_INTERNET else technique["internet_signal"]),
             "llm_signal": technique["llm_signal"],
             "stability_bias": technique["stability_bias"],
         },
@@ -174,7 +187,7 @@ def run_special_fleet_training(max_mode: bool, study_areas: List[str], technique
             "steps": steps,
             "candidates": candidates,
             "sql_signal": technique["sql_signal"],
-            "internet_signal": min(0.99, technique["internet_signal"] + 0.03),
+            "internet_signal": 0.0 if OFFLINE_ONLY_MODE else (min(0.14, technique["internet_signal"] + 0.01) if USER_ROUTED_INTERNET else min(0.99, technique["internet_signal"] + 0.03)),
             "llm_signal": min(0.99, technique["llm_signal"] + 0.02),
             "stability_bias": technique["stability_bias"],
         },
@@ -251,7 +264,7 @@ def deep_auto_learning_zone(max_mode: bool, study_areas: List[str], rounds: int,
                 "steps": steps + (i * 120),
                 "candidates": candidates,
                 "sql_signal": technique["sql_signal"],
-                "internet_signal": technique["internet_signal"],
+                "internet_signal": 0.0 if OFFLINE_ONLY_MODE else (min(0.14, technique["internet_signal"]) if USER_ROUTED_INTERNET else technique["internet_signal"]),
                 "llm_signal": technique["llm_signal"],
                 "stability_bias": max(0.60, min(0.98, technique["stability_bias"] + (technique["gaussian_pressure"] * 0.05))),
             },
@@ -367,6 +380,9 @@ with st.sidebar:
 unified, unified_err = safe_get("/unified-config", timeout=20)
 bonus_data, bonus_err = safe_get("/aihub-bonus", timeout=20)
 snapshot, snapshot_err = safe_get("/snapshot", timeout=20)
+growth_data, growth_err = safe_get("/learning-growth", timeout=20)
+cpp_kernel, cpp_kernel_err = safe_get("/cpp-kernel-status", timeout=20)
+knowledge_mesh, mesh_err = safe_get("/knowledge-mesh", timeout=20)
 aihub_bonus = float(bonus_data.get("aihub_bonus", 0.0))
 agent_rows = normalize_agents(snapshot, aihub_bonus) if not snapshot_err else []
 runtime_hermes = len(agent_rows)
@@ -392,14 +408,56 @@ st.write(
     f"entry={unified.get('single_exe_entrypoint', 'hermes-gateway')} | "
     f"profile={unified.get('aihub_shared_ml_profile', 'global-learning')}"
 )
+if LOW_BANDWIDTH_MODE:
+    st.caption("Low-bandwidth mode: local-first routing with minimized internet-signal weight for faster, lighter cycles.")
+if USER_ROUTED_INTERNET and not OFFLINE_ONLY_MODE:
+    st.caption("Internet mode: routed through your controlled path only (capped low internet-signal).")
 render_learning_diagram()
+
+cpp1, cpp2, cpp3 = st.columns(3)
+cpp_available = bool(cpp_kernel.get("available", False)) if not cpp_kernel_err else False
+cpp1.metric("C++ Brain Kernel", "Active" if cpp_available else "Fallback")
+cpp2.metric("Chaos + Gaussian", "On" if cpp_available else "Degraded")
+cpp3.metric("KNAA/GNAA Core", "Native" if cpp_available else "Python")
+if cpp_kernel_err:
+    st.caption(f"C++ kernel status pending: {cpp_kernel_err}")
+else:
+    st.caption(f"C++ library: {cpp_kernel.get('library_path', 'n/a')}")
+
+st.subheader("Knowledge Mesh + Long-Term Compression")
+if mesh_err:
+    st.caption(f"Knowledge mesh pending: {mesh_err}")
+else:
+    summary = knowledge_mesh.get("summary", {})
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Mesh Links", str(int(summary.get("link_count", 0))))
+    m2.metric("Mesh Paths", str(int(summary.get("unique_paths", 0))))
+    m3.metric("Task Families", str(int(summary.get("task_families", 0))))
+    m4.metric("Avg Confidence", f"{float(summary.get('avg_confidence', 0.0)):.3f}")
+    latest_links = knowledge_mesh.get("links", [])[:8]
+    if latest_links:
+        st.dataframe(
+            [
+                {
+                    "Source": item.get("source_agent"),
+                    "Target": item.get("target_agent"),
+                    "Task": item.get("task_family"),
+                    "Weight": round(float(item.get("weight", 0.0)), 4),
+                    "Confidence": round(float(item.get("confidence", 0.0)), 4),
+                    "Shape3D": ", ".join(f"{float(v):.3f}" for v in item.get("shape3d", [0.0, 0.0, 0.0])),
+                }
+                for item in latest_links
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
 
 mode = st.radio("Training Level", ["Easy", "Near Max Hermes"], horizontal=True, index=1)
 max_mode = mode == "Near Max Hermes"
 
 study_areas = st.multiselect(
     "Study Areas",
-    ["Security", "Optimization", "AIHub", "Fleet Topology", "Learning Retention", "Truth & Safety", "Internet Signals", "Cost Efficiency"],
+    ["Security", "Optimization", "AIHub", "Movies & Media", "Fleet Topology", "Learning Retention", "Truth & Safety", "Internet Signals", "Cost Efficiency"],
     key="ctl_study_areas",
 )
 with st.expander("Advanced Intelligence Techniques"):
@@ -411,14 +469,23 @@ with st.expander("Advanced Intelligence Techniques"):
             "Multi-parallel swarm",
             "Multipolar ensemble",
             "Natural pressure adaptation",
+            "GNAA adaptive memory",
+            "Chaos engine trials",
+            "Gaussian 3D evidence",
+            "C++ neural kernel boost",
+            "Sub-agent niche shaping",
             "Cross-agent communication mesh",
         ],
         key="ctl_techniques",
     )
-    swarm_strategy = st.selectbox("Swarm strategy", ["hybrid", "swarm", "mesh", "multipolar", "specialist-mix"], key="ctl_swarm_strategy")
+    swarm_strategy = st.selectbox("Swarm strategy", ["normal", "hybrid", "swarm", "mesh", "multipolar", "specialist-mix"], key="ctl_swarm_strategy")
+    st.caption("Type guide: normal=stable baseline, hybrid=balanced, swarm=parallel speed, mesh=collaboration depth, multipolar=diverse reasoning, specialist-mix=niche experts.")
     micro_agents = st.slider("Micro Hermes agents", min_value=16, max_value=256, step=16, key="ctl_micro_agents")
+    st.caption("Micro agents ideal range: 96-224 for heavy learning; 48-128 for cost-sensitive runs.")
     gaussian_pressure = st.slider("Gaussian learning pressure", min_value=0.40, max_value=1.00, step=0.02, key="ctl_gaussian_pressure")
+    st.caption("Gaussian pressure ideal range: 0.70-0.92 for stable growth; >0.92 is aggressive exploration.")
     permanent_intelligence = st.checkbox("Permanent intelligence memory mode", key="ctl_permanent_intelligence")
+    st.caption("Permanent intelligence keeps long-horizon memory, affecting all future training cycles.")
     high_level_learning = st.slider(
         "High-level learning focus (performance -> long-term learning)",
         min_value=0.0,
@@ -426,6 +493,7 @@ with st.expander("Advanced Intelligence Techniques"):
         step=0.01,
         key="ctl_high_level_learning",
     )
+    st.caption("High-level learning ideal range: 0.65-0.88 for best blend of performance + long-term adaptation.")
 
 technique_profile = build_technique_profile(
     techniques=techniques,
@@ -442,6 +510,8 @@ st.caption(
     f"high_level_learning={technique_profile['high_level_learning']:.2f}"
 )
 st.caption("Agent skill system: 25 total skills, 3 active skills per Hermes unit.")
+if "Movies & Media" in study_areas:
+    st.caption("Movies/media domain is active: AIHub movie bonus + mesh learning ingestion enabled.")
 
 learned_profile = latest_learned_profile(snapshot)
 sync1, sync2, sync3 = st.columns([1.1, 1.1, 2.2])
@@ -497,8 +567,12 @@ fleet_truth = pull_metric(snapshot, ("avg_truth_score", "truth_score", "truth"),
 fleet_shape = pull_metric(snapshot, ("avg_fleet_shape_score", "fleet_shape_score"), default=0.0)
 learning_depth = pull_metric(snapshot, ("learning_steps", "steps", "total_steps"), default=0.0)
 fleet_score = max(0.0, min(100.0, ((fleet_reward * 0.35) + (fleet_truth * 0.35) + (fleet_shape * 0.30)) * 100.0))
+growth_index = float(growth_data.get("growth_index", 0.0)) if not growth_err else 0.0
+knowledge_depth = growth_data.get("knowledge_depth", {}) if isinstance(growth_data, dict) else {}
 st.progress(float(max(0.0, min(1.0, avg_progress))), text=f"Fleet Progress: {avg_progress * 100:.1f}%")
-st.metric("Fleet Score", f"{fleet_score:.1f}/100")
+g1, g2 = st.columns(2)
+g1.metric("Fleet Score", f"{fleet_score:.1f}/100")
+g2.metric("Hermes Growth", f"{growth_index * 100:.1f}%")
 xp1, xp2, xp3, xp4 = st.columns(4)
 with xp1:
     render_xp_bar("Learning XP", min(1.0, learning_depth / 1000.0), "#48C9B0")
@@ -520,6 +594,24 @@ with trend2:
     score_tail = fleet_score_history(snapshot)
     if score_tail:
         st.line_chart(score_tail[-20:])
+if isinstance(knowledge_depth, dict):
+    st.caption(
+        "Knowledge depth: "
+        f"bandits={int(knowledge_depth.get('bandit_specialties', 0))} | "
+        f"q_states={int(knowledge_depth.get('q_table_states', 0))} | "
+        f"beta_priors={int(knowledge_depth.get('beta_priors', 0))} | "
+        f"hard_facts={int(knowledge_depth.get('hard_facts', 0))} | "
+        f"adaptive_channels={int(knowledge_depth.get('adaptive_dynamic_channels', 0))}"
+    )
+adaptive_mods = snapshot.get("adaptive_dynamic_modifiers", {}) if isinstance(snapshot, dict) else {}
+if isinstance(adaptive_mods, dict) and adaptive_mods:
+    st.caption(
+        "Adaptive center: "
+        f"range={adaptive_mods.get('moving_range_low', 0.0):.2f}-{adaptive_mods.get('moving_range_high', 1.0):.2f}, "
+        f"confidence={adaptive_mods.get('confidence_signal', 0.0):.2f}, "
+        f"modifier_gain={adaptive_mods.get('modifier_gain', 0.0):.2f}, "
+        f"pivot_bias={adaptive_mods.get('pivot_bias', 0.0):.2f}"
+    )
 
 summary_left, summary_right = st.columns([2, 1])
 with summary_left:
@@ -549,7 +641,24 @@ with summary_right:
             log_text("fleet-health-report", chat)
             st.success("Fleet health report generated.")
     if st.button("🚀 Deploy All Hermes", use_container_width=True):
-        deploy = run_auto_cycle(max_mode=True, technique=technique_profile)
+        deploy, deploy_err = safe_post(
+            "/runtime-orchestrate/deploy",
+            {
+                "mode": "deploy",
+                "scope": "all",
+                "specialty": "fleet",
+                "steps": 240,
+                "candidates": 160,
+                "sql_signal": min(0.99, technique_profile["sql_signal"] + 0.05),
+                "internet_signal": 0.0 if OFFLINE_ONLY_MODE else technique_profile["internet_signal"],
+                "llm_signal": min(0.99, technique_profile["llm_signal"] + 0.05),
+                "stability_bias": min(0.99, technique_profile["stability_bias"] + 0.02),
+            },
+            timeout=120,
+        )
+        if deploy_err:
+            st.error(f"Deploy orchestration failed: {deploy_err}")
+            deploy = {"error": deploy_err}
         log_text("deploy-all-hermes", deploy)
         st.success("All Hermes units deployed and synced.")
     if st.button("⚡ Permanent Bonus Boost", use_container_width=True):
@@ -557,7 +666,7 @@ with summary_right:
             "/curate-learning",
             {
                 "sql_signal": min(0.99, technique_profile["sql_signal"] + 0.04),
-                "internet_signal": min(0.99, technique_profile["internet_signal"] + 0.04),
+                "internet_signal": 0.0 if OFFLINE_ONLY_MODE else (min(0.14, technique_profile["internet_signal"] + 0.01) if USER_ROUTED_INTERNET else min(0.99, technique_profile["internet_signal"] + 0.04)),
                 "llm_signal": min(0.99, technique_profile["llm_signal"] + 0.04),
                 "stability_bias": min(0.99, technique_profile["stability_bias"] + 0.03),
             },
@@ -569,10 +678,10 @@ with summary_right:
 
 act1, act2, act3, act4, act5 = st.columns([1.1, 1, 1, 1.1, 1.3])
 with act1:
-    if st.button("Run Full Auto Learning + Fleet Upgrade", use_container_width=True):
+    if st.button("⚡ One Fusion Run (4-in-1)", use_container_width=True):
         result = run_auto_cycle(max_mode=max_mode, technique=technique_profile)
         log_text("full-auto-cycle", result)
-        st.success("Auto cycle finished.")
+        st.success("Fusion run finished (simulate + pulse + optimize + curate/dedupe).")
         st.text_area("Auto Cycle Result", value=json.dumps(result, indent=2), height=260)
 with act2:
     if st.button("Refresh Fleet Data", use_container_width=True):
@@ -663,11 +772,52 @@ if st.button("Send to Hermes", use_container_width=True):
         st.error(f"Hermes text request failed: {chat_err}")
     else:
         st.session_state["last_chat"] = chat.get("response_text", "")
+        st.session_state["last_chat_optimizer"] = chat.get("provider_response", {}).get("multi_llm_optimizer", {})
         log_text("learning-space-chat", chat)
         st.success("Hermes response ready.")
 if st.session_state.get("last_chat", ""):
     st.text_area("Hermes Learning Response", value=st.session_state["last_chat"], height=220)
+    opt = st.session_state.get("last_chat_optimizer", {})
+    if isinstance(opt, dict) and opt:
+        st.caption(
+            f"Multi-LLM optimizer: model={opt.get('selected_model')} | "
+            f"blend={opt.get('blend_mode')} | "
+            f"cost=${float(opt.get('estimated_cost_usd', 0.0)):.4f} | "
+            f"speed={float(opt.get('estimated_tokens_per_sec', 0.0)):.1f} tok/s | "
+            f"eff={float(opt.get('token_efficiency', 0.0)):.3f}"
+        )
 st.caption("Prompt path: Prompt -> Hermes fleet agents -> learning pulse -> optimization -> bonus + XP")
+
+st.subheader("Local Learning Data (easy)")
+exp1, exp2, exp3 = st.columns([1.2, 1.2, 2.2])
+with exp1:
+    if st.button("Export Full Learning State", use_container_width=True):
+        learning_state, ls_err = safe_get("/learning-state", timeout=30)
+        if ls_err:
+            st.error(f"Export failed: {ls_err}")
+        else:
+            st.session_state["learning_state_blob"] = json.dumps(learning_state, indent=2)
+            st.success("Learning state exported.")
+with exp2:
+    if st.button("Import Learning State", use_container_width=True):
+        raw = st.session_state.get("learning_state_blob", "").strip()
+        if not raw:
+            st.warning("Paste/export state JSON first.")
+        else:
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                st.error(f"Invalid JSON: {exc}")
+            else:
+                imp, imp_err = safe_post("/learning-state/import", parsed, timeout=45)
+                if imp_err:
+                    st.error(f"Import failed: {imp_err}")
+                else:
+                    st.success("Learning state imported.")
+                    log_text("learning-state-import", imp)
+with exp3:
+    st.caption("Use this to move full Hermes learning memory locally between runs/machines.")
+st.text_area("Learning State JSON", key="learning_state_blob", height=220)
 
 st.subheader("Hermes Fleet Units")
 if snapshot_err:

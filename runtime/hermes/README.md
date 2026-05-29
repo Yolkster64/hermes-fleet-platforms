@@ -3,6 +3,7 @@
 1. Start stack:
    - `pwsh ./runtime/hermes/start-local.ps1`
    - or one-command advanced fleet startup: `pwsh ./runtime/hermes/start-agent-fleet.ps1`
+   - startup scripts auto-enable `docker-compose.intel.yml` when `/dev/dri` is detected for Intel Arc/NPU acceleration
 2. MCP Docker gateway (primary entry):
    - `http://localhost:${MCP_DOCKER_PORT:-8788}`
 3. GUI:
@@ -17,13 +18,40 @@ This runtime enables:
 - Unified non-blocking flow pulse through `/learning-pulse` (simulate + optimize + curate in one call)
 - Duplicate-data optimization scan through `/dedupe-optimize` to reduce redundant learning input
 - AIHub intelligence bonus endpoint `/aihub-bonus` for cross-LLM/Hermes uplift signal
-- SQL telemetry in `runtime/auto/hermes_super_orchestrator.db`
+- SQL telemetry in `/workspace/runtime/hermes_persist/hermes_super_orchestrator.db` (via Docker named volume `hermes-data`)
+- Telemetry guardrails for local durability:
+  - Row retention caps per telemetry table (pruned on interval)
+  - External signal payload cap (`HERMES_MAX_EXTERNAL_SIGNAL_BYTES`) to avoid runaway DB growth
+- Full orchestrator learning-state persistence:
+  - `HERMES_ORCHESTRATOR_STATE_PATH=/workspace/runtime/hermes_persist/hermes_orchestrator_state.json`
+  - `HERMES_ORCHESTRATOR_STATE_SAVE_SECONDS=10`
+- Learning-state APIs for local data flow:
+  - `GET /learning-growth`
+  - `GET /learning-state`
+  - `POST /learning-state/import`
+  - `GET /knowledge-mesh`
+  - `POST /ingest-knowledge-mesh`
+- Native C++ learning kernel in containers:
+  - API service auto-builds `core/native/hermes_learning_kernel.so` on startup
+  - Kernel status endpoint: `GET /cpp-kernel-status`
+  - Bridge modes: `native_cpp` when available, `python_fallback` otherwise
+  - Adaptive Brain super-algorithm enabled in C++ (`adaptive_brain_decision`) with moving ranges, evidence-amplified modifiers, fuzzy/proactive decisioning, and cautious-vs-pivot behavior tied into fleet training + AIHub bonus
+  - C++ data/learning upgrades include quantized compression + linear-regression prediction used by prethink planning
+  - Hard-fact evidence locking is enabled: repeated high-confidence patterns can lock and bypass unstable branches when conditions are met
+- Volume-backed long-term learning mesh:
+  - `hermes-data` persists compressed mesh links, 3D evidence shapes, and cross-agent transfer signals in SQLite (`knowledge_mesh_links`)
 - Continuous fleet auto-training via `hermes-trainer` service
 - C# performance front-end (`hermes-gateway`) for smoother API routing and integration
+- C# orchestration control-plane endpoints:
+  - `POST /auth/login` (session token for gateway auth)
+  - `POST /runtime-orchestrate/deploy` (C#-dispatched learning pulse + optimize deploy flow)
+  - `POST /runtime-orchestrate/restore` (restore/swap orchestration signal path)
+  - `POST /runtime-bridge/transfer` (C# runtime bridge for C++/Python/Java transfer metadata and dispatch)
 - API security between gateway and backend via `HERMES_API_KEY`
 - Single EXE entrypoint through C# gateway publish (`runtime/hermes/build-single-exe.ps1`)
   - Output: `runtime/hermes/dist/HermesUnified.exe`
 - LLM API bridge for Hermes via `/llm-chat` (through gateway) uses a built-in temporary API by default (no env vars required)
+- Multi-LLM optimizer is active in Hermes `/llm-chat` responses (`provider_response.multi_llm_optimizer`) for blended cost/speed/power routing
 - GUI text training ground for direct prompt/response workflow against the shared AIHub model
 - Expanded text-first GUI control center with:
   - One-screen super-easy flow
@@ -53,14 +81,25 @@ This runtime enables:
   - Spatial overlap map compares strategy groups/setups in multi-analysis form (overlap + distance) for stronger setting selection
   - Strategy memory now updates with value-brain-assisted reward weighting for longer-term, smarter adaptation
   - Full auto cycle button (simulate + pulse + optimize + curate + dedupe)
-  - Built-in API key field in GUI sidebar (uses `X-Hermes-Key`)
+  - Built-in API key field in GUI sidebar (uses `X-Hermes-Key`) plus optional gateway session tokens (`X-Hermes-Session`)
 - Resource targeting via env vars:
-  - `HERMES_GPU_TARGET_UTILIZATION` (default `0.92`)
+  - `HERMES_GPU_TARGET_UTILIZATION` (default `0.75`)
   - `HERMES_CPU_TARGET_UTILIZATION` (default `0.95`)
+- Docker service resource envelope (current defaults):
+  - `hermes-trainer`: `cpus: 24.0`, `memory: 20G`
+  - `hermes-api`: `cpus: 24.0`, `memory: 20G`
+  - `hermes-gateway`: `cpus: 24.0`, `memory: 3G`
+  - `hermes-gui`: `cpus: 24.0`, `memory: 3G`
+  - Persistent learning/data volume: `hermes-data` mounted at `/workspace/runtime/hermes_persist`
 - Unified AI/ML contract across AIHub + Hermes + security/optimization services:
   - `AIHUB_UNIFIED_ENABLED` (default `true`)
-  - `AIHUB_SHARED_MODEL_ID` (default `aihub-unified-v1`)
+  - `AIHUB_SHARED_MODEL_ID` (default `hermes-fleet-latest`)
   - `AIHUB_SHARED_ML_PROFILE` (default `global-learning`)
+  - `HERMES_FLEET_MODEL_LABEL` (default `hermes-fleet-newest`)
+  - `HERMES_MCP_SERVER` (default `github`)
+  - `HERMES_LOW_BANDWIDTH_MODE` (default `true`, local-first/low internet traffic)
+  - `HERMES_USER_ROUTED_INTERNET` (default `true`, internet influence only through your controlled pathway with capped weighting)
+  - `HERMES_OFFLINE_ONLY` (default `false`; set `true` for strict no-internet weighting)
   - Inspect with `GET /unified-config` on gateway (`:${MCP_DOCKER_PORT:-8788}`)
 - Auto trainer defaults are tuned near max throughput in Docker:
   - `HERMES_TRAIN_STEPS=2000`
@@ -72,13 +111,17 @@ This runtime enables:
   - `HERMES_SMART_ACTIONS=true`
   - `HERMES_ALWAYS_DEEP_LEARNING=true`
   - `HERMES_SWARM_STRATEGY=hybrid`
-  - `HERMES_MICRO_AGENT_COUNT=128`
+  - `HERMES_LEARNING_STATE_PATH=/workspace/runtime/hermes_persist/hermes_learning_state.json`
+  - `HERMES_FLEET_MODEL_LABEL=hermes-fleet-newest`
   - `HERMES_GAUSSIAN_PRESSURE=0.88`
   - `HERMES_PERMANENT_INTELLIGENCE=true`
   - `HERMES_SPECIALIST_MODES=swarm,mesh,multipolar,specialist-mix`
   - `HERMES_AGENT_WORK_STYLES=fast_micro,deep_specialist,balanced_hybrid`
   - Agent behavior rotates specialist mode + work style + 3-skill packs continuously to discover faster fleet configurations
   - Behavior: trainer now runs continuous smart-action loops (simulate + pulse + curate + dedupe + optimize + LLM-guided action routing)
+  - Two-way learning memory is preserved in Docker volume + fleet loops:
+    - Container persistence: SQLite + JSON state under `/workspace/runtime/hermes_persist` (`hermes-data` volume)
+    - Fleet persistence: trainer continuously publishes learned signals back into orchestrator endpoints
 - Gateway API key is enabled by default in compose:
   - `HERMES_GATEWAY_KEY=local-hermes-ui-key`
   - GUI and trainer are pre-wired to use the same key
