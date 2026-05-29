@@ -33,22 +33,12 @@ namespace HELIOS.Platform.Architecture
     /// <summary>
     /// Service registry for discovering and managing services
     /// </summary>
-    public interface IServiceRegistry
-    {
-        void Register(ServiceMetadata metadata);
-        void Unregister(string serviceName);
-        ServiceMetadata Discover(string serviceName);
-        IEnumerable<ServiceMetadata> DiscoverByTag(string tagKey, object tagValue);
-        IEnumerable<ServiceMetadata> GetAllServices();
-        void UpdateHealth(string serviceName, ServiceHealthStatus status);
-        ServiceHealthStatus GetHealth(string serviceName);
-        bool IsHealthy(string serviceName);
-    }
+
 
     /// <summary>
     /// Service registry implementation
     /// </summary>
-    public class ServiceRegistry : IServiceRegistry
+    public class ServiceRegistry : MonadoBlade.Core.Common.IServiceRegistry
     {
         private readonly Dictionary<string, ServiceMetadata> _registry = new();
         private readonly ReaderWriterLockSlim _lock = new();

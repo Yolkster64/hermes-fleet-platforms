@@ -78,13 +78,13 @@ namespace MonadoBlade.Week6.Services
                 task.Status = MaintenanceTaskStatus.Completed;
                 task.LastRunTime = DateTime.UtcNow;
                 task.NextRunTime = CalculateNextRunTime(task.CronExpression);
-                result.Success = true;
+                result = Result.Ok(result.Value);
                 result.Status = "Completed";
             }
             catch (Exception ex)
             {
                 task.Status = MaintenanceTaskStatus.Failed;
-                result.Success = false;
+                result = Result.Fail<MaintenanceResult>("Operation failed");
                 result.ErrorMessage = ex.Message;
                 result.Status = "Failed";
             }

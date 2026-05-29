@@ -44,7 +44,7 @@ namespace MonadoBlade.Week6.Interfaces
         void SubscribeToAlerts(Action<ResourceAlert> handler);
 
         /// <summary>Triggers auto-remediation if possible.</summary>
-        Task<RemediationResult> AutoRemediateAsync(ResourceAlert alert);
+        Task<Result<RemediationResult>> AutoRemediateAsync(ResourceAlert alert);
 
         /// <summary>Forecasts resource capacity (when disk/memory will fill).</summary>
         Task<CapacityForecast> ForecastCapacityAsync();
@@ -141,7 +141,6 @@ namespace MonadoBlade.Week6.Interfaces
 
     public class RemediationResult
     {
-        public bool Success { get; set; }
         public string? Action { get; set; }
         public string? Details { get; set; }
         public ResourceAlert? AlertAfterRemediation { get; set; }

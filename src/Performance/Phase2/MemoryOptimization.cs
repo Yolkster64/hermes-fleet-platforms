@@ -6,7 +6,7 @@ namespace MonadoBlade.Performance.Phase2
 {
     /// <summary>
     /// Object pooling for frequently allocated objects to reduce GC pressure.
-    /// Implements ArrayPool<T> patterns and readonly structs for 30% memory reduction.
+    /// Implements ArrayPool<T> patterns and readonly structs for 30% memory reduction. (Legacy comments removed for clarity)
     /// </summary>
     public interface IObjectPool<T> where T : class, new()
     {

@@ -1,4 +1,6 @@
 namespace MonadoBlade.Core.Common;
+using MonadoBlade.Core.Patterns;
+using MonadoBlade.Core.Common;
 
 /// <summary>
 /// Core interface ALL services implement. Every system component extends this.
@@ -29,7 +31,7 @@ public interface IServiceContext
     string CorrelationId { get; }
     
     /// <summary>Gets user/tenant context.</summary>
-    IPrincipal? Principal { get; }
+    System.Security.Principal.IPrincipal? Principal { get; }
     
     /// <summary>Gets configuration provider.</summary>
     IConfigurationProvider Configuration { get; }

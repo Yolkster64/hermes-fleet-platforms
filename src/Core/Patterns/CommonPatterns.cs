@@ -1,4 +1,5 @@
 namespace MonadoBlade.Core.Patterns;
+using MonadoBlade.Core.Common;
 
 /// <summary>
 /// Async operation pattern with automatic timing, retries, and metrics.

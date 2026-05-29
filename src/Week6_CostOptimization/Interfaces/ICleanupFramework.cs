@@ -11,22 +11,22 @@ namespace MonadoBlade.Week6.Interfaces
     public interface ICleanupAutomationFramework
     {
         /// <summary>Deletes cache items older than specified days.</summary>
-        Task<CleanupResult> CacheCleanupAsync(int daysOld = 7);
+        Task<Result<CleanupResult>> CacheCleanupAsync(int daysOld = 7);
 
         /// <summary>Clears temporary files from temp partition.</summary>
-        Task<CleanupResult> TempFileCleanupAsync();
+        Task<Result<CleanupResult>> TempFileCleanupAsync();
 
         /// <summary>Archives old backups to cold storage and deletes local copies.</summary>
-        Task<CleanupResult> BackupArchivalAsync(int daysOld = 30);
+        Task<Result<CleanupResult>> BackupArchivalAsync(int daysOld = 30);
 
         /// <summary>Compresses logs older than daysOld, deletes logs older than 1 year.</summary>
-        Task<CleanupResult> LogCleanupAsync(int daysOld = 7);
+        Task<Result<CleanupResult>> LogCleanupAsync(int daysOld = 7);
 
         /// <summary>Removes unused Docker images.</summary>
-        Task<CleanupResult> DockerCleanupAsync();
+        Task<Result<CleanupResult>> DockerCleanupAsync();
 
         /// <summary>Cleans unused NuGet packages from cache.</summary>
-        Task<CleanupResult> NuGetCacheCleanupAsync();
+        Task<Result<CleanupResult>> NuGetCacheCleanupAsync();
 
         /// <summary>Defragments NTFS partitions.</summary>
         Task<DefragResult> DefragmentNtfsAsync(string driveLetter = "C:");
@@ -58,7 +58,6 @@ namespace MonadoBlade.Week6.Interfaces
 
     public class CleanupResult
     {
-        public bool Success { get; set; }
         public string Operation { get; set; }
         public int ItemsProcessed { get; set; }
         public int ItemsDeleted { get; set; }

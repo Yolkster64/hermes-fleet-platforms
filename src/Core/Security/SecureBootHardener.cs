@@ -106,9 +106,9 @@ namespace MonadoBlade.Core.Security
         public BootAttestationResult PerformBootAttestation(Dictionary<int, string> expectedPCRValues)
         {
             if (!_tpm2Available)
-                return new BootAttestationResult { Success = false, Reason = "TPM 2.0 not available" };
+                return Result.Fail<BootAttestationResult>("TPM 2.0 not available");
 
-            var result = new BootAttestationResult { Success = true };
+            var result = Result.Ok(new BootAttestationResult());
             var mismatches = new List<string>();
 
             foreach (var kvp in expectedPCRValues)
@@ -125,7 +125,7 @@ namespace MonadoBlade.Core.Security
                 var actualHash = _pcrBank[pcrIndex];
                 if (!actualHash.Equals(expectedHash, StringComparison.OrdinalIgnoreCase))
                 {
-                    result.Success = false;
+                    result = Result.Fail<BootAttestationResult>("Operation failed");
                     mismatches.Add($"PCR[{pcrIndex}] mismatch - Expected: {expectedHash}, Got: {actualHash}");
                 }
             }

@@ -10,60 +10,9 @@ using System;
 using System.Collections.Generic;
 
 /// <summary>
-/// Unified error result type - consolidates try-catch patterns throughout codebase.
-/// CONSOLIDATION: Replaces Result, Failure, Success patterns with single canonical Result<T>.
-/// Benefit: Eliminates exception throwing for expected failures, improves performance and testability.
+/// Error handling and dependency injection consolidation.
 /// </summary>
-public abstract record Result
-{
-    public sealed record Success : Result;
-    public sealed record Failure(string ErrorMessage, Exception Exception = null) : Result;
-
-    public static Result Ok() => new Success();
-    public static Result Fail(string message, Exception ex = null) => new Failure(message, ex);
-    public static Result<T> Ok<T>(T value) => new Result<T>.Success(value);
-    public static Result<T> Fail<T>(string message, Exception ex = null) => new Result<T>.Failure(message, ex);
-
-    public bool IsSuccess => this is Success;
-    public bool IsFailure => this is Failure;
-}
-
-/// <summary>
-/// Typed result with value - eliminates ComputeResult, FileOperationResult duplication.
-/// </summary>
-public abstract record Result<T>
-{
-    public sealed record Success(T Value) : Result<T>;
-    public sealed record Failure(string ErrorMessage, Exception Exception = null) : Result<T>;
-
-    public TResult Match<TResult>(
-        Func<T, TResult> onSuccess,
-        Func<string, Exception, TResult> onFailure) =>
-        this switch
-        {
-            Success s => onSuccess(s.Value),
-            Failure f => onFailure(f.ErrorMessage, f.Exception),
-            _ => throw new InvalidOperationException("Unknown Result type")
-        };
-
-    public void Match(
-        Action<T> onSuccess,
-        Action<string, Exception> onFailure) =>
-        _ = Match(
-            v => { onSuccess(v); return true; },
-            (msg, ex) => { onFailure(msg, ex); return true; });
-
-    public bool IsSuccess => this is Success;
-    public bool IsFailure => this is Failure;
-
-    public T ValueOrThrow() =>
-        Match(
-            v => v,
-            (msg, ex) => throw new InvalidOperationException(msg, ex));
-
-    public T ValueOrDefault(T defaultValue = default) =>
-        Match(v => v, (_, __) => defaultValue);
-}
+// (Result/Result<T> definitions removed; see ResultPattern.cs for canonical implementation)
 
 /// <summary>
 /// Error code enumeration - consolidates error handling across services.
@@ -218,55 +167,7 @@ public sealed class ServiceNotRegisteredException : Exception
 ///         .AddCoreServices()
 ///         .Build();
 /// </summary>
-public sealed class ServiceRegistrationBuilder
-{
-    private readonly ServiceContainer _container;
-
-    public ServiceRegistrationBuilder()
-    {
-        _container = new ServiceContainer();
-    }
-
-    public ServiceRegistrationBuilder AddUnifiedLogger()
-    {
-        _container.RegisterSingleton<IUnifiedLogger>(new ConsoleUnifiedLogger());
-        return this;
-    }
-
-    public ServiceRegistrationBuilder AddAsyncOperationMetrics()
-    {
-        _container.RegisterSingleton(new AsyncOperationMetrics());
-        return this;
-    }
-
-    public ServiceRegistrationBuilder AddMemoryPoolManager()
-    {
-        _container.RegisterSingleton(MemoryPoolManager.Instance);
-        return this;
-    }
-
-    public ServiceRegistrationBuilder AddService<T>(T instance) where T : class
-    {
-        _container.RegisterSingleton(instance);
-        return this;
-    }
-
-    public ServiceRegistrationBuilder AddService<TInterface, T>(T instance) 
-        where TInterface : class 
-        where T : class, TInterface
-    {
-        _container.RegisterSingleton<TInterface>(instance);
-        return this;
-    }
-
-    public ServiceRegistrationBuilder AddFactory<T>(Func<ServiceContainer, T> factory) where T : class
-    {
-        _container.RegisterSingleton(factory);
-        return this;
-    }
-
-    public ServiceContainer Build() => _container;
-}
+// Duplicate removed: ServiceRegistrationBuilder now only in canonical file
 
 /// <summary>
 /// Uniform exception wrapper - consolidates exception handling patterns.

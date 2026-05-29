@@ -14,16 +14,16 @@ namespace HELIOS.Platform.Architecture.ObjectPooling
     /// - Maintains task identity while reusing object memory
     /// - Thread-safe concurrent bag for high-throughput scheduling
     /// </summary>
-    public class TaskDescriptorPool : IDisposable
+    public class TaskDescriptorPool : MonadoBlade.Performance.Phase2.IObjectPool<TaskDescriptor>, IDisposable
     {
         private readonly ConcurrentBag<TaskDescriptor> _pool;
         private readonly int _initialSize;
         private readonly int _maxSize;
         private volatile int _poolSize;
-        private volatile long _allocations;
-        private volatile long _hits;
-        private volatile long _misses;
-        private volatile long _resets;
+        private long _allocations;
+        private long _hits;
+        private long _misses;
+        private long _resets;
         private bool _disposed;
 
         private readonly Stopwatch _metrics = Stopwatch.StartNew();
@@ -54,7 +54,7 @@ namespace HELIOS.Platform.Architecture.ObjectPooling
         /// <summary>
         /// Gets a task descriptor from the pool
         /// </summary>
-        public TaskDescriptor GetDescriptor()
+        public TaskDescriptor Rent()
         {
             ThrowIfDisposed();
 
@@ -75,7 +75,7 @@ namespace HELIOS.Platform.Architecture.ObjectPooling
         /// <summary>
         /// Returns a descriptor to the pool after resetting it
         /// </summary>
-        public void ReturnDescriptor(TaskDescriptor descriptor)
+        public void Return(TaskDescriptor descriptor)
         {
             ThrowIfDisposed();
 
@@ -94,7 +94,7 @@ namespace HELIOS.Platform.Architecture.ObjectPooling
         /// <summary>
         /// Gets current statistics
         /// </summary>
-        public TaskPoolStatistics GetStatistics()
+        public MonadoBlade.Performance.Phase2.PoolStatistics GetStatistics()
         {
             long totalOps = _hits + _misses;
             return new TaskPoolStatistics

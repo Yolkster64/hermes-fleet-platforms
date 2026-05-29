@@ -78,20 +78,12 @@ namespace HELIOS.Platform.Architecture
     /// <summary>
     /// Metrics collection interface
     /// </summary>
-    public interface IMetricsCollector
-    {
-        CpuMetrics GetCpuMetrics();
-        MemoryMetrics GetMemoryMetrics();
-        IEnumerable<DiskMetrics> GetDiskMetrics();
-        IEnumerable<NetworkMetrics> GetNetworkMetrics();
-        ProcessMetrics GetProcessMetrics(int processId);
-        ProcessMetrics GetProcessMetrics(string processName);
-    }
+
 
     /// <summary>
     /// Metrics collector implementation
     /// </summary>
-    public class MetricsCollector : IMetricsCollector
+    public class MetricsCollector : MonadoBlade.Core.Common.IMetricsCollector
     {
         private PerformanceCounter _cpuCounter;
         private PerformanceCounter _ramCounter;

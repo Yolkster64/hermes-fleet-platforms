@@ -58,6 +58,11 @@ class SDKConfig:
     region: str = "us-east-1"
     
     # Authentication
+
+# --- USB Device Abstraction Layer ---
+# [REMOVED UNUSED] IUSBDevice, IUSBProtocol, USBHotPlugObserver, HermesGUI stubs (see git history if needed)
+
+
     use_mtls: bool = True
     tls_cert_path: Optional[str] = None
     tls_key_path: Optional[str] = None
@@ -65,7 +70,7 @@ class SDKConfig:
     # Networking
     connect_timeout: float = 10.0
     request_timeout: float = 30.0
-    max_pool_size: int = 100
+    max_pool_size: int = 100  # Centralized pool size for all HTTP clients
     enable_compression: bool = True
     
     # Retry Policy
@@ -265,7 +270,7 @@ class HermesClient:
         self._http_client = httpx.AsyncClient(
             timeout=httpx.Timeout(self.config.request_timeout),
             limits=httpx.Limits(max_keepalive_connections=self.config.max_pool_size)
-        )
+        )  # Uses centralized pool config
         
         # SDK sub-clients
         self.llm = LLMClient(self)

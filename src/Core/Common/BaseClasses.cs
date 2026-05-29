@@ -1,6 +1,10 @@
 namespace MonadoBlade.Core.Common;
 
 using System.Collections.Concurrent;
+using MonadoBlade.Core.Patterns;
+using MonadoBlade.Core.Common;
+using MonadoBlade.Core.Patterns;
+using MonadoBlade.Core;
 
 /// <summary>
 /// Base class for all service components. Implements lifecycle, health, and context management.

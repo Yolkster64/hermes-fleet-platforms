@@ -176,7 +176,7 @@ namespace MonadoBlade.Week6.Services
             _alertHandler = handler;
         }
 
-        public async Task<RemediationResult> AutoRemediateAsync(ResourceAlert alert)
+        public async Task<Result<RemediationResult>> AutoRemediateAsync(ResourceAlert alert)
         {
             return await Task.Run(() =>
             {
@@ -200,7 +200,14 @@ namespace MonadoBlade.Week6.Services
                     result.Success = true;
                 }
 
-                return result;
+                if (result.Success)
+                {
+                    return Result.Ok(result);
+                }
+                else
+                {
+                    return Result.Fail<RemediationResult>("Remediation failed or not applicable.");
+                }
             });
         }
 

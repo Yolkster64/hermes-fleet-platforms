@@ -632,7 +632,7 @@ public class ExternalAPIGatewayTests
 public class MockServiceContext : IServiceContext
 {
     public string CorrelationId => Guid.NewGuid().ToString();
-    public IPrincipal? Principal => null;
+    public System.Security.Principal.IPrincipal? Principal => null;
     public IConfigurationProvider Configuration => new MockConfiguration();
     public ILoggingProvider Logger => new MockLogger();
     public IMetricsCollector Metrics => new MockMetrics();

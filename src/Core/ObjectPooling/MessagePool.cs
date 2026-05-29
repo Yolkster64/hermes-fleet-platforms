@@ -14,7 +14,7 @@ namespace HELIOS.Platform.Architecture.ObjectPooling
     /// - Pool hits: >85% reuse rate
     /// - Thread-safe: ConcurrentBag for lock-free operations
     /// </summary>
-    public class MessagePool : IDisposable
+    public class MessagePool : MonadoBlade.Performance.Phase2.IObjectPool<ServiceMessage>, IDisposable
     {
         private readonly ConcurrentBag<ServiceMessage> _messagePool;
         private readonly ConcurrentBag<MessagePoolMetrics> _metricsPool;
@@ -64,7 +64,7 @@ namespace HELIOS.Platform.Architecture.ObjectPooling
         /// <summary>
         /// Gets a message from the pool or creates a new one if pool is empty
         /// </summary>
-        public ServiceMessage GetMessage()
+        public ServiceMessage Rent()
         {
             ThrowIfDisposed();
 
@@ -85,7 +85,7 @@ namespace HELIOS.Platform.Architecture.ObjectPooling
         /// <summary>
         /// Returns a message to the pool after clearing its state
         /// </summary>
-        public void ReturnMessage(ServiceMessage message)
+        public void Return(ServiceMessage message)
         {
             ThrowIfDisposed();
 
@@ -142,7 +142,7 @@ namespace HELIOS.Platform.Architecture.ObjectPooling
         /// <summary>
         /// Gets current pool statistics
         /// </summary>
-        public PoolStatistics GetStatistics()
+        public MonadoBlade.Performance.Phase2.PoolStatistics GetStatistics()
         {
             return new PoolStatistics
             {

@@ -26,18 +26,12 @@ namespace HELIOS.Platform.Architecture
     /// <summary>
     /// Inter-service communication bus
     /// </summary>
-    public interface IInterServiceBus
-    {
-        void Subscribe(string serviceeName, string messageType, MessageHandler handler);
-        void Unsubscribe(string serviceName, string messageType);
-        Task PublishAsync(ServiceMessage message);
-        Task<ServiceMessage> RequestAsync(ServiceMessage message, TimeSpan timeout);
-    }
+
 
     /// <summary>
     /// In-process service message bus
     /// </summary>
-    public class InterServiceBus : IInterServiceBus
+    public class InterServiceBus : MonadoBlade.Core.Common.IInterServiceBus
     {
         private readonly Dictionary<string, Dictionary<string, List<MessageHandler>>> _subscriptions = new();
         private readonly object _subscriptionLock = new();

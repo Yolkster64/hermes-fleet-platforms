@@ -6,52 +6,52 @@ namespace MonadoBlade.Core.Patterns;
 /// </summary>
 public abstract record Result
 {
-    public sealed record Success(object? Value = null) : Result;
-    public sealed record Failure(ErrorCode ErrorCode, string Message, Exception? InnerException = null) : Result;
-    
-    public T Match<T>(Func<object?, T> onSuccess, Func<ErrorCode, string, Exception?, T> onFailure) =>
-        this switch
-        {
-            Success s => onSuccess(s.Value),
-            Failure f => onFailure(f.ErrorCode, f.Message, f.InnerException),
-            _ => throw new InvalidOperationException("Unknown result type")
-        };
-    
-    public async Task<T> MatchAsync<T>(
-        Func<object?, Task<T>> onSuccess,
-        Func<ErrorCode, string, Exception?, Task<T>> onFailure) =>
-        this switch
-        {
-            Success s => await onSuccess(s.Value),
-            Failure f => await onFailure(f.ErrorCode, f.Message, f.InnerException),
-            _ => throw new InvalidOperationException("Unknown result type")
-        };
+    public sealed record Success : Result;
+    public sealed record Failure(string ErrorMessage, Exception Exception = null) : Result;
+
+    public static Result Ok() => new Success();
+    public static Result Fail(string message, Exception ex = null) => new Failure(message, ex);
+
+    public bool IsSuccess => this is Success;
+    public bool IsFailure => this is Failure;
 }
+
 
 /// <summary>Generic Result&lt;T&gt; for typed operations.</summary>
 public abstract record Result<T>
 {
     public sealed record Success(T Value) : Result<T>;
-    public sealed record Failure(ErrorCode ErrorCode, string Message, Exception? InnerException = null) : Result<T>;
-    
-    public TResult Match<TResult>(Func<T, TResult> onSuccess, Func<ErrorCode, string, Exception?, TResult> onFailure) =>
+    public sealed record Failure(string ErrorMessage, Exception Exception = null) : Result<T>;
+
+    public TResult Match<TResult>(
+        Func<T, TResult> onSuccess,
+        Func<string, Exception, TResult> onFailure) =>
         this switch
         {
             Success s => onSuccess(s.Value),
-            Failure f => onFailure(f.ErrorCode, f.Message, f.InnerException),
-            _ => throw new InvalidOperationException("Unknown result type")
+            Failure f => onFailure(f.ErrorMessage, f.Exception),
+            _ => throw new InvalidOperationException("Unknown Result type")
         };
-    
-    public async Task<TResult> MatchAsync<TResult>(
-        Func<T, Task<TResult>> onSuccess,
-        Func<ErrorCode, string, Exception?, Task<TResult>> onFailure) =>
-        this switch
-        {
-            Success s => await onSuccess(s.Value),
-            Failure f => await onFailure(f.ErrorCode, f.Message, f.InnerException),
-            _ => throw new InvalidOperationException("Unknown result type")
-        };
+
+    public void Match(
+        Action<T> onSuccess,
+        Action<string, Exception> onFailure) =>
+        _ = Match(
+            v => { onSuccess(v); return true; },
+            (msg, ex) => { onFailure(msg, ex); return true; });
+
+    public bool IsSuccess => this is Success;
+    public bool IsFailure => this is Failure;
+
+    public T ValueOrThrow() =>
+        Match(
+            v => v,
+            (msg, ex) => throw new InvalidOperationException(msg, ex));
+
+    public T ValueOrDefault(T defaultValue = default) =>
+        Match(v => v, (_, __) => defaultValue);
 }
+
 
 /// <summary>Helper methods for Result pattern.</summary>
 public static class ResultExtensions

@@ -16,45 +16,43 @@ namespace MonadoBlade.Week6.Services
         private readonly List<CleanupResult> _cleanupHistory = new();
         private readonly object _lockObj = new();
 
-        public async Task<CleanupResult> CacheCleanupAsync(int daysOld = 7)
+        public async Task<Result<CleanupResult>> CacheCleanupAsync(int daysOld = 7)
         {
             return await ExecuteCleanupAsync("Cache Cleanup", async () =>
             {
-                    return new CleanupResult
-                    {
-                        Operation = "Cache Cleanup",
-                        ItemsProcessed = 150,
-                        ItemsDeleted = 120,
-                        BytesFreed = 500L * 1024 * 1024, // 500 MB
-                        Duration = TimeSpan.FromSeconds(5),
-                        Success = true
-                    };
+                return Result.Ok(new CleanupResult
+                {
+                    Operation = "Cache Cleanup",
+                    ItemsProcessed = 150,
+                    ItemsDeleted = 120,
+                    BytesFreed = 500L * 1024 * 1024, // 500 MB
+                    Duration = TimeSpan.FromSeconds(5)
+                });
             });
         }
 
-        public async Task<CleanupResult> TempFileCleanupAsync()
+        public async Task<Result<CleanupResult>> TempFileCleanupAsync()
         {
             return await ExecuteCleanupAsync("Temp File Cleanup", async () =>
             {
                 // Mock: in production, clean Windows temp directories
-                return new CleanupResult
+                return Result.Ok(new CleanupResult
                 {
                     Operation = "Temp File Cleanup",
                     ItemsProcessed = 300,
                     ItemsDeleted = 290,
                     BytesFreed = 2L * 1024 * 1024 * 1024, // 2 GB
-                    Duration = TimeSpan.FromSeconds(30),
-                    Success = true
-                };
+                    Duration = TimeSpan.FromSeconds(30)
+                });
             });
         }
 
-        public async Task<CleanupResult> BackupArchivalAsync(int daysOld = 30)
+        public async Task<Result<CleanupResult>> BackupArchivalAsync(int daysOld = 30)
         {
             return await ExecuteCleanupAsync("Backup Archival", async () =>
             {
                 // Archive old backups
-                return new CleanupResult
+                return Result.Ok(new CleanupResult
                 {
                     Operation = "Backup Archival",
                     ItemsProcessed = 12,
@@ -66,90 +64,89 @@ namespace MonadoBlade.Week6.Services
             });
         }
 
-        public async Task<CleanupResult> LogCleanupAsync(int daysOld = 7)
+        public async Task<Result<CleanupResult>> LogCleanupAsync(int daysOld = 7)
         {
+            return await ExecuteCleanupAsync("Log Cleanup", async () =>
+            {
                 // Compress and delete old logs
-                return new CleanupResult
+                return Result.Ok(new CleanupResult
                 {
                     Operation = "Log Cleanup",
                     ItemsProcessed = 500,
                     ItemsDeleted = 350,
                     BytesFreed = 5L * 1024 * 1024 * 1024, // 5 GB
-                    Duration = TimeSpan.FromSeconds(60),
-                    Success = true
-                };
+                    Duration = TimeSpan.FromSeconds(60)
+                });
+            });
         }
 
-        public async Task<CleanupResult> DockerCleanupAsync()
+        public async Task<Result<CleanupResult>> DockerCleanupAsync()
         {
+            return await ExecuteCleanupAsync("Docker Cleanup", async () =>
+            {
                 // Remove unused images and containers
-                return new CleanupResult
+                return Result.Ok(new CleanupResult
                 {
                     Operation = "Docker Cleanup",
                     ItemsProcessed = 25,
                     ItemsDeleted = 15,
                     BytesFreed = 10L * 1024 * 1024 * 1024, // 10 GB
-                    Duration = TimeSpan.FromSeconds(45),
-                    Success = true
-                };
+                    Duration = TimeSpan.FromSeconds(45)
+                });
+            });
         }
 
-        public async Task<CleanupResult> NuGetCacheCleanupAsync()
+        public async Task<Result<CleanupResult>> NuGetCacheCleanupAsync()
         {
-                return new CleanupResult
+            return await ExecuteCleanupAsync("NuGet Cache Cleanup", async () =>
+            {
+                return Result.Ok(new CleanupResult
                 {
                     Operation = "NuGet Cache Cleanup",
                     ItemsProcessed = 200,
                     ItemsDeleted = 150,
                     BytesFreed = 800L * 1024 * 1024, // 800 MB
-                    Duration = TimeSpan.FromSeconds(20),
-                    Success = true
-                };
+                    Duration = TimeSpan.FromSeconds(20)
+                });
+            });
         }
 
-        public async Task<DefragResult> DefragmentNtfsAsync(string driveLetter = "C:")
+        public async Task<Result<DefragResult>> DefragmentNtfsAsync(string driveLetter = "C:")
         {
-            return await Task.Run(() =>
+            return await ExecuteCleanupAsync("NTFS Defragmentation", async () =>
             {
                 try
                 {
                     // Mock: would call Windows defragmentation API
-                    return new DefragResult
+                    return Result.Ok(new DefragResult
                     {
-                        Success = true,
                         Drive = driveLetter,
                         FragmentationBefore = 25.5,
                         FragmentationAfter = 5.2,
                         Duration = TimeSpan.FromMinutes(45),
                         Status = "Completed successfully"
-                    };
+                    });
                 }
                 catch (Exception ex)
                 {
-                    return new DefragResult
-                    {
-                        Success = false,
-                        Drive = driveLetter,
-                        Status = $"Failed: {ex.Message}"
-                    };
+                    return Result.Fail<DefragResult>($"Failed: {ex.Message}");
                 }
             });
         }
 
-        public async Task<DefragResult> OptimizeRefsAsync(string driveLetter = "D:")
+        public async Task<Result<DefragResult>> OptimizeRefsAsync(string driveLetter = "D:")
         {
-            return await Task.Run(() =>
+            return await ExecuteCleanupAsync("ReFS Optimization", async () =>
             {
                 // ReFS optimization for DevDrive
-                return new DefragResult
+                return Result.Ok(new DefragResult
                 {
-                    Success = true,
                     Drive = driveLetter,
                     FragmentationBefore = 10.0,
                     FragmentationAfter = 2.0,
                     Duration = TimeSpan.FromMinutes(30),
                     Status = "DevDrive optimization complete"
-                };
+                });
             });
         }
 
@@ -183,7 +180,7 @@ namespace MonadoBlade.Week6.Services
         {
             return await Task.Run(() =>
             {
-                var result = new ServiceHealthResult { Success = true };
+                var result = Result.Ok(new ServiceHealthResult());
                 
                 // Mock service restarts
                 result.RestartedServices.Add(new ServiceRestartInfo
@@ -207,9 +204,12 @@ namespace MonadoBlade.Week6.Services
             });
         }
 
-        public async Task<CleanupResult> RemoveOrphanedProcessesAsync()
+        public async Task<Result<CleanupResult>> RemoveOrphanedProcessesAsync()
         {
-                return new CleanupResult
+            return await ExecuteCleanupAsync("Remove Orphaned Processes", async () =>
+            {
+                // Simulate orphaned process cleanup
+                return Result.Ok(new CleanupResult
                 {
                     Operation = "Orphaned Process Cleanup",
                     ItemsProcessed = 8,

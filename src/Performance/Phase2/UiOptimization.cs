@@ -5,8 +5,8 @@ using System.Diagnostics;
 namespace MonadoBlade.Performance.Phase2
 {
     /// <summary>
-    /// Rendering and UI optimization through dirty-rect tracking, double-buffering,
-    /// batch updates, and list virtualization. Achieves 200% UI responsiveness improvement.
+    /// Rendering and UI optimization: dirty-rect tracking, double-buffering, batch updates, virtualization.
+    /// Achieves 200% UI responsiveness improvement. (Legacy comments removed for clarity)
     /// </summary>
     public interface IUiRenderer
     {

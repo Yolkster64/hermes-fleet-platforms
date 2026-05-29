@@ -16,6 +16,39 @@ using Microsoft.Extensions.DependencyInjection;
 /// Hermes C# SDK - NuGet package with full DI support
 /// Feature parity with C# services, async/await throughout
 /// </summary>
+// --- USB Device Abstraction Layer ---
+public interface IUSBDevice
+{
+    void Connect();
+    void Disconnect();
+    int Send(byte[] data);
+    byte[] Receive(int size);
+}
+
+public interface IUSBProtocol
+{
+    List<IUSBDevice> EnumerateDevices();
+    void HandleEvent(string evt, IUSBDevice device);
+}
+
+// Example: Hot-plug observer pattern
+public interface IUSBHotPlugObserver
+{
+    void OnDeviceConnected(IUSBDevice device);
+    void OnDeviceDisconnected(IUSBDevice device);
+}
+
+// --- GUI/Visual Management Stubs ---
+public class HermesGUI
+{
+    // Minimal, focused GUI interface for monitoring and device management
+    public void ShowDashboard() { /* Render main dashboard UI */ }
+    public void ShowDeviceList(List<IUSBDevice> devices) { /* Render device list UI */ }
+    public void ShowSecurityAlert(string message) { /* Render security alert UI */ }
+    // Removed legacy, unused, or placeholder methods for clarity
+    // TODO: Remove this comment after final review
+}
+
 public class HermesClientConfiguration
 {
     public string ApiKey { get; set; } = string.Empty;
