@@ -369,13 +369,15 @@ bonus_data, bonus_err = safe_get("/aihub-bonus", timeout=20)
 snapshot, snapshot_err = safe_get("/snapshot", timeout=20)
 aihub_bonus = float(bonus_data.get("aihub_bonus", 0.0))
 agent_rows = normalize_agents(snapshot, aihub_bonus) if not snapshot_err else []
-total_hermes = len(agent_rows)
+runtime_hermes = len(agent_rows)
+configured_hermes = int(st.session_state.get("ctl_micro_agents", 0))
+total_hermes = runtime_hermes if runtime_hermes > 0 else configured_hermes
 active_hermes = len([a for a in agent_rows if a["active"]])
 avg_progress = (sum(a["progress"] for a in agent_rows) / total_hermes) if total_hermes else 0.0
 
 c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("System", "Online" if not unified_err else "Offline")
-c2.metric("Total Hermes", str(total_hermes))
+c2.metric("Hermes Amount", str(total_hermes), delta=f"runtime {runtime_hermes} | target {configured_hermes}")
 c3.metric("Active Hermes", str(active_hermes))
 c4.metric("AIHub Bonus", f"{aihub_bonus * 100:.1f}%")
 c5.metric("Model", str(unified.get("aihub_shared_model_id", "aihub-unified-v1")))
@@ -671,11 +673,12 @@ st.subheader("Hermes Fleet Units")
 if snapshot_err:
     st.warning(f"Fleet snapshot unavailable: {snapshot_err}")
 else:
-    d1, d2, d3, d4 = st.columns(4)
+    d1, d2, d3, d4, d5 = st.columns(5)
     d1.metric("Reward", f"{fleet_reward:.3f}")
     d2.metric("Truth", f"{fleet_truth:.3f}")
     d3.metric("Fleet Shape", f"{fleet_shape:.3f}")
-    d4.metric("Learning Depth", str(int(learning_depth)))
+    d4.metric("Hermes Amount", str(total_hermes), delta=f"runtime {runtime_hermes} | target {configured_hermes}")
+    d5.metric("Learning Depth", str(int(learning_depth)))
     st.dataframe(
         [
             {
@@ -700,6 +703,7 @@ else:
         st.json(snapshot)
 
     st.subheader("Live Fleet Feed")
+    st.caption(f"Hermes amount now: {total_hermes} (runtime {runtime_hermes} / target {configured_hermes})")
     recent_events = snapshot.get("recent_events", [])
     if recent_events:
         for event in recent_events[:8]:
