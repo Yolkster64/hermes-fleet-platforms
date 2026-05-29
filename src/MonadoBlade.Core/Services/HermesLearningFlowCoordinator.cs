@@ -15,6 +15,7 @@ public sealed class HermesLearningFlowCoordinator : IAsyncDisposable
     private CancellationTokenSource? _cts;
     private Task? _loopTask;
     private Uri? _orchestratorBaseUri;
+    private int _processed;
 
     public HermesLearningFlowCoordinator(HermesLearningIntermediaryService intermediary, HttpClient? httpClient = null, int capacity = 256)
     {
@@ -91,6 +92,12 @@ public sealed class HermesLearningFlowCoordinator : IAsyncDisposable
                 pulsePayload,
                 cancellationToken);
             pulseResponse.EnsureSuccessStatusCode();
+
+            _processed++;
+            if (_processed % 12 == 0)
+            {
+                await _intermediary.TriggerDedupeOptimizationAsync(_orchestratorBaseUri, cancellationToken: cancellationToken);
+            }
         }
     }
 

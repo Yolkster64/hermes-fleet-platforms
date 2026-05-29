@@ -112,6 +112,24 @@ public sealed class HermesLearningIntermediaryService
             cancellationToken);
         response.EnsureSuccessStatusCode();
     }
+
+    public async Task TriggerDedupeOptimizationAsync(
+        Uri orchestratorBaseUri,
+        IEnumerable<string>? roots = null,
+        int maxFileMb = 8,
+        CancellationToken cancellationToken = default)
+    {
+        var payload = new
+        {
+            roots = roots?.ToArray() ?? new[] { "imports", "core", "src", "runtime" },
+            max_file_mb = maxFileMb,
+        };
+        using var response = await _httpClient.PostAsJsonAsync(
+            new Uri(orchestratorBaseUri, "/dedupe-optimize"),
+            payload,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
 }
 
 public sealed record HermesIntermediaryScore(

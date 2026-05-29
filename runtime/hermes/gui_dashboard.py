@@ -90,6 +90,18 @@ with col2:
             st.json(response.json())
         except Exception as exc:
             st.error(f"Learning pulse failed: {exc}")
+    if st.button("Run dedupe optimization scan"):
+        try:
+            response = requests.post(
+                f"{API_BASE}/dedupe-optimize",
+                json={"roots": ["imports", "core", "src", "runtime"], "max_file_mb": 8},
+                timeout=90,
+            )
+            response.raise_for_status()
+            st.success("Dedupe optimization scan completed.")
+            st.json(response.json())
+        except Exception as exc:
+            st.error(f"Dedupe optimization failed: {exc}")
 
 st.subheader("Recent SQL horizon metrics")
 rows = read_latest_scores()

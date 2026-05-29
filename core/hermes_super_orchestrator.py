@@ -1,4 +1,5 @@
 import json
+import hashlib
 import os
 import random
 import sqlite3
@@ -150,6 +151,18 @@ class SqlTelemetryStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS dedupe_candidates (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts REAL NOT NULL,
+                    file_hash TEXT NOT NULL,
+                    file_count INTEGER NOT NULL,
+                    total_bytes INTEGER NOT NULL,
+                    sample_path TEXT NOT NULL
+                )
+                """
+            )
 
     def write_metric(self, agent: AgentProfile) -> None:
         with self._conn() as conn:
@@ -290,6 +303,16 @@ class SqlTelemetryStore:
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (time.time(), specialty, team_shape, active_agents, score, compressed),
+            )
+
+    def write_dedupe_candidate(self, file_hash: str, file_count: int, total_bytes: int, sample_path: str) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO dedupe_candidates(ts, file_hash, file_count, total_bytes, sample_path)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (time.time(), file_hash, file_count, total_bytes, sample_path),
             )
 
 
@@ -905,6 +928,60 @@ class HermesSuperOrchestrator:
         self.store.write_event("learning_pulse", pulse)
         return pulse
 
+    def run_dedupe_optimization(self, roots: Optional[List[str]] = None, max_file_mb: int = 8) -> Dict:
+        roots = roots or ["imports", "core", "src", "runtime"]
+        max_bytes = max(1, int(max_file_mb)) * 1024 * 1024
+        skip_dirs = {".git", "obj", "bin", "node_modules", "__pycache__"}
+        hash_map: Dict[str, List[Dict]] = {}
+
+        for root in roots:
+            if not os.path.exists(root):
+                continue
+            for base, dirs, files in os.walk(root):
+                dirs[:] = [d for d in dirs if d not in skip_dirs]
+                for name in files:
+                    path = os.path.join(base, name)
+                    try:
+                        size = os.path.getsize(path)
+                    except OSError:
+                        continue
+                    if size <= 0 or size > max_bytes:
+                        continue
+                    try:
+                        with open(path, "rb") as f:
+                            digest = hashlib.sha256(f.read()).hexdigest()
+                    except OSError:
+                        continue
+                    hash_map.setdefault(digest, []).append({"path": path, "size": size})
+
+        groups = []
+        potential_saved = 0
+        for digest, items in hash_map.items():
+            if len(items) < 2:
+                continue
+            total = sum(i["size"] for i in items)
+            potential_saved += total - min(i["size"] for i in items)
+            sample = items[0]["path"]
+            self.store.write_dedupe_candidate(digest, len(items), total, sample)
+            groups.append(
+                {
+                    "hash": digest,
+                    "count": len(items),
+                    "total_bytes": total,
+                    "sample_path": sample,
+                }
+            )
+
+        groups.sort(key=lambda g: g["total_bytes"], reverse=True)
+        result = {
+            "roots": roots,
+            "duplicate_groups": len(groups),
+            "potential_saved_bytes": potential_saved,
+            "top_groups": groups[:20],
+        }
+        self.store.write_event("dedupe_optimization", result)
+        return result
+
     def rank_llm_output(
         self,
         output_text: str,
@@ -1009,7 +1086,7 @@ class OrchestratorApi:
                 self._json({"error": "not_found"}, status=404)
 
             def do_POST(self):  # noqa: N802
-                if self.path not in ("/train-step", "/simulate", "/horizon-tests", "/rank-output", "/ingest-signal", "/optimize-fleet", "/curate-learning", "/learning-pulse"):
+                if self.path not in ("/train-step", "/simulate", "/horizon-tests", "/rank-output", "/ingest-signal", "/optimize-fleet", "/curate-learning", "/learning-pulse", "/dedupe-optimize"):
                     self._json({"error": "not_found"}, status=404)
                     return
                 length = int(self.headers.get("Content-Length", "0"))
@@ -1062,6 +1139,14 @@ class OrchestratorApi:
                             internet_signal=float(payload.get("internet_signal", 0.55)),
                             llm_signal=float(payload.get("llm_signal", 0.65)),
                             stability_bias=float(payload.get("stability_bias", 0.68)),
+                        )
+                    elif self.path == "/dedupe-optimize":
+                        roots = payload.get("roots", ["imports", "core", "src", "runtime"])
+                        if not isinstance(roots, list):
+                            roots = ["imports", "core", "src", "runtime"]
+                        result = orchestrator.run_dedupe_optimization(
+                            roots=[str(r) for r in roots],
+                            max_file_mb=int(payload.get("max_file_mb", 8)),
                         )
                     else:
                         result = orchestrator.rank_llm_output(

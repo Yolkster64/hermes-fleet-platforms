@@ -47,6 +47,11 @@ def run_cycle() -> None:
             },
             timeout=90,
         ).raise_for_status()
+        requests.post(
+            f"{API_BASE}/dedupe-optimize",
+            json={"roots": ["imports", "core", "src", "runtime"], "max_file_mb": 8},
+            timeout=120,
+        ).raise_for_status()
     print(
         f"[auto-trainer] steps={data.get('steps')} "
         f"avg_reward={data.get('avg_reward_score'):.4f} "

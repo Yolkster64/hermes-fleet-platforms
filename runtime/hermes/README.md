@@ -14,6 +14,7 @@ This runtime enables:
 - Learning source curation through `/curate-learning` (SQL vs internet vs LLM weighting)
 - Long-horizon meta-learning blended across gaussian alignment + correction + all-data signals
 - Unified non-blocking flow pulse through `/learning-pulse` (simulate + optimize + curate in one call)
+- Duplicate-data optimization scan through `/dedupe-optimize` to reduce redundant learning input
 - SQL telemetry in `runtime/auto/hermes_super_orchestrator.db`
 - Continuous fleet auto-training via `hermes-trainer` service
 - Resource targeting via env vars:
