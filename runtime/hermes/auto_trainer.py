@@ -80,6 +80,10 @@ STRATEGY_ALGOS: dict[str, dict[str, float]] = {
 _algo_live: dict[str, dict[str, float]] = {k: dict(v) for k, v in STRATEGY_ALGOS.items()}
 
 
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
 def _resolved_state_path() -> str:
     if os.path.isabs(LEARNING_STATE_PATH):
         return LEARNING_STATE_PATH
@@ -365,12 +369,12 @@ def _composite_value_brain(data: dict, factors: dict[str, float], algo: dict[str
 
 
 def _horizon_growth_profile(data: dict, brain_value: dict[str, float], signal_score: float) -> dict[str, float]:
-    short_horizon = max(0.0, min(1.0, (float(data.get("avg_reward_score", 0.5)) * 0.42) + (float(brain_value.get("ease", 0.5)) * 0.33) + (float(data.get("avg_quality", 0.5)) * 0.25)))
-    mid_horizon = max(0.0, min(1.0, (float(data.get("avg_truth_score", 0.5)) * 0.40) + (float(data.get("avg_fleet_shape_score", 0.5)) * 0.35) + (float(brain_value.get("correctness", 0.5)) * 0.25)))
-    long_horizon = max(0.0, min(1.0, (float(data.get("avg_long_haul_meta_score", 0.5)) * 0.45) + (float(data.get("avg_knaa_qnaa_score", 0.5)) * 0.30) + (float(brain_value.get("value", 0.5)) * 0.25)))
-    growth = max(0.0, min(1.0, (short_horizon * 0.30) + (mid_horizon * 0.35) + (long_horizon * 0.35)))
-    maturity = max(0.0, min(1.0, (long_horizon * 0.48) + (growth * 0.32) + (signal_score * 0.20)))
-    softening = max(0.0, min(1.0, (mid_horizon * 0.45) + (maturity * 0.35) + ((1.0 - abs(short_horizon - long_horizon)) * 0.20)))
+    short_horizon = _clamp01((float(data.get("avg_reward_score", 0.5)) * 0.42) + (float(brain_value.get("ease", 0.5)) * 0.33) + (float(data.get("avg_quality", 0.5)) * 0.25))
+    mid_horizon = _clamp01((float(data.get("avg_truth_score", 0.5)) * 0.40) + (float(data.get("avg_fleet_shape_score", 0.5)) * 0.35) + (float(brain_value.get("correctness", 0.5)) * 0.25))
+    long_horizon = _clamp01((float(data.get("avg_long_haul_meta_score", 0.5)) * 0.45) + (float(data.get("avg_knaa_qnaa_score", 0.5)) * 0.30) + (float(brain_value.get("value", 0.5)) * 0.25))
+    growth = _clamp01((short_horizon * 0.30) + (mid_horizon * 0.35) + (long_horizon * 0.35))
+    maturity = _clamp01((long_horizon * 0.48) + (growth * 0.32) + (signal_score * 0.20))
+    softening = _clamp01((mid_horizon * 0.45) + (maturity * 0.35) + ((1.0 - abs(short_horizon - long_horizon)) * 0.20))
     return {
         "short_horizon": short_horizon,
         "mid_horizon": mid_horizon,
@@ -383,11 +387,11 @@ def _horizon_growth_profile(data: dict, brain_value: dict[str, float], signal_sc
 
 def _training_factor_profile(data: dict, horizon_profile: dict[str, float]) -> dict[str, float]:
     active_agents = float(data.get("active_agents", data.get("agent_count", 120)))
-    size_factor = max(0.0, min(1.0, active_agents / 256.0))
-    position_score = max(0.0, min(1.0, float(data.get("avg_success_rate", data.get("avg_truth_score", 0.6)))))
-    success_signal = max(0.0, min(1.0, float(data.get("avg_reward_score", 0.5))))
-    wrongness_signal = max(0.0, min(1.0, 1.0 - float(data.get("avg_truth_score", 0.6))))
-    monitor_comparison = max(0.0, min(1.0, 1.0 - abs(float(data.get("avg_knaa_qnaa_score", 0.5)) - float(data.get("avg_fleet_shape_score", 0.5)))))
+    size_factor = _clamp01(active_agents / 256.0)
+    position_score = _clamp01(float(data.get("avg_success_rate", data.get("avg_truth_score", 0.6))))
+    success_signal = _clamp01(float(data.get("avg_reward_score", 0.5)))
+    wrongness_signal = _clamp01(1.0 - float(data.get("avg_truth_score", 0.6)))
+    monitor_comparison = _clamp01(1.0 - abs(float(data.get("avg_knaa_qnaa_score", 0.5)) - float(data.get("avg_fleet_shape_score", 0.5))))
     return {
         "size_factor": size_factor,
         "position_score": position_score,

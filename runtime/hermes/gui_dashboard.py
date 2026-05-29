@@ -88,6 +88,24 @@ def log_text(label: str, payload: Dict[str, Any]) -> None:
     st.session_state["logs"] = st.session_state["logs"][:25]
 
 
+def run_logged_post_action(
+    label: str,
+    path: str,
+    payload: Dict[str, Any],
+    success_message: str,
+    error_prefix: str,
+    timeout: int = 120,
+) -> Tuple[Dict[str, Any], str]:
+    response, err = safe_post(path, payload, timeout=timeout)
+    if err:
+        st.error(f"{error_prefix}: {err}")
+        response = {"error": err}
+    else:
+        st.success(success_message)
+    log_text(label, response)
+    return response, err
+
+
 def pull_metric(payload: Any, names: Tuple[str, ...], default: float = 0.0) -> float:
     if isinstance(payload, dict):
         for name in names:
@@ -510,12 +528,14 @@ ts5.metric("GitHub Knowledge Sync", "Active" if github_sync else "Pending")
 if not is_training_active:
     st.warning("Training appears idle. Use 'Force Training Pulse Now' to restart immediate learning.")
 if st.button("Force Training Pulse Now", use_container_width=True):
-    pulse_now, pulse_now_err = safe_post("/learning-pulse", {"specialty": "fleet", "steps": 220, "candidates": 140}, timeout=120)
-    if pulse_now_err:
-        st.error(f"Training pulse failed: {pulse_now_err}")
-    else:
-        log_text("force-training-pulse", pulse_now)
-        st.success("Training pulse triggered.")
+    run_logged_post_action(
+        label="force-training-pulse",
+        path="/learning-pulse",
+        payload={"specialty": "fleet", "steps": 220, "candidates": 140},
+        success_message="Training pulse triggered.",
+        error_prefix="Training pulse failed",
+        timeout=120,
+    )
 
 brain_catalog = snapshot_data.get("brain_horizon_catalog", {}) if isinstance(snapshot_data, dict) else {}
 brain_profile = snapshot_data.get("brain_horizon_profile", {}) if isinstance(snapshot_data, dict) else {}
@@ -653,15 +673,18 @@ activity_profile = {
     "dynamic_response": dynamic_response,
 }
 if st.button("Apply Activity Profile Now", use_container_width=True):
-    _, activity_err = safe_post(
-        "/ingest-signal",
-        {"source": "gui_activity_profile", "signal_score": max(0.0, min(1.0, success_priority * 0.7 + (1.0 - wrongness_tolerance) * 0.3)), "payload": activity_profile},
+    run_logged_post_action(
+        label="gui-activity-profile",
+        path="/ingest-signal",
+        payload={
+            "source": "gui_activity_profile",
+            "signal_score": max(0.0, min(1.0, success_priority * 0.7 + (1.0 - wrongness_tolerance) * 0.3)),
+            "payload": activity_profile,
+        },
+        success_message="Activity profile applied to active brain.",
+        error_prefix="Activity profile push failed",
         timeout=60,
     )
-    if activity_err:
-        st.error(f"Activity profile push failed: {activity_err}")
-    else:
-        st.success("Activity profile applied to active brain.")
 
 technique_profile = build_technique_profile(
     techniques=techniques,
@@ -813,9 +836,10 @@ with summary_right:
             log_text("fleet-health-report", chat)
             st.success("Fleet health report generated.")
     if st.button("🚀 Deploy All Hermes", use_container_width=True):
-        deploy, deploy_err = safe_post(
-            "/runtime-orchestrate/deploy",
-            {
+        run_logged_post_action(
+            label="deploy-all-hermes",
+            path="/runtime-orchestrate/deploy",
+            payload={
                 "mode": "deploy",
                 "scope": "all",
                 "batch_size": deploy_batch,
@@ -827,17 +851,15 @@ with summary_right:
                 "llm_signal": min(0.99, technique_profile["llm_signal"] + 0.05),
                 "stability_bias": min(0.99, technique_profile["stability_bias"] + 0.02),
             },
+            success_message="All Hermes units deployed and synced.",
+            error_prefix="Deploy orchestration failed",
             timeout=120,
         )
-        if deploy_err:
-            st.error(f"Deploy orchestration failed: {deploy_err}")
-            deploy = {"error": deploy_err}
-        log_text("deploy-all-hermes", deploy)
-        st.success("All Hermes units deployed and synced.")
     if st.button("🚚 Deploy 10 Hermes", use_container_width=True):
-        deploy_ten, deploy_ten_err = safe_post(
-            "/runtime-orchestrate/deploy",
-            {
+        run_logged_post_action(
+            label="deploy-batch-hermes",
+            path="/runtime-orchestrate/deploy",
+            payload={
                 "mode": "deploy",
                 "scope": "batch",
                 "batch_size": deploy_batch,
@@ -849,24 +871,19 @@ with summary_right:
                 "llm_signal": min(0.99, technique_profile["llm_signal"] + 0.03),
                 "stability_bias": min(0.99, technique_profile["stability_bias"] + 0.02),
             },
+            success_message=f"Batch deploy completed for {deploy_batch} Hermes units.",
+            error_prefix="Batch deploy failed",
             timeout=120,
         )
-        if deploy_ten_err:
-            st.error(f"Batch deploy failed: {deploy_ten_err}")
-            deploy_ten = {"error": deploy_ten_err}
-        log_text("deploy-batch-hermes", deploy_ten)
-        st.success(f"Batch deploy completed for {deploy_batch} Hermes units.")
     if st.button("↩️ Return Hermes", use_container_width=True):
-        returned, returned_err = safe_post(
-            "/runtime-orchestrate/return",
-            {"mode": "return", "specialty": "fleet", "units": deploy_batch, "reason": "gui-return-request", "confidence": 0.88},
+        run_logged_post_action(
+            label="return-hermes",
+            path="/runtime-orchestrate/return",
+            payload={"mode": "return", "specialty": "fleet", "units": deploy_batch, "reason": "gui-return-request", "confidence": 0.88},
+            success_message=f"Return signal sent for {deploy_batch} Hermes units.",
+            error_prefix="Return action failed",
             timeout=90,
         )
-        if returned_err:
-            st.error(f"Return action failed: {returned_err}")
-            returned = {"error": returned_err}
-        log_text("return-hermes", returned)
-        st.success(f"Return signal sent for {deploy_batch} Hermes units.")
     if st.button("⚡ Permanent Bonus Boost", use_container_width=True):
         boost1, e1 = safe_post(
             "/curate-learning",
