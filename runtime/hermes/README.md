@@ -22,10 +22,7 @@ This runtime enables:
 - API security between gateway and backend via `HERMES_API_KEY`
 - Single EXE entrypoint through C# gateway publish (`runtime/hermes/build-single-exe.ps1`)
   - Output: `runtime/hermes/dist/HermesUnified.exe`
-- LLM API bridge for Hermes via `/llm-chat` (through gateway), configured by:
-  - `AIHUB_LLM_API_URL`
-  - `AIHUB_LLM_API_KEY`
-  - `AIHUB_LLM_API_MODEL`
+- LLM API bridge for Hermes via `/llm-chat` (through gateway) uses a built-in temporary API by default (no env vars required)
 - GUI text training ground for direct prompt/response workflow against the shared AIHub model
 - Resource targeting via env vars:
   - `HERMES_GPU_TARGET_UTILIZATION` (default `0.75`)

@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHttpClient("hermes");
@@ -146,21 +147,29 @@ app.MapPost("/dedupe-optimize", async (IHttpClientFactory factory, DedupeRequest
     return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
 });
 
-app.MapPost("/llm-chat", async (IHttpClientFactory factory, LlmChatRequest request, HttpContext context) =>
+app.MapPost("/llm-chat", async (IHttpClientFactory factory, HttpContext context) =>
 {
     if (!Authorized(context))
         return Results.Unauthorized();
+    var payload = await context.Request.ReadFromJsonAsync<JsonElement>();
+    var prompt = payload.TryGetProperty("prompt", out var promptNode) ? (promptNode.GetString() ?? "") : "";
+    var systemPrompt = payload.TryGetProperty("system_prompt", out var systemNode)
+        ? (systemNode.GetString() ?? "You are Hermes AIHub assistant.")
+        : "You are Hermes AIHub assistant.";
+    var model = payload.TryGetProperty("model", out var modelNode) ? modelNode.GetString() : null;
+    var temperature = payload.TryGetProperty("temperature", out var tempNode) && tempNode.TryGetDouble(out var t) ? t : 0.3;
+    var maxTokens = payload.TryGetProperty("max_tokens", out var tokNode) && tokNode.TryGetInt32(out var mt) ? mt : 512;
     using var client = factory.CreateClient("hermes");
     AttachBackendKey(client);
     using var response = await client.PostAsJsonAsync(
         $"{backendUrl}/llm-chat",
         new
         {
-            prompt = request.Prompt,
-            system_prompt = request.SystemPrompt,
-            model = request.Model,
-            temperature = request.Temperature,
-            max_tokens = request.MaxTokens,
+            prompt,
+            system_prompt = systemPrompt,
+            model,
+            temperature,
+            max_tokens = maxTokens,
         });
     var body = await response.Content.ReadAsStringAsync();
     return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
@@ -191,9 +200,3 @@ public sealed record LearningPulseRequest(
     double LlmSignal = 0.7,
     double StabilityBias = 0.72);
 public sealed record DedupeRequest(string[] Roots, int MaxFileMb = 8);
-public sealed record LlmChatRequest(
-    string Prompt,
-    string SystemPrompt = "You are Hermes AIHub assistant.",
-    string? Model = null,
-    double Temperature = 0.3,
-    int MaxTokens = 512);

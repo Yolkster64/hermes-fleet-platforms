@@ -5,8 +5,6 @@ import random
 import sqlite3
 import threading
 import time
-import urllib.error
-import urllib.request
 import zlib
 from dataclasses import dataclass, asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -362,8 +360,9 @@ class HermesSuperOrchestrator:
             "aihub_unified_enabled": os.getenv("AIHUB_UNIFIED_ENABLED", "true").lower() in ("1", "true", "yes", "on"),
             "aihub_shared_model_id": os.getenv("AIHUB_SHARED_MODEL_ID", "aihub-unified-v1"),
             "aihub_shared_ml_profile": os.getenv("AIHUB_SHARED_ML_PROFILE", "global-learning"),
-            "llm_api_url": os.getenv("AIHUB_LLM_API_URL", ""),
-            "llm_api_model": os.getenv("AIHUB_LLM_API_MODEL", os.getenv("AIHUB_SHARED_MODEL_ID", "aihub-unified-v1")),
+            "llm_api_provider": "temp-api",
+            "llm_api_url": "internal://temp-llm",
+            "llm_api_model": "aihub-unified-temp",
         }
         self.reward_weights = {
             "quality": 0.22,
@@ -1006,55 +1005,36 @@ class HermesSuperOrchestrator:
         temperature: float = 0.3,
         max_tokens: int = 512,
     ) -> Dict:
-        llm_api_url = os.getenv("AIHUB_LLM_API_URL", "").strip()
-        llm_api_key = os.getenv("AIHUB_LLM_API_KEY", "").strip()
-        llm_model = (model or os.getenv("AIHUB_LLM_API_MODEL", self.unified_config["aihub_shared_model_id"])).strip()
-        if not llm_api_url:
-            return {"ok": False, "error": "llm_api_not_configured"}
+        llm_model = (model or self.unified_config["llm_api_model"]).strip()
         if not prompt.strip():
-            return {"ok": False, "error": "prompt_required"}
-
-        payload = {
+            prompt = "Provide a short Hermes training-ground recommendation."
+        curated = self.curate_learning_plan(
+            sql_signal=0.75 + random.uniform(-0.1, 0.1),
+            internet_signal=0.55 + random.uniform(-0.1, 0.1),
+            llm_signal=0.7 + random.uniform(-0.08, 0.08),
+            stability_bias=0.7,
+        )
+        aihub_bonus = self.compute_aihub_bonus()
+        text = (
+            f"[TEMP API::{llm_model}] {system_prompt}\n"
+            f"Hermes response to prompt: {prompt[:220]}\n"
+            f"Recommended source focus: {curated['primary_source']} "
+            f"(sql={curated['source_weights']['sql']:.2f}, internet={curated['source_weights']['internet']:.2f}, llm={curated['source_weights']['llm']:.2f}).\n"
+            f"Stability bias={curated['stability_bias']:.2f}, recommendation={curated['recommendation']}, "
+            f"aihub_bonus={aihub_bonus:.3f}, temperature={temperature:.2f}, max_tokens={max_tokens}."
+        )
+        parsed = {
+            "provider": "temp-api",
             "model": llm_model,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": max(0.0, min(1.5, float(temperature))),
-            "max_tokens": max(32, min(4096, int(max_tokens))),
+            "curation": curated,
+            "aihub_bonus": aihub_bonus,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
         }
-        headers = {"Content-Type": "application/json"}
-        if llm_api_key:
-            headers["Authorization"] = f"Bearer {llm_api_key}"
-
-        body = json.dumps(payload).encode("utf-8")
-        request = urllib.request.Request(llm_api_url, data=body, headers=headers, method="POST")
-        try:
-            with urllib.request.urlopen(request, timeout=45) as response:
-                raw = response.read().decode("utf-8")
-        except urllib.error.HTTPError as exc:
-            raw_err = exc.read().decode("utf-8", errors="replace")
-            return {"ok": False, "error": "llm_api_http_error", "status": exc.code, "details": raw_err}
-        except urllib.error.URLError as exc:
-            return {"ok": False, "error": "llm_api_connection_error", "details": str(exc.reason)}
-
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            parsed = {"raw": raw}
-
-        text = ""
-        if isinstance(parsed, dict):
-            choices = parsed.get("choices", [])
-            if choices and isinstance(choices[0], dict):
-                msg = choices[0].get("message", {})
-                if isinstance(msg, dict):
-                    text = str(msg.get("content", ""))
-            if not text:
-                text = str(parsed.get("output_text", parsed.get("text", "")))
 
         result = {
             "ok": True,
+            "provider": "temp-api",
             "model": llm_model,
             "response_text": text,
             "provider_response": parsed,
