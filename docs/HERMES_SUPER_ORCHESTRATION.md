@@ -32,6 +32,7 @@ API endpoints:
 2. `GET /snapshot`
 3. `POST /train-step`
 4. `POST /simulate`
+5. `POST /horizon-tests`
 
 Example training call:
 
@@ -45,6 +46,12 @@ Example simulation sweep:
 curl -X POST http://127.0.0.1:8787/simulate -H "Content-Type: application/json" -d "{\"specialty\":\"llm_orchestration\",\"steps\":2000}"
 ```
 
+Example short/mid/long horizon test suite:
+
+```bash
+curl -X POST http://127.0.0.1:8787/horizon-tests -H "Content-Type: application/json" -d "{\"specialty\":\"sql_learning\",\"short_steps\":100,\"mid_steps\":400,\"long_steps\":1500}"
+```
+
 Build native kernel DLL on Windows (MSVC Developer Prompt):
 
 ```bash
@@ -53,12 +60,16 @@ cl /LD /O2 core\\native\\hermes_learning_kernel.cpp /Fe:core\\native\\hermes_lea
 
 ## Optimization Model
 
-Each train step computes a 4D optimization envelope:
+Each train step computes an expanded optimization envelope:
 
 - `quality` (result quality proxy)
 - `speed` (throughput proxy under current load)
 - `cost_efficiency` (resource/cost efficiency)
 - `truth_score` (anti-false-promotion gate)
+- `compression_gain` (signal density after compression/quantization)
+- `data_freshness` (recency/online relevance factor)
+- `pattern_diversity` (non-collapsing strategy diversity)
+- `risk_adjusted` (risk-normalized confidence)
 - plus `novelty` (exploration factor)
 
 Reward update:
@@ -79,6 +90,13 @@ Learning strategies in parallel:
 2. q-learning table updates by workload complexity bins
 3. bayesian success priors per specialty
 4. simulation sweeps (`/simulate`) for batch tuning
+5. horizon-specific test suites (`/horizon-tests`) for short/mid/long objective balancing
+
+Horizon optimization:
+
+1. **Short** tests emphasize immediate speed + quality + truth.
+2. **Mid** tests emphasize balanced speed/cost/truth stability.
+3. **Long** tests emphasize truth durability + cost efficiency + compression wins.
 
 ## SQL + Compression
 

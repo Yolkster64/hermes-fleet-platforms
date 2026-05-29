@@ -41,6 +41,10 @@ class InteractionOutcome:
     cost_efficiency: float
     truth_score: float
     novelty: float
+    compression_gain: float
+    data_freshness: float
+    pattern_diversity: float
+    risk_adjusted: float
     success: float
 
 
@@ -73,6 +77,21 @@ class SqlTelemetryStore:
                     ts REAL NOT NULL,
                     event_type TEXT NOT NULL,
                     payload_compressed BLOB NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS horizon_test_scores (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts REAL NOT NULL,
+                    horizon TEXT NOT NULL,
+                    specialty TEXT NOT NULL,
+                    score REAL NOT NULL,
+                    quality REAL NOT NULL,
+                    speed REAL NOT NULL,
+                    cost_efficiency REAL NOT NULL,
+                    truth_score REAL NOT NULL
                 )
                 """
             )
@@ -117,6 +136,26 @@ class SqlTelemetryStore:
             )
         return out
 
+    def write_horizon_score(self, horizon: str, specialty: str, score: float, outcome: InteractionOutcome) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO horizon_test_scores(
+                    ts, horizon, specialty, score, quality, speed, cost_efficiency, truth_score
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    time.time(),
+                    horizon,
+                    specialty,
+                    score,
+                    outcome.quality,
+                    outcome.speed,
+                    outcome.cost_efficiency,
+                    outcome.truth_score,
+                ),
+            )
+
 
 class ResourceGovernor:
     def __init__(self, gpu_target_utilization: float = 0.75, cpu_target_utilization: float = 0.8) -> None:
@@ -155,13 +194,29 @@ class HermesSuperOrchestrator:
         self.agents = agents
         self.store = store or SqlTelemetryStore()
         self.governor = ResourceGovernor(gpu_target_utilization=0.75)
-        self.reward_weights = {"quality": 0.32, "speed": 0.20, "cost": 0.16, "truth": 0.22, "novelty": 0.10}
+        self.reward_weights = {
+            "quality": 0.22,
+            "speed": 0.16,
+            "cost": 0.12,
+            "truth": 0.21,
+            "novelty": 0.08,
+            "compression": 0.07,
+            "freshness": 0.07,
+            "diversity": 0.04,
+            "risk": 0.03,
+        }
+        self.horizon_weights = {
+            "short": {"quality": 0.28, "speed": 0.30, "cost": 0.12, "truth": 0.20, "compression": 0.10},
+            "mid": {"quality": 0.26, "speed": 0.20, "cost": 0.20, "truth": 0.24, "compression": 0.10},
+            "long": {"quality": 0.24, "speed": 0.10, "cost": 0.20, "truth": 0.30, "compression": 0.16},
+        }
         self.truth_threshold = 0.68
         self.native_bridge = HermesCppNativeBridge()
         self.algorithm_state = {
             "bandit_values": {},  # specialty -> value
             "q_table": {},  # (specialty, bin) -> value
             "beta_priors": {},  # specialty -> (alpha, beta)
+            "horizon_memory": {"short": [], "mid": [], "long": []},
         }
         self.lock = threading.Lock()
 
@@ -187,14 +242,14 @@ class HermesSuperOrchestrator:
             self.reward_weights["speed"],
             self.reward_weights["cost"],
             self.reward_weights["truth"],
-            self.reward_weights["novelty"],
+            self.reward_weights["compression"] + self.reward_weights["novelty"],
         ]
         return self.native_bridge.reward_update(
             quality=outcome.quality,
             speed=outcome.speed,
             cost_efficiency=outcome.cost_efficiency,
             truth_score=outcome.truth_score,
-            novelty=outcome.novelty,
+            novelty=outcome.compression_gain + outcome.pattern_diversity,
             weights=weights,
         )
 
@@ -232,6 +287,22 @@ class HermesSuperOrchestrator:
         self._q_learning_update(specialty, complexity, reward)
         self._bayesian_update(specialty, success)
 
+    def _horizon_score(self, horizon: str, outcome: InteractionOutcome) -> float:
+        w = self.horizon_weights[horizon]
+        return (
+            outcome.quality * w["quality"]
+            + outcome.speed * w["speed"]
+            + outcome.cost_efficiency * w["cost"]
+            + outcome.truth_score * w["truth"]
+            + outcome.compression_gain * w["compression"]
+        )
+
+    def _update_horizon_memory(self, horizon: str, value: float) -> None:
+        mem = self.algorithm_state["horizon_memory"][horizon]
+        mem.append(value)
+        if len(mem) > 1500:
+            del mem[: len(mem) - 1500]
+
     def _natural_selection(self) -> None:
         inactive_candidates = [a for a in self.agents if a.success_rate < 0.2 and a.reward_score < 0.1]
         if inactive_candidates and len(self.agents) > 6:
@@ -264,15 +335,32 @@ class HermesSuperOrchestrator:
             cost_efficiency = max(0.0, 1.0 - (effective_work * random.uniform(0.3, 0.9)))
             truth_score = max(0.0, min(1.0, quality * 0.7 + success * 0.2 + random.uniform(0.0, 0.1)))
             novelty = max(0.0, min(1.0, random.gauss(0.55, 0.2)))
+            compression_gain = max(0.0, min(1.0, random.gauss(0.58, 0.18)))
+            data_freshness = max(0.0, min(1.0, random.gauss(0.62, 0.20)))
+            pattern_diversity = max(0.0, min(1.0, random.gauss(0.5, 0.22)))
+            risk_adjusted = max(0.0, min(1.0, truth_score * 0.65 + quality * 0.2 + speed * 0.15))
             outcome = InteractionOutcome(
                 quality=quality,
                 speed=speed,
                 cost_efficiency=cost_efficiency,
                 truth_score=truth_score,
                 novelty=novelty,
+                compression_gain=compression_gain,
+                data_freshness=data_freshness,
+                pattern_diversity=pattern_diversity,
+                risk_adjusted=risk_adjusted,
                 success=success,
             )
-            objective_score = self._multi_objective_score(outcome)
+            short_score = self._horizon_score("short", outcome)
+            mid_score = self._horizon_score("mid", outcome)
+            long_score = self._horizon_score("long", outcome)
+            objective_score = (short_score * 0.45) + (mid_score * 0.33) + (long_score * 0.22)
+            objective_score += (
+                outcome.data_freshness * self.reward_weights["freshness"]
+                + outcome.pattern_diversity * self.reward_weights["diversity"]
+                + outcome.risk_adjusted * self.reward_weights["risk"]
+            )
+            objective_score = (objective_score * 0.55) + (self._multi_objective_score(outcome) * 0.45)
             delta = self._truth_gate_adjustment(objective_score, truth_score)
 
             agent.reward_score = max(0.0, min(10.0, agent.reward_score + (delta - 0.28)))
@@ -282,6 +370,12 @@ class HermesSuperOrchestrator:
             self._run_algorithm_updates(agent.specialty, workload_complexity, delta, success)
             self._gaussian_tune_rewards()
             self._natural_selection()
+            self._update_horizon_memory("short", short_score)
+            self._update_horizon_memory("mid", mid_score)
+            self._update_horizon_memory("long", long_score)
+            self.store.write_horizon_score("short", agent.specialty, short_score, outcome)
+            self.store.write_horizon_score("mid", agent.specialty, mid_score, outcome)
+            self.store.write_horizon_score("long", agent.specialty, long_score, outcome)
 
             self.store.write_metric(agent)
             event = {
@@ -293,6 +387,13 @@ class HermesSuperOrchestrator:
                 "cost_efficiency": cost_efficiency,
                 "truth_score": truth_score,
                 "novelty": novelty,
+                "compression_gain": compression_gain,
+                "data_freshness": data_freshness,
+                "pattern_diversity": pattern_diversity,
+                "risk_adjusted": risk_adjusted,
+                "short_score": short_score,
+                "mid_score": mid_score,
+                "long_score": long_score,
                 "objective_score": objective_score,
                 "reward_score": agent.reward_score,
                 "success_rate": agent.success_rate,
@@ -313,6 +414,9 @@ class HermesSuperOrchestrator:
         avg_quality = sum(r["quality"] for r in results) / len(results)
         avg_speed = sum(r["speed"] for r in results) / len(results)
         avg_cost = sum(r["cost_efficiency"] for r in results) / len(results)
+        avg_short = sum(r["short_score"] for r in results) / len(results)
+        avg_mid = sum(r["mid_score"] for r in results) / len(results)
+        avg_long = sum(r["long_score"] for r in results) / len(results)
         truth_violations = len([r for r in results if r["truth_score"] < self.truth_threshold])
         return {
             "steps": steps,
@@ -321,8 +425,28 @@ class HermesSuperOrchestrator:
             "avg_quality": avg_quality,
             "avg_speed": avg_speed,
             "avg_cost_efficiency": avg_cost,
+            "avg_short_score": avg_short,
+            "avg_mid_score": avg_mid,
+            "avg_long_score": avg_long,
             "truth_violations": truth_violations,
             "reward_weights": self.reward_weights,
+        }
+
+    def run_horizon_test_suite(self, specialty: str = "general", short_steps: int = 80, mid_steps: int = 300, long_steps: int = 1200) -> Dict:
+        short = self.run_simulations(steps=short_steps, specialty=specialty)
+        mid = self.run_simulations(steps=mid_steps, specialty=specialty)
+        long = self.run_simulations(steps=long_steps, specialty=specialty)
+        weighted = (
+            short["avg_short_score"] * 0.42
+            + mid["avg_mid_score"] * 0.33
+            + long["avg_long_score"] * 0.25
+        )
+        return {
+            "specialty": specialty,
+            "short": short,
+            "mid": mid,
+            "long": long,
+            "weighted_horizon_score": weighted,
         }
 
     def snapshot(self) -> Dict:
@@ -363,7 +487,7 @@ class OrchestratorApi:
                 self._json({"error": "not_found"}, status=404)
 
             def do_POST(self):  # noqa: N802
-                if self.path not in ("/train-step", "/simulate"):
+                if self.path not in ("/train-step", "/simulate", "/horizon-tests"):
                     self._json({"error": "not_found"}, status=404)
                     return
                 length = int(self.headers.get("Content-Length", "0"))
@@ -375,10 +499,18 @@ class OrchestratorApi:
                         workload_complexity=float(payload.get("complexity", 0.5)),
                     )
                 else:
-                    result = orchestrator.run_simulations(
-                        steps=int(payload.get("steps", 500)),
-                        specialty=str(payload.get("specialty", "general")),
-                    )
+                    if self.path == "/simulate":
+                        result = orchestrator.run_simulations(
+                            steps=int(payload.get("steps", 500)),
+                            specialty=str(payload.get("specialty", "general")),
+                        )
+                    else:
+                        result = orchestrator.run_horizon_test_suite(
+                            specialty=str(payload.get("specialty", "general")),
+                            short_steps=int(payload.get("short_steps", 80)),
+                            mid_steps=int(payload.get("mid_steps", 300)),
+                            long_steps=int(payload.get("long_steps", 1200)),
+                        )
                 self._json(result)
 
         return Handler
