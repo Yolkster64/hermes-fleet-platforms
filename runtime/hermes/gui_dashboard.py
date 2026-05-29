@@ -1,11 +1,12 @@
 import json
 import os
 import time
-from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
 import streamlit as st
 from gui_api_client import API_BASE, run_logged_post_action, safe_get, safe_post
+from gui_insights import fleet_score_history, latest_learned_profile, render_learning_diagram, render_xp_bar
+from gui_volume_tools import read_volume_file, resolve_volume_root, scan_volume_files
 try:
     from core.hermes_variable_registry import VARIABLE_CATALOG, default_user_entry_profile
 except Exception:  # pragma: no cover
@@ -282,119 +283,6 @@ def deep_auto_learning_zone(max_mode: bool, study_areas: List[str], rounds: int,
         )
         outputs.append({"round": i + 1, "pulse": pulse, "pulse_error": pulse_err, "compare": compare, "compare_error": compare_err})
     return {"rounds": rounds, "study_areas": study_areas, "technique_profile": technique, "results": outputs}
-
-
-def render_xp_bar(label: str, value: float, color: str = "#4CAF50") -> None:
-    pct = max(0.0, min(1.0, value)) * 100
-    st.markdown(
-        (
-            f"**{label}**  \n"
-            f"<div style='background:#1b1f24;border-radius:8px;padding:2px;'>"
-            f"<div style='width:{pct:.1f}%;background:{color};height:16px;border-radius:6px;'></div>"
-            f"</div>"
-            f"<small>{pct:.1f}%</small>"
-        ),
-        unsafe_allow_html=True,
-    )
-
-
-def render_learning_diagram() -> None:
-    st.graphviz_chart(
-        """
-digraph learning {
-  rankdir=LR;
-  node [shape=box, style=rounded];
-  Prompt -> "Hermes Agents";
-  "Hermes Agents" -> "Simulation";
-  "Simulation" -> "Learning Pulse";
-  "Learning Pulse" -> "Fleet Optimize";
-  "Fleet Optimize" -> "Curate + Dedupe";
-  "Curate + Dedupe" -> "Bonus + XP";
-  "Bonus + XP" -> "Auto Next Cycle";
-}
-        """
-    )
-
-
-def latest_learned_profile(snapshot_data: Dict[str, Any]) -> Dict[str, Any]:
-    signals = snapshot_data.get("external_signals_tail", [])
-    for item in signals:
-        payload = item.get("payload", {})
-        if not isinstance(payload, dict):
-            continue
-        if "high_level_learning" in payload or "strategy" in payload or "swarm_strategy" in payload:
-            return payload
-    return {}
-
-
-def fleet_score_history(snapshot_data: Dict[str, Any]) -> List[float]:
-    scores: List[float] = []
-    for event in reversed(snapshot_data.get("recent_events", [])):
-        payload = event.get("payload", {})
-        if not isinstance(payload, dict):
-            continue
-        reward = payload.get("reward_score")
-        truth = payload.get("truth_score")
-        shape = payload.get("fleet_shape_score")
-        if isinstance(reward, (int, float)) and isinstance(truth, (int, float)) and isinstance(shape, (int, float)):
-            score = max(0.0, min(100.0, ((float(reward) * 0.35) + (float(truth) * 0.35) + (float(shape) * 0.30)) * 100.0))
-            scores.append(score)
-    return scores
-
-
-def resolve_volume_root() -> str:
-    candidates = [
-        os.getenv("HERMES_VOLUME_DATA_PATH", "").strip(),
-        "/workspace/runtime/hermes_persist",
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hermes_persist")),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "auto")),
-    ]
-    for path in candidates:
-        if path and os.path.exists(path):
-            return path
-    return "/workspace/runtime/hermes_persist"
-
-
-def scan_volume_files(root: str, limit: int = 500) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
-    if not os.path.exists(root):
-        return rows
-    for base, dirs, files in os.walk(root):
-        dirs[:] = [d for d in dirs if d not in {".git", "__pycache__", "node_modules"}]
-        for name in files:
-            path = os.path.join(base, name)
-            try:
-                stat = os.stat(path)
-            except OSError:
-                continue
-            rel = os.path.relpath(path, root).replace("\\", "/")
-            rows.append(
-                {
-                    "relative_path": rel,
-                    "bytes": int(stat.st_size),
-                    "modified_unix": float(stat.st_mtime),
-                    "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
-                }
-            )
-    rows.sort(key=lambda r: r["modified_unix"], reverse=True)
-    return rows[: max(50, min(2000, int(limit)))]
-
-
-def read_volume_file(root: str, rel_path: str, max_bytes: int = 2_000_000) -> Tuple[bytes, str]:
-    target = os.path.abspath(os.path.join(root, rel_path))
-    root_abs = os.path.abspath(root)
-    if not target.startswith(root_abs):
-        return b"", "Invalid path."
-    if not os.path.exists(target):
-        return b"", "File not found."
-    try:
-        with open(target, "rb") as fh:
-            data = fh.read(max_bytes + 1)
-    except OSError as exc:
-        return b"", str(exc)
-    if len(data) > max_bytes:
-        return data[:max_bytes], f"File truncated to {max_bytes} bytes for preview."
-    return data, ""
 
 
 st.set_page_config(page_title="Hermes Super Easy", page_icon="🧠", layout="wide")
