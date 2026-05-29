@@ -28,6 +28,7 @@ This runtime enables:
   - One-screen super-easy flow
   - Learning Space text panel (prompt -> Hermes response)
   - Fleet Data section (`/snapshot`) for live runtime context
+  - Fleet Summary text and instant Fleet Health Report action
   - Full auto cycle button (simulate + pulse + optimize + curate + dedupe)
   - Built-in API key field in GUI sidebar (uses `X-Hermes-Key`)
 - Resource targeting via env vars:

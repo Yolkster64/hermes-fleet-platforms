@@ -46,6 +46,23 @@ def log_text(label: str, payload: Dict[str, Any]) -> None:
     st.session_state["logs"] = st.session_state["logs"][:20]
 
 
+def pull_metric(payload: Any, names: Tuple[str, ...], default: float = 0.0) -> float:
+    if isinstance(payload, dict):
+        for name in names:
+            if name in payload and isinstance(payload[name], (int, float)):
+                return float(payload[name])
+        for value in payload.values():
+            found = pull_metric(value, names, default=default)
+            if found != default:
+                return found
+    if isinstance(payload, list):
+        for value in payload:
+            found = pull_metric(value, names, default=default)
+            if found != default:
+                return found
+    return default
+
+
 def run_auto_cycle(max_mode: bool) -> Dict[str, Any]:
     steps = 2200 if max_mode else 600
     candidates = 480 if max_mode else 160
@@ -108,6 +125,38 @@ st.write(
     f"profile={unified.get('aihub_shared_ml_profile', 'global-learning')}"
 )
 
+fleet_reward = pull_metric(snapshot, ("avg_reward_score", "reward_score", "reward"), default=0.0)
+fleet_truth = pull_metric(snapshot, ("avg_truth_score", "truth_score", "truth"), default=0.0)
+fleet_shape = pull_metric(snapshot, ("avg_fleet_shape_score", "fleet_shape_score"), default=0.0)
+learning_depth = pull_metric(snapshot, ("learning_steps", "steps", "total_steps"), default=0.0)
+
+summary_left, summary_right = st.columns([2, 1])
+with summary_left:
+    st.subheader("Fleet Summary")
+    st.write(
+        f"- Reward quality: **{fleet_reward:.3f}**\n"
+        f"- Truth and safety: **{fleet_truth:.3f}**\n"
+        f"- Fleet shape signal: **{fleet_shape:.3f}**\n"
+        f"- Learning depth: **{int(learning_depth)} steps**"
+    )
+with summary_right:
+    st.subheader("Quick Actions")
+    if st.button("Generate Fleet Health Report", use_container_width=True):
+        report_prompt = (
+            "Create a short fleet health report from current Hermes data with "
+            "strengths, risks, and next optimization action."
+        )
+        chat, chat_err = safe_post(
+            "/llm-chat",
+            {"prompt": report_prompt, "system_prompt": "You are Hermes AIHub fleet analyst.", "temperature": 0.2, "max_tokens": 800},
+        )
+        if chat_err:
+            st.error(f"Report generation failed: {chat_err}")
+        else:
+            st.session_state["last_chat"] = chat.get("response_text", "")
+            log_text("fleet-health-report", chat)
+            st.success("Fleet health report generated.")
+
 mode = st.radio("Training Level", ["Easy", "Near Max Hermes"], horizontal=True, index=1)
 max_mode = mode == "Near Max Hermes"
 
@@ -159,6 +208,11 @@ st.subheader("Fleet Data")
 if snapshot_err:
     st.warning(f"Fleet snapshot unavailable: {snapshot_err}")
 else:
+    d1, d2, d3 = st.columns(3)
+    d1.metric("Reward", f"{fleet_reward:.3f}")
+    d2.metric("Truth", f"{fleet_truth:.3f}")
+    d3.metric("Fleet Shape", f"{fleet_shape:.3f}")
+    st.caption("Raw runtime data:")
     st.json(snapshot)
 
 if not st.session_state["auto_boot_done"]:
