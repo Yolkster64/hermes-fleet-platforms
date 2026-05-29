@@ -406,6 +406,27 @@ def ingest_github_context(volume_root: str, repo_root: str) -> Dict[str, object]
         "created_unix": time.time(),
     }
     with _connect(db) as conn:
+        latest = conn.execute(
+            """
+            SELECT branch, commit_sha, commit_subject, changed_files, created_unix
+            FROM github_context
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        if latest and (
+            latest[0] == payload["branch"]
+            and latest[1] == payload["commit_sha"]
+            and latest[2] == payload["commit_subject"]
+            and int(latest[3]) == payload["changed_files"]
+        ):
+            return {
+                "branch": str(latest[0]),
+                "commit_sha": str(latest[1]),
+                "commit_subject": str(latest[2]),
+                "changed_files": int(latest[3]),
+                "created_unix": float(latest[4]),
+            }
         conn.execute(
             """
             INSERT INTO github_context (branch, commit_sha, commit_subject, changed_files, created_unix)
