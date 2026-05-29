@@ -623,6 +623,32 @@ with st.expander("Advanced Intelligence Techniques"):
     st.caption("High-level learning ideal range: 0.65-0.88 for best blend of performance + long-term adaptation.")
     render_variable_guide()
 
+st.subheader("Activity Goal Profile (Fast User Controls)")
+goal_profile = st.selectbox("Goal character", ["balanced", "speed", "safe", "cost"], key="ctl_goal_profile")
+success_priority = st.slider("Success priority", min_value=0.0, max_value=1.0, value=0.72, step=0.01, key="ctl_success_priority")
+wrongness_tolerance = st.slider("Wrongness tolerance", min_value=0.0, max_value=1.0, value=0.22, step=0.01, key="ctl_wrongness_tolerance")
+group_preference = st.slider("Group analysis weight", min_value=0.0, max_value=1.0, value=0.58, step=0.01, key="ctl_group_preference")
+solo_preference = st.slider("Solo analysis weight", min_value=0.0, max_value=1.0, value=0.42, step=0.01, key="ctl_solo_preference")
+dynamic_response = st.slider("Dynamic monitor response", min_value=0.0, max_value=1.0, value=0.62, step=0.01, key="ctl_dynamic_response")
+activity_profile = {
+    "goal_profile": goal_profile,
+    "success_priority": success_priority,
+    "wrongness_tolerance": wrongness_tolerance,
+    "group_preference": group_preference,
+    "solo_preference": solo_preference,
+    "dynamic_response": dynamic_response,
+}
+if st.button("Apply Activity Profile Now", use_container_width=True):
+    _, activity_err = safe_post(
+        "/ingest-signal",
+        {"source": "gui_activity_profile", "signal_score": max(0.0, min(1.0, success_priority * 0.7 + (1.0 - wrongness_tolerance) * 0.3)), "payload": activity_profile},
+        timeout=60,
+    )
+    if activity_err:
+        st.error(f"Activity profile push failed: {activity_err}")
+    else:
+        st.success("Activity profile applied to active brain.")
+
 technique_profile = build_technique_profile(
     techniques=techniques,
     swarm_strategy=swarm_strategy,
@@ -653,6 +679,7 @@ with sync1:
                 "micro_agents": technique_profile["micro_agents"],
                 "gaussian_pressure": technique_profile["gaussian_pressure"],
                 "high_level_learning": technique_profile["high_level_learning"],
+                "activity_profile": activity_profile,
                 "techniques": technique_profile["techniques"],
                 "study_areas": study_areas,
             },

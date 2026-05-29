@@ -528,6 +528,7 @@ def _emit_strategy_feedback(
     truth: float,
     shape: float,
     brain_value: dict[str, float],
+    horizon_profile: dict[str, float],
     chaos: tuple[float, float, float, float],
 ) -> None:
     leaderboard = sorted(_strategy_memory.get(occasion, {}).items(), key=lambda item: item[1], reverse=True)
@@ -788,6 +789,7 @@ def run_cycle() -> None:
         truth=learned_truth,
         shape=learned_shape,
         brain_value=brain_value,
+        horizon_profile=horizon_profile,
         chaos=(x, y, z, chaos_rate),
     )
     _emit_knowledge_sync(_cycle, dynamic_specialty, signal_score, (x, y, z, chaos_rate))
