@@ -71,7 +71,7 @@ services:
       context: ../..
       dockerfile: runtime/hermes/Dockerfile
     container_name: hermes-gui
-    command: streamlit run runtime/hermes/gui_dashboard.py --server.port 8501 --server.address 0.0.0.0
+    command: streamlit run runtime/hermes/gui_fleet_control_center.py --server.port 8501 --server.address 0.0.0.0
     environment:
       HERMES_API_BASE_URL: http://hermes-gateway:8788
       HERMES_GUI_API_KEY: "local-hermes-ui-key"
@@ -113,7 +113,7 @@ services:
       context: ../..
       dockerfile: runtime/hermes/Dockerfile
     container_name: hermes-trainer
-    command: python runtime/hermes/auto_trainer.py
+    command: python runtime/hermes/trainer_fleet_super.py
     environment:
       HERMES_API_BASE_URL: http://hermes-gateway:8788
       HERMES_GATEWAY_KEY: "local-hermes-ui-key"
