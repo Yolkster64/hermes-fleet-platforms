@@ -17,9 +17,11 @@ This runtime enables:
 - Long-horizon meta-learning blended across gaussian alignment + correction + all-data signals
 - Unified non-blocking flow pulse through `/learning-pulse` (simulate + optimize + curate in one call)
 - Duplicate-data optimization scan through `/dedupe-optimize` to reduce redundant learning input
+- AIHub intelligence bonus endpoint `/aihub-bonus` for cross-LLM/Hermes uplift signal
 - SQL telemetry in `runtime/auto/hermes_super_orchestrator.db`
 - Continuous fleet auto-training via `hermes-trainer` service
 - C# performance front-end (`hermes-gateway`) for smoother API routing and integration
+- API security between gateway and backend via `HERMES_API_KEY`
 - Resource targeting via env vars:
   - `HERMES_GPU_TARGET_UTILIZATION` (default `0.75`)
   - `HERMES_CPU_TARGET_UTILIZATION` (default `0.80`)

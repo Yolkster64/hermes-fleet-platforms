@@ -13,18 +13,18 @@ for ($i = 0; $i -lt 20; $i++) {
     }
 }
 
-try {
-    Invoke-RestMethod -Uri "$api/learning-pulse" -Method Post -ContentType "application/json" -Body '{"specialty":"fleet","steps":60,"candidates":40}' | Out-Null
-} catch {
-    Write-Host "Warm-start pulse skipped (API not ready yet)."
-}
-
 for ($i = 0; $i -lt 20; $i++) {
     try {
         Invoke-RestMethod -Uri "$gateway/health" -Method Get | Out-Null
         break
     } catch {
         Start-Sleep -Seconds 2
+    }
+
+    try {
+        Invoke-RestMethod -Uri "$gateway/learning-pulse" -Method Post -ContentType "application/json" -Body '{"specialty":"fleet","steps":60,"candidates":40}' | Out-Null
+    } catch {
+        Write-Host "Warm-start pulse skipped (gateway not ready yet)."
     }
 }
 

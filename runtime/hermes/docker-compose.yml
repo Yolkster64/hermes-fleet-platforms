@@ -10,6 +10,7 @@ services:
       HERMES_API_PORT: "8787"
       HERMES_GPU_TARGET_UTILIZATION: "0.75"
       HERMES_CPU_TARGET_UTILIZATION: "0.80"
+      HERMES_API_KEY: "local-hermes-dev-key"
     ports:
       - "8787:8787"
     volumes:
@@ -63,6 +64,7 @@ services:
     container_name: hermes-gateway
     environment:
       HERMES_BACKEND_URL: http://hermes-api:8787
+      HERMES_API_KEY: "local-hermes-dev-key"
     depends_on:
       - hermes-api
     ports:

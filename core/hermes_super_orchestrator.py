@@ -382,6 +382,7 @@ class HermesSuperOrchestrator:
             "punishment_memory": [],
             "fleet_shape_memory": [],
             "long_haul_meta_memory": [],
+            "aihub_bonus_memory": [],
         }
         self.goal_shape_targets = {
             "quality": (0.90, 0.62, 0.52),
@@ -722,11 +723,13 @@ class HermesSuperOrchestrator:
                 truth_score=truth_score,
                 gaussian_alignment=gaussian_alignment,
             )
+            aihub_bonus = self.compute_aihub_bonus()
             objective_score += knaa_qnaa_score * 0.12
             objective_score += quantized_compression_score * 0.06
             objective_score += fleet_shape_score * 0.08
             objective_score += external_signal_score * 0.05
             objective_score += long_haul_meta_score * 0.10
+            objective_score += aihub_bonus * 0.09
             objective_score = (objective_score * 0.55) + (self._multi_objective_score(outcome) * 0.45)
             delta = self._truth_gate_adjustment(objective_score, truth_score)
             delta += punishment_correction
@@ -772,6 +775,7 @@ class HermesSuperOrchestrator:
                 "punishment_correction": punishment_correction,
                 "gaussian_alignment": gaussian_alignment,
                 "long_haul_meta_score": long_haul_meta_score,
+                "aihub_bonus": aihub_bonus,
                 "objective_score": objective_score,
                 "reward_score": agent.reward_score,
                 "success_rate": agent.success_rate,
@@ -800,6 +804,7 @@ class HermesSuperOrchestrator:
         avg_quantized_compression = sum(r["quantized_compression_score"] for r in results) / len(results)
         avg_fleet_shape = sum(r["fleet_shape_score"] for r in results) / len(results)
         avg_long_haul_meta = sum(r["long_haul_meta_score"] for r in results) / len(results)
+        avg_aihub_bonus = sum(r["aihub_bonus"] for r in results) / len(results)
         truth_violations = len([r for r in results if r["truth_score"] < self.truth_threshold])
         return {
             "steps": steps,
@@ -815,6 +820,7 @@ class HermesSuperOrchestrator:
             "avg_quantized_compression_score": avg_quantized_compression,
             "avg_fleet_shape_score": avg_fleet_shape,
             "avg_long_haul_meta_score": avg_long_haul_meta,
+            "avg_aihub_bonus": avg_aihub_bonus,
             "truth_violations": truth_violations,
             "reward_weights": self.reward_weights,
         }
@@ -982,6 +988,21 @@ class HermesSuperOrchestrator:
         self.store.write_event("dedupe_optimization", result)
         return result
 
+    def compute_aihub_bonus(self) -> float:
+        signal = self.store.recent_external_signal_score()
+        knaa_tail = self.algorithm_state["knaa_qnaa_memory"][-80:]
+        fleet_tail = self.algorithm_state["fleet_shape_memory"][-80:]
+        meta_tail = self.algorithm_state["long_haul_meta_memory"][-80:]
+        knaa_avg = (sum(knaa_tail) / len(knaa_tail)) if knaa_tail else 0.5
+        fleet_avg = (sum(fleet_tail) / len(fleet_tail)) if fleet_tail else 0.5
+        meta_avg = (sum(meta_tail) / len(meta_tail)) if meta_tail else 0.5
+        bonus = max(0.0, min(1.0, (signal * 0.34) + (knaa_avg * 0.20) + (fleet_avg * 0.20) + (meta_avg * 0.26)))
+        mem = self.algorithm_state["aihub_bonus_memory"]
+        mem.append(bonus)
+        if len(mem) > 2000:
+            del mem[: len(mem) - 2000]
+        return bonus
+
     def rank_llm_output(
         self,
         output_text: str,
@@ -1053,6 +1074,7 @@ class HermesSuperOrchestrator:
             "fleet_shape_memory_tail": self.algorithm_state["fleet_shape_memory"][-20:],
             "punishment_memory_tail": self.algorithm_state["punishment_memory"][-20:],
             "long_haul_meta_memory_tail": self.algorithm_state["long_haul_meta_memory"][-20:],
+            "aihub_bonus_memory_tail": self.algorithm_state["aihub_bonus_memory"][-20:],
             "agents": [asdict(a) for a in self.agents],
             "recent_events": self.store.recent_events(limit=10),
         }
@@ -1063,11 +1085,19 @@ class OrchestratorApi:
         self.orchestrator = orchestrator
         self.host = host
         self.port = port
+        self.api_key = os.getenv("HERMES_API_KEY", "")
 
     def _handler(self):
         orchestrator = self.orchestrator
+        api_key = self.api_key
 
         class Handler(BaseHTTPRequestHandler):
+            def _authorized(self) -> bool:
+                if not api_key:
+                    return True
+                incoming = self.headers.get("X-Hermes-Key", "")
+                return incoming == api_key
+
             def _json(self, payload: Dict, status: int = 200) -> None:
                 body = json.dumps(payload).encode("utf-8")
                 self.send_response(status)
@@ -1080,13 +1110,22 @@ class OrchestratorApi:
                 if self.path == "/health":
                     self._json({"ok": True})
                     return
+                if not self._authorized():
+                    self._json({"error": "unauthorized"}, status=401)
+                    return
                 if self.path == "/snapshot":
                     self._json(orchestrator.snapshot())
+                    return
+                if self.path == "/aihub-bonus":
+                    self._json({"aihub_bonus": orchestrator.compute_aihub_bonus()})
                     return
                 self._json({"error": "not_found"}, status=404)
 
             def do_POST(self):  # noqa: N802
-                if self.path not in ("/train-step", "/simulate", "/horizon-tests", "/rank-output", "/ingest-signal", "/optimize-fleet", "/curate-learning", "/learning-pulse", "/dedupe-optimize"):
+                if not self._authorized():
+                    self._json({"error": "unauthorized"}, status=401)
+                    return
+                if self.path not in ("/train-step", "/simulate", "/horizon-tests", "/rank-output", "/ingest-signal", "/optimize-fleet", "/curate-learning", "/learning-pulse", "/dedupe-optimize", "/aihub-bonus"):
                     self._json({"error": "not_found"}, status=404)
                     return
                 length = int(self.headers.get("Content-Length", "0"))
@@ -1148,6 +1187,8 @@ class OrchestratorApi:
                             roots=[str(r) for r in roots],
                             max_file_mb=int(payload.get("max_file_mb", 8)),
                         )
+                    elif self.path == "/aihub-bonus":
+                        result = {"aihub_bonus": orchestrator.compute_aihub_bonus()}
                     else:
                         result = orchestrator.rank_llm_output(
                             output_text=str(payload.get("output", "")),
