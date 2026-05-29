@@ -45,6 +45,7 @@ This runtime enables:
 - Canonical runtime script names:
   - Unified app entry: `runtime/hermes/apps/runtime_entrypoint.py` (`--app gui|dashboard|trainer|train`)
   - GUI alias: `runtime/hermes/apps/gui_control_center.py`
+  - GUI API/action helper split: `runtime/hermes/gui_api_client.py`
   - Trainer alias: `runtime/hermes/apps/fleet_trainer_service.py`
   - Startup helpers: `runtime/hermes/scripts/startup/helpers.ps1`
   - Legacy aliases remain (`gui_fleet_control_center.py`, `trainer_fleet_super.py`, `gui_dashboard.py`, `auto_trainer.py`, `start-local.ps1`, `start-agent-fleet.ps1`, `start-common.ps1`, `start-hermes-local-runtime.ps1`, `start-hermes-super-fleet.ps1`, `startup-helpers.ps1`) for compatibility

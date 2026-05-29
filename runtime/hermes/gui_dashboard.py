@@ -4,8 +4,8 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
-import requests
 import streamlit as st
+from gui_api_client import API_BASE, run_logged_post_action, safe_get, safe_post
 try:
     from core.hermes_variable_registry import VARIABLE_CATALOG, default_user_entry_profile
 except Exception:  # pragma: no cover
@@ -23,7 +23,6 @@ except Exception:  # pragma: no cover
             "energy_saver": 0.55,
         }
 
-API_BASE = os.getenv("HERMES_API_BASE_URL", "http://localhost:8788")
 DEFAULT_API_KEY = os.getenv("HERMES_GUI_API_KEY", "local-hermes-ui-key")
 LOW_BANDWIDTH_MODE = os.getenv("HERMES_LOW_BANDWIDTH_MODE", "true").lower() in ("1", "true", "yes", "on")
 OFFLINE_ONLY_MODE = os.getenv("HERMES_OFFLINE_ONLY", "false").lower() in ("1", "true", "yes", "on")
@@ -60,68 +59,6 @@ SIZE_MODE_DETAILS = {
     "medium-balanced": "Balanced Hermes: steady quality/speed for daily training.",
     "large-deep": "Full Hermes: deeper reasoning and long-horizon adaptation.",
 }
-
-
-def headers() -> Dict[str, str]:
-    key = st.session_state.get("api_key", "").strip()
-    return {"X-Hermes-Key": key} if key else {}
-
-
-def api_get(path: str, timeout: int = 30) -> Dict[str, Any]:
-    r = requests.get(f"{API_BASE}{path}", headers=headers(), timeout=timeout)
-    r.raise_for_status()
-    return r.json()
-
-
-def api_post(path: str, payload: Dict[str, Any], timeout: int = 120) -> Dict[str, Any]:
-    r = requests.post(f"{API_BASE}{path}", json=payload, headers=headers(), timeout=timeout)
-    r.raise_for_status()
-    return r.json()
-
-
-def safe_get(path: str, timeout: int = 30) -> Tuple[Dict[str, Any], str]:
-    try:
-        return api_get(path, timeout=timeout), ""
-    except Exception as exc:  # pragma: no cover
-        return {}, str(exc)
-
-
-def safe_post(path: str, payload: Dict[str, Any], timeout: int = 120) -> Tuple[Dict[str, Any], str]:
-    last_error = ""
-    for attempt in range(3):
-        try:
-            return api_post(path, payload=payload, timeout=timeout), ""
-        except Exception as exc:  # pragma: no cover
-            last_error = str(exc)
-            if attempt < 2:
-                time.sleep(0.7)
-    return {}, last_error
-
-
-def log_text(label: str, payload: Dict[str, Any]) -> None:
-    st.session_state.setdefault("logs", [])
-    st.session_state["logs"].insert(0, {"label": label, "payload": payload})
-    st.session_state["logs"] = st.session_state["logs"][:25]
-
-
-def run_logged_post_action(
-    label: str,
-    path: str,
-    payload: Dict[str, Any],
-    success_message: str,
-    error_prefix: str,
-    timeout: int = 120,
-) -> Tuple[Dict[str, Any], str]:
-    response, err = safe_post(path, payload, timeout=timeout)
-    if err:
-        st.error(f"{error_prefix}: {err}")
-        response = {"error": err}
-    else:
-        st.success(success_message)
-    log_text(label, response)
-    return response, err
-
-
 def pull_metric(payload: Any, names: Tuple[str, ...], default: float = 0.0) -> float:
     if isinstance(payload, dict):
         for name in names:
@@ -172,6 +109,18 @@ def build_technique_profile(
     }
 
 
+def _effective_internet_signal(raw_signal: float, low_cap: bool = False) -> float:
+    if OFFLINE_ONLY_MODE:
+        return 0.0
+    if USER_ROUTED_INTERNET:
+        cap = 0.14 if low_cap else 0.22
+        return min(cap, raw_signal)
+    if LOW_BANDWIDTH_MODE:
+        cap = 0.30 if low_cap else 0.60
+        return min(cap, raw_signal)
+    return raw_signal
+
+
 def render_variable_guide() -> None:
     st.caption("Variable guide")
     st.markdown(
@@ -196,7 +145,7 @@ def run_auto_cycle(max_mode: bool, technique: Dict[str, Any]) -> Dict[str, Any]:
             "steps": steps,
             "candidates": candidates,
             "sql_signal": technique["sql_signal"],
-            "internet_signal": 0.0 if OFFLINE_ONLY_MODE else (min(0.14, technique["internet_signal"]) if USER_ROUTED_INTERNET else (min(0.30, technique["internet_signal"]) if LOW_BANDWIDTH_MODE else technique["internet_signal"])),
+            "internet_signal": _effective_internet_signal(technique["internet_signal"], low_cap=True),
             "llm_signal": technique["llm_signal"],
             "stability_bias": max(0.60, min(0.98, technique["stability_bias"] + (technique["gaussian_pressure"] * 0.04))),
         },
@@ -207,7 +156,7 @@ def run_auto_cycle(max_mode: bool, technique: Dict[str, Any]) -> Dict[str, Any]:
         "/curate-learning",
         {
             "sql_signal": technique["sql_signal"],
-            "internet_signal": 0.0 if OFFLINE_ONLY_MODE else (min(0.14, technique["internet_signal"]) if USER_ROUTED_INTERNET else technique["internet_signal"]),
+            "internet_signal": _effective_internet_signal(technique["internet_signal"], low_cap=False),
             "llm_signal": technique["llm_signal"],
             "stability_bias": technique["stability_bias"],
         },
