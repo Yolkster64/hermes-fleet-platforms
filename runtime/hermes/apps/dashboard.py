@@ -1,5 +1,5 @@
-from runtime_entrypoint import run_app
+from alias_entry import run_alias
 
 
 if __name__ == "__main__":
-    run_app("dashboard")
+    run_alias("dashboard")

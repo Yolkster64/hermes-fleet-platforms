@@ -45,6 +45,7 @@ This runtime enables:
 - Canonical runtime script names:
   - Unified app entry: `runtime/hermes/apps/runtime_entrypoint.py` (`--app gui|dashboard|control-center|trainer|train|fleet-trainer`, auto bootstraps volume + SQL intelligence)
   - Clean launch aliases: `runtime/hermes/apps/dashboard.py`, `runtime/hermes/apps/trainer.py`
+  - Alias helpers (deduplicated launcher logic): `runtime/hermes/apps/alias_entry.py`, `runtime/hermes/legacy_alias_entry.py`
   - GUI alias: `runtime/hermes/apps/gui_control_center.py`
   - GUI API/action helper split: `runtime/hermes/gui_api_client.py`
   - GUI insights/render split: `runtime/hermes/gui_insights.py`
