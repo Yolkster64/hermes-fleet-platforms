@@ -8,6 +8,9 @@ var app = builder.Build();
 var backendUrl = Environment.GetEnvironmentVariable("HERMES_BACKEND_URL") ?? "http://hermes-api:8787";
 var backendApiKey = Environment.GetEnvironmentVariable("HERMES_API_KEY") ?? "";
 var gatewayKey = Environment.GetEnvironmentVariable("HERMES_GATEWAY_KEY") ?? "";
+var allowInsecureNoKey = (Environment.GetEnvironmentVariable("HERMES_ALLOW_INSECURE_NO_KEY") ?? "false")
+    .Trim()
+    .ToLowerInvariant() is "1" or "true" or "yes" or "on";
 var unifiedEnabled = Environment.GetEnvironmentVariable("AIHUB_UNIFIED_ENABLED") ?? "true";
 var sharedModelId = Environment.GetEnvironmentVariable("AIHUB_SHARED_MODEL_ID") ?? "aihub-unified-v1";
 var sharedMlProfile = Environment.GetEnvironmentVariable("AIHUB_SHARED_ML_PROFILE") ?? "global-learning";
@@ -15,7 +18,7 @@ var sharedMlProfile = Environment.GetEnvironmentVariable("AIHUB_SHARED_ML_PROFIL
 bool Authorized(HttpContext context)
 {
     if (string.IsNullOrWhiteSpace(gatewayKey))
-        return true;
+        return allowInsecureNoKey;
     return context.Request.Headers.TryGetValue("X-Hermes-Key", out var incoming) && incoming.ToString() == gatewayKey;
 }
 
@@ -62,7 +65,8 @@ app.MapGet("/unified-config", (HttpContext context) =>
         security = new
         {
             gateway_key_enabled = !string.IsNullOrWhiteSpace(gatewayKey),
-            backend_api_key_enabled = !string.IsNullOrWhiteSpace(backendApiKey)
+            backend_api_key_enabled = !string.IsNullOrWhiteSpace(backendApiKey),
+            allow_insecure_no_key = allowInsecureNoKey
         }
     });
 });

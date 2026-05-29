@@ -52,7 +52,13 @@ class InteractionOutcome:
 
 class SqlTelemetryStore:
     def __init__(self, db_path: str = "runtime/auto/hermes_super_orchestrator.db") -> None:
-        self.db_path = db_path
+        if os.path.isabs(db_path):
+            resolved = db_path
+        else:
+            repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+            resolved = os.path.abspath(os.path.join(repo_root, db_path))
+        os.makedirs(os.path.dirname(resolved), exist_ok=True)
+        self.db_path = resolved
         self._init_db()
 
     def _conn(self) -> sqlite3.Connection:
@@ -1148,15 +1154,17 @@ class OrchestratorApi:
         self.host = host
         self.port = port
         self.api_key = os.getenv("HERMES_API_KEY", "")
+        self.allow_insecure_no_key = os.getenv("HERMES_ALLOW_INSECURE_NO_KEY", "false").lower() in ("1", "true", "yes", "on")
 
     def _handler(self):
         orchestrator = self.orchestrator
         api_key = self.api_key
+        allow_insecure_no_key = self.allow_insecure_no_key
 
         class Handler(BaseHTTPRequestHandler):
             def _authorized(self) -> bool:
                 if not api_key:
-                    return True
+                    return allow_insecure_no_key
                 incoming = self.headers.get("X-Hermes-Key", "")
                 return incoming == api_key
 

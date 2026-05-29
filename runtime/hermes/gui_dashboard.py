@@ -319,6 +319,8 @@ with st.sidebar:
     st.caption("Default Docker key is pre-filled.")
     st.markdown("### How it works")
     st.caption("1. Send prompt or click auto action\n2. Hermes fleet simulates + learns\n3. Bonus and XP improve")
+    live_refresh = st.checkbox("Live fleet auto-refresh", value=True)
+    refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, value=20, step=5)
 
 unified, unified_err = safe_get("/unified-config", timeout=20)
 bonus_data, bonus_err = safe_get("/aihub-bonus", timeout=20)
@@ -560,6 +562,18 @@ else:
     with st.expander("Show Raw Data (advanced)"):
         st.json(snapshot)
 
+    st.subheader("Live Fleet Feed")
+    recent_events = snapshot.get("recent_events", [])
+    if recent_events:
+        for event in recent_events[:8]:
+            event_type = str(event.get("event_type", "event"))
+            ts = float(event.get("ts", 0.0))
+            payload = event.get("payload", {})
+            st.markdown(f"**{event_type}**  \n`{ts:.0f}`")
+            st.code(str(payload)[:900])
+    else:
+        st.caption("No recent events yet.")
+
 st.subheader("Tips + Tools")
 t1, t2, t3 = st.columns(3)
 t1.info("Tip: Keep Near Max mode on for stronger fleet adaptation.")
@@ -578,3 +592,8 @@ if not st.session_state["auto_boot_done"]:
 with st.expander("Text Log"):
     for item in st.session_state.get("logs", []):
         st.code(f"{item['label']}: {item['payload']}")
+
+if live_refresh:
+    st.caption(f"Live refresh active: updating every {refresh_seconds}s")
+    time.sleep(refresh_seconds)
+    st.rerun()

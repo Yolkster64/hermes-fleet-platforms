@@ -69,5 +69,6 @@ This runtime enables:
 - Gateway API key is enabled by default in compose:
   - `HERMES_GATEWAY_KEY=local-hermes-ui-key`
   - GUI and trainer are pre-wired to use the same key
+  - Runtime now fails closed when API keys are missing unless `HERMES_ALLOW_INSECURE_NO_KEY=true`
 - Startup script auto-opens both GUI and unified-config pages:
   - `pwsh ./runtime/hermes/start-local.ps1`
