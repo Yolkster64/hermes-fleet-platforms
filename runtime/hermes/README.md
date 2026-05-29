@@ -34,6 +34,8 @@ This runtime enables:
   - Per-Hermes symbol/bonus/progress/zone table
   - 25-skill agent system with 3 active skills per Hermes unit
   - Learning Space text panel (prompt -> Hermes response)
+  - Automatic Learning Zone with timed smart cycles
+  - Visual learning flow diagram + multiple XP bars
   - Fleet Data section (`/snapshot`) for live runtime context (raw hidden by default)
   - Fleet Summary text and instant Fleet Health Report action
   - Deep Auto Learning Zone (`♾️`) with study-area targeting and multi-round comparison

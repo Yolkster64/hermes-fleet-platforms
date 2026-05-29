@@ -118,9 +118,9 @@ def build_technique_profile(
 
 
 def run_auto_cycle(max_mode: bool, technique: Dict[str, Any]) -> Dict[str, Any]:
-    steps = 2200 if max_mode else 600
-    candidates = min(500, (480 if max_mode else 160) + int(technique.get("micro_agents", 48) * 0.3))
-    sim_steps = 2000 if max_mode else 500
+    steps = 520 if max_mode else 220
+    candidates = min(500, (320 if max_mode else 140) + int(technique.get("micro_agents", 48) * 0.2))
+    sim_steps = 320 if max_mode else 120
     specialty = f"fleet:{technique.get('swarm_strategy', 'hybrid')}"
 
     simulate, sim_err = safe_post("/simulate", {"specialty": specialty, "steps": sim_steps})
@@ -161,8 +161,8 @@ def run_auto_cycle(max_mode: bool, technique: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def run_special_fleet_training(max_mode: bool, study_areas: List[str], technique: Dict[str, Any]) -> Dict[str, Any]:
-    steps = 3200 if max_mode else 1200
-    candidates = min(500, (500 if max_mode else 220) + int(technique.get("micro_agents", 48) * 0.2))
+    steps = 760 if max_mode else 300
+    candidates = min(500, (360 if max_mode else 180) + int(technique.get("micro_agents", 48) * 0.15))
     areas = "-".join([s.lower().replace(" & ", "-").replace(" ", "-") for s in study_areas[:3]]) if study_areas else "general"
     specialty = f"fleet:{technique.get('swarm_strategy', 'hybrid')}:{areas}"
     pulse, pulse_err = safe_post(
@@ -178,7 +178,7 @@ def run_special_fleet_training(max_mode: bool, study_areas: List[str], technique
         },
         timeout=180,
     )
-    simulate, sim_err = safe_post("/simulate", {"specialty": specialty, "steps": 1400 if max_mode else 520}, timeout=160)
+    simulate, sim_err = safe_post("/simulate", {"specialty": specialty, "steps": 360 if max_mode else 140}, timeout=120)
     optimize, opt_err = safe_post("/optimize-fleet", {"specialty": specialty, "candidates": candidates}, timeout=140)
     return {
         "specialty": specialty,
@@ -238,8 +238,8 @@ def normalize_agents(snapshot_data: Dict[str, Any], global_bonus: float) -> List
 
 
 def deep_auto_learning_zone(max_mode: bool, study_areas: List[str], rounds: int, technique: Dict[str, Any]) -> Dict[str, Any]:
-    candidates = min(500, (480 if max_mode else 180) + int(technique.get("micro_agents", 48) * 0.25))
-    steps = 2400 if max_mode else 700
+    candidates = min(500, (300 if max_mode else 160) + int(technique.get("micro_agents", 48) * 0.2))
+    steps = 520 if max_mode else 220
     outputs: List[Dict[str, Any]] = []
     for i in range(max(1, rounds)):
         pulse, pulse_err = safe_post(
@@ -269,9 +269,41 @@ def deep_auto_learning_zone(max_mode: bool, study_areas: List[str], rounds: int,
     return {"rounds": rounds, "study_areas": study_areas, "technique_profile": technique, "results": outputs}
 
 
+def render_xp_bar(label: str, value: float, color: str = "#4CAF50") -> None:
+    pct = max(0.0, min(1.0, value)) * 100
+    st.markdown(
+        (
+            f"**{label}**  \n"
+            f"<div style='background:#1b1f24;border-radius:8px;padding:2px;'>"
+            f"<div style='width:{pct:.1f}%;background:{color};height:16px;border-radius:6px;'></div>"
+            f"</div>"
+            f"<small>{pct:.1f}%</small>"
+        ),
+        unsafe_allow_html=True,
+    )
+
+
+def render_learning_diagram() -> None:
+    st.graphviz_chart(
+        """
+digraph learning {
+  rankdir=LR;
+  node [shape=box, style=rounded];
+  Prompt -> "Hermes Agents";
+  "Hermes Agents" -> "Simulation";
+  "Simulation" -> "Learning Pulse";
+  "Learning Pulse" -> "Fleet Optimize";
+  "Fleet Optimize" -> "Curate + Dedupe";
+  "Curate + Dedupe" -> "Bonus + XP";
+  "Bonus + XP" -> "Auto Next Cycle";
+}
+        """
+    )
+
+
 st.set_page_config(page_title="Hermes Super Easy", page_icon="🧠", layout="wide")
 st.title("Hermes Fleet Command Center")
-st.caption("Super simple dashboard: see total Hermes, deploy all, track progress, and run deep auto-learning.")
+st.caption("Super simple dashboard: what is happening now, how learning works, and one-click actions.")
 
 if "api_key" not in st.session_state:
     st.session_state["api_key"] = DEFAULT_API_KEY
@@ -285,6 +317,8 @@ with st.sidebar:
     st.text_input("API Key", key="api_key", type="password")
     st.caption(f"Gateway: {API_BASE}")
     st.caption("Default Docker key is pre-filled.")
+    st.markdown("### How it works")
+    st.caption("1. Send prompt or click auto action\n2. Hermes fleet simulates + learns\n3. Bonus and XP improve")
 
 unified, unified_err = safe_get("/unified-config", timeout=20)
 bonus_data, bonus_err = safe_get("/aihub-bonus", timeout=20)
@@ -312,6 +346,7 @@ st.write(
     f"entry={unified.get('single_exe_entrypoint', 'hermes-gateway')} | "
     f"profile={unified.get('aihub_shared_ml_profile', 'global-learning')}"
 )
+render_learning_diagram()
 
 mode = st.radio("Training Level", ["Easy", "Near Max Hermes"], horizontal=True, index=1)
 max_mode = mode == "Near Max Hermes"
@@ -360,6 +395,15 @@ learning_depth = pull_metric(snapshot, ("learning_steps", "steps", "total_steps"
 fleet_score = max(0.0, min(100.0, ((fleet_reward * 0.35) + (fleet_truth * 0.35) + (fleet_shape * 0.30)) * 100.0))
 st.progress(float(max(0.0, min(1.0, avg_progress))), text=f"Fleet Progress: {avg_progress * 100:.1f}%")
 st.metric("Fleet Score", f"{fleet_score:.1f}/100")
+xp1, xp2, xp3, xp4 = st.columns(4)
+with xp1:
+    render_xp_bar("Learning XP", min(1.0, learning_depth / 1000.0), "#48C9B0")
+with xp2:
+    render_xp_bar("Reward XP", fleet_reward, "#58D68D")
+with xp3:
+    render_xp_bar("Truth XP", fleet_truth, "#5DADE2")
+with xp4:
+    render_xp_bar("Fleet Shape XP", fleet_shape, "#AF7AC5")
 
 summary_left, summary_right = st.columns([2, 1])
 with summary_left:
@@ -372,6 +416,7 @@ with summary_left:
     )
 with summary_right:
     st.subheader("Quick Actions")
+    st.caption("These buttons run full actions immediately.")
     if st.button("Generate Fleet Health Report", use_container_width=True):
         report_prompt = (
             "Create a short fleet health report from current Hermes data with "
@@ -391,6 +436,20 @@ with summary_right:
         deploy = run_auto_cycle(max_mode=True, technique=technique_profile)
         log_text("deploy-all-hermes", deploy)
         st.success("All Hermes units deployed and synced.")
+    if st.button("⚡ Permanent Bonus Boost", use_container_width=True):
+        boost1, e1 = safe_post(
+            "/curate-learning",
+            {
+                "sql_signal": min(0.99, technique_profile["sql_signal"] + 0.04),
+                "internet_signal": min(0.99, technique_profile["internet_signal"] + 0.04),
+                "llm_signal": min(0.99, technique_profile["llm_signal"] + 0.04),
+                "stability_bias": min(0.99, technique_profile["stability_bias"] + 0.03),
+            },
+            timeout=90,
+        )
+        boost2, e2 = safe_post("/dedupe-optimize", {"roots": ["core", "runtime", "src"], "max_file_mb": 8}, timeout=120)
+        log_text("permanent-bonus-boost", {"curate_learning": boost1, "dedupe": boost2, "errors": [e1, e2]})
+        st.success("Permanent bonus boost tools applied.")
 
 act1, act2, act3, act4, act5 = st.columns([1.1, 1, 1, 1.1, 1.3])
 with act1:
@@ -433,6 +492,21 @@ with act5:
         st.success("Special fleet training completed.")
         st.text_area("Special Training Result", value=json.dumps(special, indent=2), height=260)
 
+st.subheader("Automatic Learning Zone")
+auto_enabled = st.checkbox("Always run automatic smart learning", value=True)
+auto_interval = st.slider("Auto interval (seconds)", min_value=20, max_value=300, value=45, step=5)
+if "last_auto_run_ts" not in st.session_state:
+    st.session_state["last_auto_run_ts"] = 0.0
+now_ts = time.time()
+if auto_enabled and (now_ts - float(st.session_state.get("last_auto_run_ts", 0.0))) >= auto_interval:
+    auto_result = run_auto_cycle(max_mode=max_mode, technique=technique_profile)
+    log_text("automatic-learning-zone", auto_result)
+    st.session_state["last_auto_run_ts"] = now_ts
+    st.info("Automatic smart learning cycle executed.")
+else:
+    remaining = max(0, auto_interval - int(now_ts - float(st.session_state.get("last_auto_run_ts", 0.0))))
+    st.caption(f"Next automatic cycle in ~{remaining}s")
+
 st.subheader("Learning Space (text)")
 prompt = st.text_area(
     "Ask Hermes AIHub",
@@ -452,6 +526,7 @@ if st.button("Send to Hermes", use_container_width=True):
         st.success("Hermes response ready.")
 if st.session_state.get("last_chat", ""):
     st.text_area("Hermes Learning Response", value=st.session_state["last_chat"], height=220)
+st.caption("Prompt path: Prompt -> Hermes fleet agents -> learning pulse -> optimization -> bonus + XP")
 
 st.subheader("Hermes Fleet Units")
 if snapshot_err:
@@ -484,6 +559,12 @@ else:
     st.caption("Raw runtime data is hidden by default.")
     with st.expander("Show Raw Data (advanced)"):
         st.json(snapshot)
+
+st.subheader("Tips + Tools")
+t1, t2, t3 = st.columns(3)
+t1.info("Tip: Keep Near Max mode on for stronger fleet adaptation.")
+t2.info("Tip: Use Study Areas to steer what Hermes learns next.")
+t3.info("Tip: Run Permanent Bonus Boost after major changes.")
 
 if not st.session_state["auto_boot_done"]:
     warm, warm_err = safe_post("/learning-pulse", {"specialty": "fleet", "steps": 260, "candidates": 180}, timeout=90)
