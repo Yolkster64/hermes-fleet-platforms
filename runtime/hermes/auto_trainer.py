@@ -2,10 +2,17 @@ import os
 import time
 import math
 import random
+import json
 
 import requests
 
 API_BASE = os.getenv("HERMES_API_BASE_URL", "http://hermes-api:8787")
+LEARNING_STATE_PATH = os.getenv("HERMES_LEARNING_STATE_PATH", "runtime/auto/hermes_learning_state.json")
+SHARED_MODEL_ID = os.getenv("AIHUB_SHARED_MODEL_ID", "hermes-fleet-latest")
+FLEET_MODEL_LABEL = os.getenv("HERMES_FLEET_MODEL_LABEL", "hermes-fleet-newest")
+LOW_BANDWIDTH_MODE = os.getenv("HERMES_LOW_BANDWIDTH_MODE", "true").lower() in ("1", "true", "yes", "on")
+OFFLINE_ONLY_MODE = os.getenv("HERMES_OFFLINE_ONLY", "false").lower() in ("1", "true", "yes", "on")
+USER_ROUTED_INTERNET = os.getenv("HERMES_USER_ROUTED_INTERNET", "true").lower() in ("1", "true", "yes", "on")
 SPECIALTY = os.getenv("HERMES_TRAIN_SPECIALTY", "fleet")
 STEPS = int(os.getenv("HERMES_TRAIN_STEPS", "400"))
 SLEEP_SECONDS = int(os.getenv("HERMES_TRAIN_INTERVAL_SECONDS", "12"))
@@ -20,6 +27,7 @@ MICRO_AGENT_COUNT = int(os.getenv("HERMES_MICRO_AGENT_COUNT", "128"))
 GAUSSIAN_PRESSURE = float(os.getenv("HERMES_GAUSSIAN_PRESSURE", "0.88"))
 PERMANENT_INTELLIGENCE = os.getenv("HERMES_PERMANENT_INTELLIGENCE", "true").lower() in ("1", "true", "yes", "on")
 HIGH_LEVEL_LEARNING = max(0.0, min(1.0, float(os.getenv("HERMES_HIGH_LEVEL_LEARNING", "0.70"))))
+ENABLE_MOVIE_AIHUB = os.getenv("HERMES_ENABLE_MOVIE_AIHUB", "true").lower() in ("1", "true", "yes", "on")
 SPECIALIST_MODES = [m.strip() for m in os.getenv("HERMES_SPECIALIST_MODES", "swarm,mesh,multipolar,specialist-mix").split(",") if m.strip()]
 AGENT_WORK_STYLES = [s.strip() for s in os.getenv("HERMES_AGENT_WORK_STYLES", "fast_micro,deep_specialist,balanced_hybrid").split(",") if s.strip()]
 AGENT_SKILLS_25 = [
@@ -70,6 +78,62 @@ STRATEGY_ALGOS: dict[str, dict[str, float]] = {
 _algo_live: dict[str, dict[str, float]] = {k: dict(v) for k, v in STRATEGY_ALGOS.items()}
 
 
+def _resolved_state_path() -> str:
+    if os.path.isabs(LEARNING_STATE_PATH):
+        return LEARNING_STATE_PATH
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    return os.path.abspath(os.path.join(repo_root, LEARNING_STATE_PATH))
+
+
+def _load_learning_state() -> None:
+    global _strategy_memory, _evidence_matrix, _value_brain_history, _algo_live
+    state_path = _resolved_state_path()
+    if not os.path.exists(state_path):
+        return
+    with open(state_path, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    saved_memory = data.get("strategy_memory", {})
+    for occasion in _strategy_memory.keys():
+        if occasion in saved_memory and isinstance(saved_memory[occasion], dict):
+            for strategy in _strategy_memory[occasion].keys():
+                if strategy in saved_memory[occasion]:
+                    _strategy_memory[occasion][strategy] = float(saved_memory[occasion][strategy])
+    saved_evidence = data.get("evidence_matrix", {})
+    if isinstance(saved_evidence, dict):
+        _evidence_matrix = saved_evidence
+    saved_history = data.get("value_brain_history", [])
+    if isinstance(saved_history, list):
+        _value_brain_history = [float(v) for v in saved_history[-250:]]
+    saved_algo = data.get("algo_live", {})
+    if isinstance(saved_algo, dict):
+        for strategy in _algo_live.keys():
+            if strategy in saved_algo and isinstance(saved_algo[strategy], dict):
+                for metric in _algo_live[strategy].keys():
+                    if metric in saved_algo[strategy]:
+                        _algo_live[strategy][metric] = float(saved_algo[strategy][metric])
+
+
+def _save_learning_state() -> None:
+    state_path = _resolved_state_path()
+    os.makedirs(os.path.dirname(state_path), exist_ok=True)
+    with open(state_path, "w", encoding="utf-8") as fh:
+        json.dump(
+            {
+                "version": 1,
+                "fleet_model_label": FLEET_MODEL_LABEL,
+                "shared_model_id": SHARED_MODEL_ID,
+                "strategy_memory": _strategy_memory,
+                "evidence_matrix": _evidence_matrix,
+                "value_brain_history": _value_brain_history[-250:],
+                "algo_live": _algo_live,
+                "updated_unix": time.time(),
+            },
+            fh,
+            indent=2,
+            sort_keys=True,
+        )
+
+
 def _headers():
     if GATEWAY_KEY.strip():
         return {"X-Hermes-Key": GATEWAY_KEY.strip()}
@@ -87,6 +151,12 @@ def _post(path: str, payload: dict, timeout: int = 120) -> dict:
             last_error = exc
             time.sleep(0.8 + (attempt * 0.6))
     raise last_error
+
+
+def _get(path: str, timeout: int = 30) -> dict:
+    response = requests.get(f"{API_BASE}{path}", headers=_headers(), timeout=timeout)
+    response.raise_for_status()
+    return response.json()
 
 
 def _active_specialty(cycle: int) -> str:
@@ -123,6 +193,14 @@ def _base_signals(data: dict) -> tuple[float, float, float, float]:
     stability_bias = max(0.55, min(0.99, stability_bias + (GAUSSIAN_PRESSURE * (0.02 + (0.04 * HIGH_LEVEL_LEARNING)))))
     llm_signal = max(0.60, min(0.99, llm_signal + (0.06 * HIGH_LEVEL_LEARNING)))
     internet_signal = max(0.55, min(0.99, internet_signal + (0.05 * (1.0 - HIGH_LEVEL_LEARNING))))
+    if LOW_BANDWIDTH_MODE:
+        internet_signal = max(0.06, min(0.30, internet_signal * 0.34))
+        llm_signal = max(0.70, min(0.99, llm_signal + 0.02))
+        stability_bias = max(0.60, min(0.99, stability_bias + 0.03))
+    if OFFLINE_ONLY_MODE:
+        internet_signal = 0.0
+    elif USER_ROUTED_INTERNET:
+        internet_signal = min(0.14, max(0.06, internet_signal))
     return sql_signal, internet_signal, llm_signal, stability_bias
 
 
@@ -316,12 +394,60 @@ def _comparison_upgrade_pass(occasion: str, focus: str, cycle: int, base_steps: 
                     "steps": max(80, min(260, int(base_steps * 0.65 * algo["step_mult"]))),
                     "candidates": max(48, min(220, int(base_candidates * 0.70 * algo["candidate_mult"]))),
                     "sql_signal": max(0.55, min(0.99, 0.82 + algo["sql_boost"])),
-                    "internet_signal": max(0.55, min(0.99, 0.82 + algo["internet_boost"])),
+                    "internet_signal": (
+                        0.0
+                        if OFFLINE_ONLY_MODE
+                        else (min(0.14, max(0.06, 0.12 + algo["internet_boost"] * 0.15)) if USER_ROUTED_INTERNET else max(0.55, min(0.99, 0.82 + algo["internet_boost"])))
+                    ),
                     "llm_signal": max(0.60, min(0.99, 0.86 + algo["llm_boost"])),
                     "stability_bias": max(0.55, min(0.99, 0.84 + algo["stability_boost"])),
                 },
                 timeout=70,
             )
+            try:
+                _post(
+                    "/ingest-knowledge-mesh",
+                    {
+                        "source_agent": f"trainer-{chosen_strategy}",
+                        "target_agent": "orchestrator-core",
+                        "task_family": specialty,
+                        "pattern": f"{specialty}|{chosen_strategy}|{focus}",
+                        "shape3d": [x, y, z],
+                        "weight": max(0.0, min(1.0, pulse.get("pulse_score", 0.5))),
+                        "confidence": max(0.0, min(1.0, (stability_bias * 0.6) + (signal_score * 0.4))),
+                        "payload": {
+                            "algorithm": chosen_strategy,
+                            "focus": focus,
+                            "evidence_matrix": _evidence_matrix.get(chosen_strategy, {}),
+                            "chaotic_factor_pack": factors,
+                            "value_brain": brain_value,
+                            "cpp_available": cpp_available,
+                        },
+                    },
+                    timeout=90,
+                )
+            except requests.RequestException:
+                pass
+            if ENABLE_MOVIE_AIHUB:
+                try:
+                    _post(
+                        "/ingest-signal",
+                        {
+                            "source": "movie-aihub",
+                            "signal_score": max(0.0, min(1.0, (pulse.get("pulse_score", 0.5) * 0.62) + (brain_value * 0.38))),
+                            "payload": {
+                                "domain": "movies_media",
+                                "specialty": specialty,
+                                "algorithm": chosen_strategy,
+                                "shape3d": [x, y, z],
+                                "chaos_rate": chaos_rate,
+                                "focus": focus,
+                            },
+                        },
+                        timeout=60,
+                    )
+                except requests.RequestException:
+                    pass
             score = float(out.get("avg_reward", 0.0))
         except requests.RequestException:
             score = -1.0
@@ -395,6 +521,8 @@ def _emit_strategy_feedback(
                 "cycle": cycle,
                 "focus": focus,
                 "occasion": occasion,
+                "fleet_model_label": FLEET_MODEL_LABEL,
+                "shared_model_id": SHARED_MODEL_ID,
                 "selected_strategy": selected_strategy,
                 "strategy_algorithm": algo_profile,
                 "dynamic_specialty": dynamic_specialty,
@@ -444,6 +572,8 @@ def _smart_actions(data: dict, cycle: int, active_specialty: str, skill_pack: li
                 "agent_size": agent_size,
                 "skill_pack": skill_pack,
                 "permanent_intelligence": PERMANENT_INTELLIGENCE,
+                "fleet_model_label": FLEET_MODEL_LABEL,
+                "shared_model_id": SHARED_MODEL_ID,
                 "specialist_modes": SPECIALIST_MODES,
                 "agent_work_styles": AGENT_WORK_STYLES,
                 "high_level_learning": HIGH_LEVEL_LEARNING,
@@ -481,6 +611,13 @@ def run_cycle() -> None:
         timeout=120,
     )
     signal_score = max(0.0, min(1.0, (data.get("avg_truth_score", 0.5) * 0.6) + (data.get("avg_quality", 0.5) * 0.4)))
+    cpp_kernel = {}
+    cpp_available = False
+    try:
+        cpp_kernel = _get("/cpp-kernel-status", timeout=20)
+        cpp_available = bool(cpp_kernel.get("available", False))
+    except requests.RequestException:
+        cpp_kernel = {"available": False}
     focus = _occasion_focus(data)
     occasion = _occasion_type(focus)
     x, y, z, chaos_rate = _chaos_vector(_cycle, data)
@@ -499,6 +636,8 @@ def run_cycle() -> None:
                 "avg_knaa_qnaa_score": data.get("avg_knaa_qnaa_score"),
                 "avg_fleet_shape_score": data.get("avg_fleet_shape_score"),
                 "avg_long_haul_meta_score": data.get("avg_long_haul_meta_score"),
+                "fleet_model_label": FLEET_MODEL_LABEL,
+                "shared_model_id": SHARED_MODEL_ID,
                 "high_level_learning": HIGH_LEVEL_LEARNING,
                 "focus": focus,
                 "occasion": occasion,
@@ -507,6 +646,7 @@ def run_cycle() -> None:
                 "chaotic_factor_pack": factors,
                 "value_brain": brain_value,
                 "chaos_3d_vector": {"x": x, "y": y, "z": z, "chaos_rate": chaos_rate},
+                "cpp_kernel": cpp_kernel,
             },
         },
         headers=_headers(),
@@ -514,8 +654,16 @@ def run_cycle() -> None:
     ).raise_for_status()
     agent_size, dynamic_micro_agents = _agent_size_profile(_cycle, data)
     sql_signal, internet_signal, llm_signal, stability_bias = _base_signals(data)
+    if cpp_available:
+        sql_signal = min(0.99, sql_signal + 0.04)
+        llm_signal = min(0.99, llm_signal + 0.03)
+        stability_bias = min(0.99, stability_bias + 0.02)
     sql_signal = max(0.55, min(0.99, (sql_signal + algo_profile["sql_boost"]) * factors["ratio_sql"]))
     internet_signal = max(0.55, min(0.99, (internet_signal + algo_profile["internet_boost"]) * factors["ratio_internet"]))
+    if OFFLINE_ONLY_MODE:
+        internet_signal = 0.0
+    elif USER_ROUTED_INTERNET:
+        internet_signal = min(0.14, max(0.06, internet_signal))
     llm_signal = max(0.60, min(0.99, (llm_signal + algo_profile["llm_boost"]) * factors["ratio_llm"]))
     stability_bias = max(0.55, min(0.99, (stability_bias + algo_profile["stability_boost"]) * factors["ratio_stability"]))
     pulse_steps = min(620, max(140, int((STEPS * (0.28 + (0.45 * HIGH_LEVEL_LEARNING))) if MAX_MODE else STEPS // 2)))
@@ -580,10 +728,12 @@ def run_cycle() -> None:
         chaos=(x, y, z, chaos_rate),
     )
     _smart_actions(data, _cycle, dynamic_specialty, skill_pack, agent_size, dynamic_micro_agents, (x, y, z, chaos_rate))
+    _save_learning_state()
     print(
         f"[auto-trainer] cycle={_cycle} mode={'MAX' if MAX_MODE else 'BALANCED'} strategy={selected_strategy} "
         f"specialty={dynamic_specialty} size={agent_size} micro_agents={dynamic_micro_agents} "
         f"high_level_learning={HIGH_LEVEL_LEARNING:.2f} chaos={chaos_rate:.3f} "
+        f"cpp_native={str(cpp_available).lower()} "
         f"skills={','.join(skill_pack)} steps={data.get('steps')} "
         f"avg_reward={data.get('avg_reward_score'):.4f} "
         f"avg_truth={data.get('avg_truth_score'):.4f} "
@@ -594,9 +744,15 @@ def run_cycle() -> None:
 
 
 if __name__ == "__main__":
+    _load_learning_state()
     while True:
         try:
             run_cycle()
         except Exception as exc:
             print(f"[auto-trainer] cycle failed: {exc}")
+        finally:
+            try:
+                _save_learning_state()
+            except Exception as state_exc:
+                print(f"[auto-trainer] state save failed: {state_exc}")
         time.sleep(SLEEP_SECONDS)

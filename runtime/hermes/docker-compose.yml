@@ -4,20 +4,49 @@ services:
       context: ../..
       dockerfile: runtime/hermes/Dockerfile
     container_name: hermes-api
-    command: python core/hermes_super_orchestrator.py
+    command: >
+      sh -lc "if [ -f /workspace/core/native/hermes_learning_kernel.cpp ]; then
+      g++ -O3 -std=c++17 -fPIC -shared /workspace/core/native/hermes_learning_kernel.cpp -o /workspace/core/native/hermes_learning_kernel.so;
+      fi;
+      python core/hermes_super_orchestrator.py"
     environment:
       HERMES_API_HOST: 0.0.0.0
       HERMES_API_PORT: "8787"
-      HERMES_GPU_TARGET_UTILIZATION: "0.92"
-      HERMES_CPU_TARGET_UTILIZATION: "0.95"
+      HERMES_GPU_TARGET_UTILIZATION: "0.99"
+      HERMES_CPU_TARGET_UTILIZATION: "0.99"
       HERMES_API_KEY: "local-hermes-dev-key"
+      HERMES_CPP_NATIVE_LIB: "/workspace/core/native/hermes_learning_kernel.so"
+      HERMES_LOW_BANDWIDTH_MODE: "true"
+      HERMES_OFFLINE_ONLY: "false"
+      HERMES_USER_ROUTED_INTERNET: "true"
+      HERMES_MCP_SERVER: "github"
+      HERMES_TELEMETRY_DB_PATH: "/workspace/runtime/hermes_persist/hermes_super_orchestrator.db"
+      HERMES_TELEMETRY_PRUNE_INTERVAL_SECONDS: "15"
+      HERMES_TELEMETRY_PRUNE_ON_START: "false"
+      HERMES_SQLITE_BUSY_TIMEOUT_MS: "5000"
+      HERMES_SQLITE_WRITE_RETRIES: "3"
+      HERMES_SQLITE_WRITE_RETRY_DELAY_SECONDS: "0.03"
+      HERMES_MAX_EXTERNAL_SIGNAL_BYTES: "65536"
+      HERMES_MAX_AGENT_METRICS_ROWS: "25000"
+      HERMES_MAX_ORCHESTRATOR_EVENTS_ROWS: "12000"
+      HERMES_MAX_HORIZON_SCORES_ROWS: "12000"
+      HERMES_MAX_LLM_RANKINGS_ROWS: "12000"
+      HERMES_MAX_MEMORY_BANDS_ROWS: "6000"
+      HERMES_MAX_EXTERNAL_SIGNALS_ROWS: "8000"
+      HERMES_MAX_FLEET_RUN_ROWS: "8000"
+      HERMES_MAX_DEDUPE_CANDIDATES_ROWS: "10000"
+      HERMES_MAX_KNOWLEDGE_MESH_ROWS: "12000"
+      HERMES_ORCHESTRATOR_STATE_PATH: "/workspace/runtime/hermes_persist/hermes_orchestrator_state.json"
+      HERMES_ORCHESTRATOR_STATE_SAVE_SECONDS: "10"
+      HERMES_FLEET_MODEL_LABEL: "hermes-fleet-newest"
       HERMES_SINGLE_EXE_ENTRYPOINT: "hermes-gateway"
       AIHUB_UNIFIED_ENABLED: "true"
-      AIHUB_SHARED_MODEL_ID: "aihub-unified-v1"
+      AIHUB_SHARED_MODEL_ID: "hermes-fleet-latest"
       AIHUB_SHARED_ML_PROFILE: "global-learning"
     volumes:
       - ../../:/workspace
       - ../auto:/workspace/runtime/auto
+      - hermes-data:/workspace/runtime/hermes_persist
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=5).read()"]
@@ -27,7 +56,11 @@ services:
       start_period: 20s
     deploy:
       resources:
+        limits:
+          cpus: "24.0"
+          memory: 20G
         reservations:
+          memory: 6G
           devices:
             - driver: nvidia
               count: 1
@@ -42,8 +75,13 @@ services:
     environment:
       HERMES_API_BASE_URL: http://hermes-gateway:8788
       HERMES_GUI_API_KEY: "local-hermes-ui-key"
+      HERMES_LOW_BANDWIDTH_MODE: "true"
+      HERMES_OFFLINE_ONLY: "false"
+      HERMES_USER_ROUTED_INTERNET: "true"
+      HERMES_MCP_SERVER: "github"
+      HERMES_FLEET_MODEL_LABEL: "hermes-fleet-newest"
       AIHUB_UNIFIED_ENABLED: "true"
-      AIHUB_SHARED_MODEL_ID: "aihub-unified-v1"
+      AIHUB_SHARED_MODEL_ID: "hermes-fleet-latest"
       AIHUB_SHARED_ML_PROFILE: "global-learning"
       STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
     depends_on:
@@ -54,7 +92,15 @@ services:
     volumes:
       - ../../:/workspace
       - ../auto:/workspace/runtime/auto
+      - hermes-data:/workspace/runtime/hermes_persist
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "24.0"
+          memory: 3G
+        reservations:
+          memory: 1G
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501', timeout=5).read()"]
       interval: 15s
@@ -71,6 +117,10 @@ services:
     environment:
       HERMES_API_BASE_URL: http://hermes-gateway:8788
       HERMES_GATEWAY_KEY: "local-hermes-ui-key"
+      HERMES_LOW_BANDWIDTH_MODE: "true"
+      HERMES_OFFLINE_ONLY: "false"
+      HERMES_USER_ROUTED_INTERNET: "true"
+      HERMES_MCP_SERVER: "github"
       HERMES_TRAIN_SPECIALTY: fleet
       HERMES_TRAIN_STEPS: "2000"
       HERMES_TRAIN_INTERVAL_SECONDS: "6"
@@ -83,10 +133,13 @@ services:
       HERMES_MICRO_AGENT_COUNT: "200"
       HERMES_GAUSSIAN_PRESSURE: "0.88"
       HERMES_PERMANENT_INTELLIGENCE: "true"
+      HERMES_ENABLE_MOVIE_AIHUB: "true"
+      HERMES_LEARNING_STATE_PATH: "/workspace/runtime/hermes_persist/hermes_learning_state.json"
+      HERMES_FLEET_MODEL_LABEL: "hermes-fleet-newest"
       HERMES_SPECIALIST_MODES: "swarm,mesh,multipolar,specialist-mix"
       HERMES_AGENT_WORK_STYLES: "fast_micro,deep_specialist,balanced_hybrid"
       AIHUB_UNIFIED_ENABLED: "true"
-      AIHUB_SHARED_MODEL_ID: "aihub-unified-v1"
+      AIHUB_SHARED_MODEL_ID: "hermes-fleet-latest"
       AIHUB_SHARED_ML_PROFILE: "global-learning"
     depends_on:
       hermes-gateway:
@@ -94,7 +147,15 @@ services:
     volumes:
       - ../../:/workspace
       - ../auto:/workspace/runtime/auto
+      - hermes-data:/workspace/runtime/hermes_persist
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "24.0"
+          memory: 20G
+        reservations:
+          memory: 8G
 
   hermes-gateway:
     build:
@@ -105,8 +166,13 @@ services:
       HERMES_BACKEND_URL: http://hermes-api:8787
       HERMES_API_KEY: "local-hermes-dev-key"
       HERMES_GATEWAY_KEY: "local-hermes-ui-key"
+      HERMES_LOW_BANDWIDTH_MODE: "true"
+      HERMES_OFFLINE_ONLY: "false"
+      HERMES_USER_ROUTED_INTERNET: "true"
+      HERMES_MCP_SERVER: "github"
+      HERMES_FLEET_MODEL_LABEL: "hermes-fleet-newest"
       AIHUB_UNIFIED_ENABLED: "true"
-      AIHUB_SHARED_MODEL_ID: "aihub-unified-v1"
+      AIHUB_SHARED_MODEL_ID: "hermes-fleet-latest"
       AIHUB_SHARED_ML_PROFILE: "global-learning"
     depends_on:
       hermes-api:
@@ -114,3 +180,13 @@ services:
     ports:
       - "${MCP_DOCKER_PORT:-8788}:8788"
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "24.0"
+          memory: 3G
+        reservations:
+          memory: 1G
+
+volumes:
+  hermes-data:

@@ -49,6 +49,14 @@ temp/
 *.tmp
 *.bak
 
+# Hermes local runtime artifacts
+runtime/auto/*.db
+runtime/auto/*.db-shm
+runtime/auto/*.db-wal
+runtime/hermes_persist/
+core/native/*.so
+builds/exe/
+
 # IDE and OS
 .vscode/
 .idea/

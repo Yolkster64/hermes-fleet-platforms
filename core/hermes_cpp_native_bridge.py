@@ -1,4 +1,6 @@
 import ctypes
+import os
+import platform
 from ctypes import c_double, c_size_t
 from pathlib import Path
 from typing import Optional
@@ -6,9 +8,22 @@ from typing import Optional
 
 class HermesCppNativeBridge:
     def __init__(self, dll_path: Optional[str] = None) -> None:
-        self.dll_path = dll_path or str(Path("core/native/hermes_learning_kernel.dll"))
+        self.dll_path = dll_path or self._default_library_path()
         self._dll = None
         self._load()
+
+    def _default_library_path(self) -> str:
+        env_path = os.getenv("HERMES_CPP_NATIVE_LIB", "").strip()
+        if env_path:
+            return env_path
+        system = platform.system().lower()
+        if system == "windows":
+            suffix = ".dll"
+        elif system == "darwin":
+            suffix = ".dylib"
+        else:
+            suffix = ".so"
+        return str(Path(f"core/native/hermes_learning_kernel{suffix}"))
 
     def _load(self) -> None:
         dll = Path(self.dll_path)
@@ -84,6 +99,34 @@ class HermesCppNativeBridge:
                 c_double,
             ]
             self._dll.hermes_long_haul_meta_score.restype = c_double
+        except AttributeError:
+            pass
+        try:
+            self._dll.hermes_adaptive_brain_decision.argtypes = [
+                ctypes.POINTER(c_double),
+                c_size_t,
+                ctypes.POINTER(c_double),
+                c_size_t,
+                c_double,
+                c_double,
+                c_double,
+                c_double,
+                c_double,
+                ctypes.POINTER(c_double),
+                c_size_t,
+            ]
+            self._dll.hermes_adaptive_brain_decision.restype = None
+        except AttributeError:
+            pass
+        try:
+            self._dll.hermes_linear_regression_predict.argtypes = [
+                ctypes.POINTER(c_double),
+                ctypes.POINTER(c_double),
+                c_size_t,
+                c_double,
+                c_double,
+            ]
+            self._dll.hermes_linear_regression_predict.restype = c_double
         except AttributeError:
             pass
 
@@ -291,5 +334,125 @@ class HermesCppNativeBridge:
                 c_double(correction_signal),
                 c_double(truth_score),
                 c_double(gaussian_alignment),
+            )
+        )
+
+    def adaptive_brain_decision(
+        self,
+        variables: list[float],
+        variable_weights: list[float],
+        truth_score: float,
+        stability_signal: float,
+        exploration_pressure: float,
+        chaos_control: float,
+        proactive_bias: float,
+    ) -> dict[str, float]:
+        if not variables or not variable_weights:
+            return {
+                "decision_score": 0.0,
+                "proactive_score": 0.0,
+                "adaptation_rate": 0.0,
+                "chaos_intensity": 0.0,
+                "confidence": 0.0,
+                "llm_boost": 0.0,
+                "fleet_boost": 0.0,
+                "specialization_shift": 0.0,
+            }
+        usable = min(len(variables), len(variable_weights))
+        vals = [max(0.0, min(1.0, float(v))) for v in variables[:usable]]
+        wts = [max(0.000001, float(w)) for w in variable_weights[:usable]]
+        w_sum = sum(wts) or 1.0
+        wts = [w / w_sum for w in wts]
+        truth = max(0.0, min(1.0, float(truth_score)))
+        stability = max(0.0, min(1.0, float(stability_signal)))
+        exploration = max(0.0, min(1.0, float(exploration_pressure)))
+        chaos = max(0.0, min(1.0, float(chaos_control)))
+        proactive = max(0.0, min(1.0, float(proactive_bias)))
+
+        if not self._dll or not hasattr(self._dll, "hermes_adaptive_brain_decision"):
+            weighted_mean = sum(v * w for v, w in zip(vals, wts))
+            variance = sum(((v - weighted_mean) ** 2) * w for v, w in zip(vals, wts))
+            volatility = max(0.0, min(1.0, (variance ** 0.5) * 1.6))
+            risk = max(0.0, min(1.0, (1.0 - truth) * 0.60 + volatility * 0.30 + exploration * 0.10))
+            proactive_score = max(0.0, min(1.0, proactive * 0.52 + weighted_mean * 0.28 + (1.0 - risk) * 0.20))
+            adaptation = max(0.0, min(1.0, exploration * 0.34 + volatility * 0.36 + (1.0 - stability) * 0.30))
+            chaos_intensity = max(0.0, min(1.0, chaos * (0.25 + adaptation * 0.55) + exploration * 0.12))
+            confidence = max(0.0, min(1.0, truth * 0.46 + stability * 0.34 + (1.0 - volatility) * 0.20))
+            llm_boost = max(0.0, min(1.0, proactive_score * 0.42 + confidence * 0.40 + (1.0 - risk) * 0.18))
+            fleet_boost = max(0.0, min(1.0, confidence * 0.33 + proactive_score * 0.22 + adaptation * 0.25 + (1.0 - risk) * 0.20))
+            specialization_shift = max(0.0, min(1.0, adaptation * 0.55 + chaos_intensity * 0.30 + exploration * 0.15))
+            decision = max(
+                0.0,
+                min(
+                    1.0,
+                    llm_boost * 0.23
+                    + fleet_boost * 0.25
+                    + confidence * 0.20
+                    + proactive_score * 0.16
+                    + (1.0 - chaos_intensity) * 0.08
+                    + adaptation * 0.08,
+                ),
+            )
+            return {
+                "decision_score": decision,
+                "proactive_score": proactive_score,
+                "adaptation_rate": adaptation,
+                "chaos_intensity": chaos_intensity,
+                "confidence": confidence,
+                "llm_boost": llm_boost,
+                "fleet_boost": fleet_boost,
+                "specialization_shift": specialization_shift,
+            }
+
+        vals_arr = (c_double * len(vals))(*vals)
+        wts_arr = (c_double * len(wts))(*wts)
+        out_arr = (c_double * 8)(*([0.0] * 8))
+        self._dll.hermes_adaptive_brain_decision(
+            vals_arr,
+            c_size_t(len(vals)),
+            wts_arr,
+            c_size_t(len(wts)),
+            c_double(truth),
+            c_double(stability),
+            c_double(exploration),
+            c_double(chaos),
+            c_double(proactive),
+            out_arr,
+            c_size_t(8),
+        )
+        return {
+            "decision_score": float(out_arr[0]),
+            "proactive_score": float(out_arr[1]),
+            "adaptation_rate": float(out_arr[2]),
+            "chaos_intensity": float(out_arr[3]),
+            "confidence": float(out_arr[4]),
+            "llm_boost": float(out_arr[5]),
+            "fleet_boost": float(out_arr[6]),
+            "specialization_shift": float(out_arr[7]),
+        }
+
+    def linear_regression_predict(self, y_values: list[float], x_query: float, l2_alpha: float = 0.01) -> float:
+        if len(y_values) < 2:
+            return float(y_values[-1]) if y_values else 0.0
+        ys = [float(v) for v in y_values]
+        xs = [float(i + 1) for i in range(len(ys))]
+        if not self._dll or not hasattr(self._dll, "hermes_linear_regression_predict"):
+            x_mean = sum(xs) / len(xs)
+            y_mean = sum(ys) / len(ys)
+            num = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, ys))
+            den = sum((x - x_mean) ** 2 for x in xs) + max(0.0, float(l2_alpha))
+            slope = num / max(0.000001, den)
+            intercept = y_mean - (slope * x_mean)
+            return float(intercept + (slope * float(x_query)))
+
+        xs_arr = (c_double * len(xs))(*xs)
+        ys_arr = (c_double * len(ys))(*ys)
+        return float(
+            self._dll.hermes_linear_regression_predict(
+                xs_arr,
+                ys_arr,
+                c_size_t(len(ys)),
+                c_double(float(x_query)),
+                c_double(max(0.0, float(l2_alpha))),
             )
         )

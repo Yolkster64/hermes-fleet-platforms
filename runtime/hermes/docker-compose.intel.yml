@@ -1,0 +1,20 @@
+services:
+  hermes-api:
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      HERMES_INTEL_ACCEL_ENABLE: "true"
+      HERMES_INTEL_ARC_ENABLE: "true"
+      HERMES_NPU_ENABLE: "true"
+      SYCL_DEVICE_FILTER: "level_zero:gpu,cpu"
+      ONEAPI_DEVICE_SELECTOR: "level_zero:gpu"
+
+  hermes-trainer:
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      HERMES_INTEL_ACCEL_ENABLE: "true"
+      HERMES_INTEL_ARC_ENABLE: "true"
+      HERMES_NPU_ENABLE: "true"
+      SYCL_DEVICE_FILTER: "level_zero:gpu,cpu"
+      ONEAPI_DEVICE_SELECTOR: "level_zero:gpu"

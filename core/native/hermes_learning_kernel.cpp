@@ -3,9 +3,19 @@
 #include <cstddef>
 #include <vector>
 
+#if defined(_WIN32) || defined(_WIN64)
+#define HERMES_EXPORT __declspec(dllexport)
+#else
+#define HERMES_EXPORT __attribute__((visibility("default")))
+#endif
+
 namespace {
 double sigmoid(double x) {
     return 1.0 / (1.0 + std::exp(-x));
+}
+
+double clamp01(double v) {
+    return std::clamp(v, 0.0, 1.0);
 }
 
 double mean_or_zero(const double* values, std::size_t len) {
@@ -18,11 +28,24 @@ double mean_or_zero(const double* values, std::size_t len) {
     }
     return sum / static_cast<double>(len);
 }
+
+double triangular_membership(double x, double left, double center, double right) {
+    if (x <= left || x >= right) {
+        return 0.0;
+    }
+    if (x == center) {
+        return 1.0;
+    }
+    if (x < center) {
+        return (x - left) / std::max(0.000001, center - left);
+    }
+    return (right - x) / std::max(0.000001, right - center);
+}
 }
 
 extern "C" {
 
-__declspec(dllexport) double hermes_reward_update(
+HERMES_EXPORT double hermes_reward_update(
     double quality,
     double speed,
     double cost_efficiency,
@@ -55,7 +78,7 @@ __declspec(dllexport) double hermes_reward_update(
     return score;
 }
 
-__declspec(dllexport) void hermes_quantize_float32(
+HERMES_EXPORT void hermes_quantize_float32(
     const float* input,
     std::size_t len,
     float min_value,
@@ -73,7 +96,7 @@ __declspec(dllexport) void hermes_quantize_float32(
     }
 }
 
-__declspec(dllexport) double hermes_gaussian_3d_score(
+HERMES_EXPORT double hermes_gaussian_3d_score(
     double x,
     double y,
     double z,
@@ -89,7 +112,7 @@ __declspec(dllexport) double hermes_gaussian_3d_score(
     return std::exp(-(dist2 / (2.0 * safe_sigma * safe_sigma)));
 }
 
-__declspec(dllexport) double hermes_knaa_qnaa_score(
+HERMES_EXPORT double hermes_knaa_qnaa_score(
     const double* short_values,
     std::size_t short_len,
     const double* mid_values,
@@ -110,7 +133,7 @@ __declspec(dllexport) double hermes_knaa_qnaa_score(
     return std::clamp((knaa * 0.64) + (qnaa * 0.36) + explore, 0.0, 1.0);
 }
 
-__declspec(dllexport) double hermes_fleet_shape_score(
+HERMES_EXPORT double hermes_fleet_shape_score(
     double active_agents,
     double latency_ms,
     double throughput_rps,
@@ -136,7 +159,7 @@ __declspec(dllexport) double hermes_fleet_shape_score(
     );
 }
 
-__declspec(dllexport) double hermes_quantized_compression_score(
+HERMES_EXPORT double hermes_quantized_compression_score(
     const double* values,
     std::size_t len) {
     if (values == nullptr || len == 0) {
@@ -172,7 +195,7 @@ __declspec(dllexport) double hermes_quantized_compression_score(
     return std::clamp((fidelity * 0.72) + (compression_ratio * 0.28), 0.0, 1.0);
 }
 
-__declspec(dllexport) double hermes_long_haul_meta_score(
+HERMES_EXPORT double hermes_long_haul_meta_score(
     const double* short_values,
     std::size_t short_len,
     const double* mid_values,
@@ -195,6 +218,116 @@ __declspec(dllexport) double hermes_long_haul_meta_score(
 
     const double correction = 0.5 + std::clamp(correction_signal, -1.0, 1.0) * 0.5;
     return std::clamp((horizon_stability * 0.58) + (signal_quality * 0.30) + (correction * 0.12), 0.0, 1.0);
+}
+
+HERMES_EXPORT double hermes_linear_regression_predict(
+    const double* xs,
+    const double* ys,
+    std::size_t len,
+    double x_query,
+    double l2_alpha) {
+    if (xs == nullptr || ys == nullptr || len < 2) {
+        return 0.0;
+    }
+    const double alpha = std::max(0.0, l2_alpha);
+    double sum_x = 0.0;
+    double sum_y = 0.0;
+    for (std::size_t i = 0; i < len; ++i) {
+        sum_x += xs[i];
+        sum_y += ys[i];
+    }
+    const double mean_x = sum_x / static_cast<double>(len);
+    const double mean_y = sum_y / static_cast<double>(len);
+
+    double num = 0.0;
+    double den = 0.0;
+    for (std::size_t i = 0; i < len; ++i) {
+        const double dx = xs[i] - mean_x;
+        num += dx * (ys[i] - mean_y);
+        den += dx * dx;
+    }
+    const double slope = num / std::max(0.000001, den + alpha);
+    const double intercept = mean_y - (slope * mean_x);
+    return intercept + (slope * x_query);
+}
+
+HERMES_EXPORT void hermes_adaptive_brain_decision(
+    const double* variables,
+    std::size_t variables_len,
+    const double* variable_weights,
+    std::size_t weight_len,
+    double truth_score,
+    double stability_signal,
+    double exploration_pressure,
+    double chaos_control,
+    double proactive_bias,
+    double* output_metrics,
+    std::size_t output_len) {
+    if (output_metrics == nullptr || output_len == 0) {
+        return;
+    }
+    for (std::size_t i = 0; i < output_len; ++i) {
+        output_metrics[i] = 0.0;
+    }
+
+    const std::size_t n = std::min(variables_len, weight_len);
+    if (variables == nullptr || variable_weights == nullptr || n == 0) {
+        return;
+    }
+
+    double weighted_sum = 0.0;
+    double weight_sum = 0.0;
+    for (std::size_t i = 0; i < n; ++i) {
+        const double w = std::max(0.000001, variable_weights[i]);
+        const double v = clamp01(variables[i]);
+        weighted_sum += v * w;
+        weight_sum += w;
+    }
+    const double weighted_mean = weighted_sum / std::max(0.000001, weight_sum);
+
+    double weighted_var = 0.0;
+    for (std::size_t i = 0; i < n; ++i) {
+        const double w = std::max(0.000001, variable_weights[i]);
+        const double d = clamp01(variables[i]) - weighted_mean;
+        weighted_var += w * d * d;
+    }
+    weighted_var /= std::max(0.000001, weight_sum);
+    const double volatility = clamp01(std::sqrt(std::max(0.0, weighted_var)) * 1.6);
+
+    const double low = triangular_membership(weighted_mean, 0.0, 0.20, 0.50);
+    const double medium = triangular_membership(weighted_mean, 0.20, 0.50, 0.80);
+    const double high = triangular_membership(weighted_mean, 0.50, 0.80, 1.0);
+
+    const double truth = clamp01(truth_score);
+    const double stability = clamp01(stability_signal);
+    const double exploration = clamp01(exploration_pressure);
+    const double chaos = clamp01(chaos_control);
+    const double proactive_seed = clamp01(proactive_bias);
+
+    const double risk = clamp01((1.0 - truth) * 0.60 + (volatility * 0.30) + (exploration * 0.10));
+    const double proactive = clamp01((proactive_seed * 0.42) + (high * 0.24) + (medium * 0.14) + ((1.0 - risk) * 0.20));
+    const double adaptation = clamp01((exploration * 0.34) + (volatility * 0.36) + ((1.0 - stability) * 0.18) + (high * 0.12));
+    const double chaos_intensity = clamp01((chaos * (0.25 + adaptation * 0.55)) + (low * 0.20) + (exploration * 0.12));
+    const double confidence = clamp01((truth * 0.46) + (stability * 0.34) + ((1.0 - volatility) * 0.20));
+    const double llm_boost = clamp01((proactive * 0.42) + (confidence * 0.30) + (high * 0.18) + ((1.0 - risk) * 0.10));
+    const double specialization_shift = clamp01((adaptation * 0.48) + (chaos_intensity * 0.24) + (low * 0.18) + (exploration * 0.10));
+    const double fleet_boost = clamp01((confidence * 0.30) + (proactive * 0.22) + (adaptation * 0.18) + (high * 0.16) + ((1.0 - risk) * 0.14));
+    const double decision_score = clamp01(
+        (llm_boost * 0.23)
+        + (fleet_boost * 0.25)
+        + (confidence * 0.20)
+        + (proactive * 0.16)
+        + ((1.0 - chaos_intensity) * 0.08)
+        + (adaptation * 0.08));
+
+    if (output_len > 0) output_metrics[0] = decision_score;
+    if (output_len > 1) output_metrics[1] = proactive;
+    if (output_len > 2) output_metrics[2] = adaptation;
+    if (output_len > 3) output_metrics[3] = chaos_intensity;
+    if (output_len > 4) output_metrics[4] = confidence;
+    if (output_len > 5) output_metrics[5] = llm_boost;
+    if (output_len > 6) output_metrics[6] = fleet_boost;
+    if (output_len > 7) output_metrics[7] = specialization_shift;
 }
 
 }
