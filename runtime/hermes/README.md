@@ -2,6 +2,7 @@
 
 1. Start stack:
    - `pwsh ./runtime/hermes/start-local.ps1`
+   - or one-command advanced fleet startup: `pwsh ./runtime/hermes/start-agent-fleet.ps1`
 2. MCP Docker gateway (primary entry):
    - `http://localhost:${MCP_DOCKER_PORT:-8788}`
 3. GUI:
@@ -31,6 +32,7 @@ This runtime enables:
   - Deploy-all control (`🚀 Deploy All Hermes`)
   - Special Fleet Training action (`🛰️`) for deeper specialty runs
   - Per-Hermes symbol/bonus/progress/zone table
+  - 25-skill agent system with 3 active skills per Hermes unit
   - Learning Space text panel (prompt -> Hermes response)
   - Fleet Data section (`/snapshot`) for live runtime context (raw hidden by default)
   - Fleet Summary text and instant Fleet Health Report action
@@ -52,6 +54,16 @@ This runtime enables:
   - `HERMES_FLEET_OPTIMIZE_EVERY=1`
   - `HERMES_FLEET_CANDIDATES=480`
   - `HERMES_MAX_MODE=true`
+  - `HERMES_SMART_ACTIONS=true`
+  - `HERMES_ALWAYS_DEEP_LEARNING=true`
+  - `HERMES_SWARM_STRATEGY=hybrid`
+  - `HERMES_MICRO_AGENT_COUNT=128`
+  - `HERMES_GAUSSIAN_PRESSURE=0.88`
+  - `HERMES_PERMANENT_INTELLIGENCE=true`
+  - `HERMES_SPECIALIST_MODES=swarm,mesh,multipolar,specialist-mix`
+  - `HERMES_AGENT_WORK_STYLES=fast_micro,deep_specialist,balanced_hybrid`
+  - Agent behavior rotates specialist mode + work style + 3-skill packs continuously to discover faster fleet configurations
+  - Behavior: trainer now runs continuous smart-action loops (simulate + pulse + curate + dedupe + optimize + LLM-guided action routing)
 - Gateway API key is enabled by default in compose:
   - `HERMES_GATEWAY_KEY=local-hermes-ui-key`
   - GUI and trainer are pre-wired to use the same key

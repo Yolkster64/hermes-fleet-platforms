@@ -8,6 +8,33 @@ import streamlit as st
 
 API_BASE = os.getenv("HERMES_API_BASE_URL", "http://localhost:8788")
 DEFAULT_API_KEY = os.getenv("HERMES_GUI_API_KEY", "local-hermes-ui-key")
+AGENT_SKILLS_25 = [
+    "coding",
+    "error_checking",
+    "testing",
+    "gui_design",
+    "security_hardening",
+    "performance_tuning",
+    "data_engineering",
+    "ml_modeling",
+    "neural_optimization",
+    "gaussian_learning",
+    "prompt_engineering",
+    "llm_routing",
+    "communication_mesh",
+    "fleet_orchestration",
+    "quantization",
+    "parallelization",
+    "multipolar_reasoning",
+    "memory_management",
+    "refactoring",
+    "observability",
+    "cost_optimization",
+    "deployment",
+    "api_integration",
+    "documentation",
+    "reliability_engineering",
+]
 
 
 def headers() -> Dict[str, str]:
@@ -186,6 +213,10 @@ def normalize_agents(snapshot_data: Dict[str, Any], global_bonus: float) -> List
         load = float(agent.get("load", 0.0))
         bonus = max(0.0, reward * (0.5 + global_bonus))
         progress = max(0.0, min(1.0, (reward * 0.5) + (success_rate * 0.5)))
+        size_mode = "small-fast" if progress < 0.45 else ("medium-balanced" if progress < 0.75 else "large-deep")
+        interaction = "mesh" if "research" in str(agent.get("specialty", "")).lower() else "hybrid"
+        skill_start = (i * 3) % len(AGENT_SKILLS_25)
+        skill_pack = [AGENT_SKILLS_25[(skill_start + j) % len(AGENT_SKILLS_25)] for j in range(3)]
         rows.append(
             {
                 "symbol": symbols[i % len(symbols)],
@@ -198,6 +229,9 @@ def normalize_agents(snapshot_data: Dict[str, Any], global_bonus: float) -> List
                 "bonus": bonus,
                 "progress": progress,
                 "active": bool(agent.get("active", True)),
+                "size_mode": size_mode,
+                "interaction": interaction,
+                "skills": skill_pack,
             }
         )
     return rows
@@ -317,6 +351,7 @@ st.caption(
     f"{', '.join(technique_profile['techniques']) if technique_profile['techniques'] else 'standard'} | "
     f"swarm={technique_profile['swarm_strategy']} | micro_agents={technique_profile['micro_agents']}"
 )
+st.caption("Agent skill system: 25 total skills, 3 active skills per Hermes unit.")
 
 fleet_reward = pull_metric(snapshot, ("avg_reward_score", "reward_score", "reward"), default=0.0)
 fleet_truth = pull_metric(snapshot, ("avg_truth_score", "truth_score", "truth"), default=0.0)
@@ -434,8 +469,11 @@ else:
                 "Hermes": a["name"],
                 "Bonus": round(a["bonus"], 4),
                 "Progress": f"{a['progress'] * 100:.1f}%",
+                "Size": a["size_mode"],
+                "Interaction": a["interaction"],
                 "Zone": a["zone"],
                 "Specialty": a["specialty"],
+                "Skills(3)": ", ".join(a["skills"]),
                 "Active": "Yes" if a["active"] else "No",
             }
             for a in agent_rows
