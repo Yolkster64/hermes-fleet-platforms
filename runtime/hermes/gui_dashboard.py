@@ -1,5 +1,6 @@
+import json
 import os
-from typing import Any, Dict
+from typing import Any, Dict, Tuple
 
 import requests
 import streamlit as st
@@ -19,102 +20,156 @@ def api_get(path: str, timeout: int = 30) -> Dict[str, Any]:
     return r.json()
 
 
-def api_post(path: str, payload: Dict[str, Any], timeout: int = 90) -> Dict[str, Any]:
+def api_post(path: str, payload: Dict[str, Any], timeout: int = 120) -> Dict[str, Any]:
     r = requests.post(f"{API_BASE}{path}", json=payload, headers=headers(), timeout=timeout)
     r.raise_for_status()
     return r.json()
 
 
+def safe_get(path: str, timeout: int = 30) -> Tuple[Dict[str, Any], str]:
+    try:
+        return api_get(path, timeout=timeout), ""
+    except Exception as exc:  # pragma: no cover
+        return {}, str(exc)
+
+
+def safe_post(path: str, payload: Dict[str, Any], timeout: int = 120) -> Tuple[Dict[str, Any], str]:
+    try:
+        return api_post(path, payload=payload, timeout=timeout), ""
+    except Exception as exc:  # pragma: no cover
+        return {}, str(exc)
+
+
 def log_text(label: str, payload: Dict[str, Any]) -> None:
     st.session_state.setdefault("logs", [])
     st.session_state["logs"].insert(0, {"label": label, "payload": payload})
-    st.session_state["logs"] = st.session_state["logs"][:15]
+    st.session_state["logs"] = st.session_state["logs"][:20]
 
 
 def run_auto_cycle(max_mode: bool) -> Dict[str, Any]:
-    steps = 1400 if max_mode else 400
-    candidates = 320 if max_mode else 120
-    sim = api_post("/simulate", {"specialty": "fleet", "simulations": 900 if max_mode else 240})
-    pulse = api_post("/learning-pulse", {"specialty": "fleet", "steps": steps, "candidates": candidates}, timeout=120)
-    return {"simulate": sim, "learning_pulse": pulse}
+    steps = 2200 if max_mode else 600
+    candidates = 480 if max_mode else 160
+    sim_steps = 2000 if max_mode else 500
+
+    simulate, sim_err = safe_post("/simulate", {"specialty": "fleet", "steps": sim_steps})
+    pulse, pulse_err = safe_post(
+        "/learning-pulse",
+        {"specialty": "fleet", "steps": steps, "candidates": candidates, "sql_signal": 0.86, "internet_signal": 0.72, "llm_signal": 0.90, "stability_bias": 0.83},
+        timeout=140,
+    )
+    optimize, opt_err = safe_post("/optimize-fleet", {"specialty": "fleet", "candidates": candidates}, timeout=120)
+    curate, curate_err = safe_post("/curate-learning", {"sql_signal": 0.86, "internet_signal": 0.72, "llm_signal": 0.90, "stability_bias": 0.83}, timeout=90)
+    dedupe, dedupe_err = safe_post("/dedupe-optimize", {"roots": ["core", "runtime", "src"], "max_file_mb": 8}, timeout=120)
+    return {
+        "simulate": simulate,
+        "learning_pulse": pulse,
+        "optimize_fleet": optimize,
+        "curate_learning": curate,
+        "dedupe_optimize": dedupe,
+        "errors": {"simulate": sim_err, "learning_pulse": pulse_err, "optimize_fleet": opt_err, "curate_learning": curate_err, "dedupe_optimize": dedupe_err},
+    }
 
 
-st.set_page_config(page_title="Hermes Easy Control", page_icon="🧠", layout="wide")
-st.title("Hermes Easy Control")
-st.caption("Simple automatic control center — one button runs the full training flow.")
+st.set_page_config(page_title="Hermes Super Easy", page_icon="🧠", layout="wide")
+st.title("Hermes Super Easy")
+st.caption("One-screen control: connect, train near max, learn, and view fleet data.")
 
 if "api_key" not in st.session_state:
     st.session_state["api_key"] = DEFAULT_API_KEY
 if "auto_boot_done" not in st.session_state:
     st.session_state["auto_boot_done"] = False
+if "last_chat" not in st.session_state:
+    st.session_state["last_chat"] = ""
 
 with st.sidebar:
-    st.subheader("Connection")
+    st.subheader("Easy Connection")
     st.text_input("API Key", key="api_key", type="password")
     st.caption(f"Gateway: {API_BASE}")
+    st.caption("Default Docker key is pre-filled.")
 
-try:
-    unified = api_get("/unified-config", timeout=20)
-    bonus = api_get("/aihub-bonus", timeout=20).get("aihub_bonus", 0.0)
-    c1, c2, c3 = st.columns(3)
-    c1.metric("System", "Online")
-    c2.metric("AIHub Bonus", f"{bonus*100:.1f}%")
-    c3.metric("Model", str(unified.get("llm_api_model", "aihub-unified-temp")))
-    st.write(
-        f"**Status:** ready | provider={unified.get('llm_api_provider', 'temp-api')} | "
-        f"entry={unified.get('single_exe_entrypoint', 'hermes-gateway')}"
+unified, unified_err = safe_get("/unified-config", timeout=20)
+bonus_data, bonus_err = safe_get("/aihub-bonus", timeout=20)
+snapshot, snapshot_err = safe_get("/snapshot", timeout=20)
+
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("System", "Online" if not unified_err else "Offline")
+c2.metric("AIHub Bonus", f"{bonus_data.get('aihub_bonus', 0.0) * 100:.1f}%")
+c3.metric("Mode", "MAX")
+c4.metric("Model", str(unified.get("aihub_shared_model_id", "aihub-unified-v1")))
+
+if unified_err:
+    st.error(f"Gateway not ready: {unified_err}")
+if bonus_err:
+    st.warning(f"AIHub bonus pending: {bonus_err}")
+
+st.write(
+    f"**Unified AI/ML:** provider={unified.get('llm_api_provider', 'temp-api')} | "
+    f"entry={unified.get('single_exe_entrypoint', 'hermes-gateway')} | "
+    f"profile={unified.get('aihub_shared_ml_profile', 'global-learning')}"
+)
+
+mode = st.radio("Training Level", ["Easy", "Near Max Hermes"], horizontal=True, index=1)
+max_mode = mode == "Near Max Hermes"
+
+act1, act2, act3 = st.columns([1.4, 1, 1])
+with act1:
+    if st.button("Run Full Auto Learning + Fleet Upgrade", use_container_width=True):
+        result = run_auto_cycle(max_mode=max_mode)
+        log_text("full-auto-cycle", result)
+        st.success("Auto cycle finished.")
+        st.text_area("Auto Cycle Result", value=json.dumps(result, indent=2), height=260)
+with act2:
+    if st.button("Refresh Fleet Data", use_container_width=True):
+        snapshot, snapshot_err = safe_get("/snapshot", timeout=20)
+        if snapshot_err:
+            st.error(f"Fleet data refresh failed: {snapshot_err}")
+        else:
+            log_text("fleet-refresh", snapshot)
+            st.success("Fleet data refreshed.")
+with act3:
+    if st.button("Quick Optimize Now", use_container_width=True):
+        optimize, opt_err = safe_post("/optimize-fleet", {"specialty": "fleet", "candidates": 480 if max_mode else 160}, timeout=120)
+        if opt_err:
+            st.error(f"Optimize failed: {opt_err}")
+        else:
+            log_text("quick-optimize", optimize)
+            st.success("Fleet optimization complete.")
+
+st.subheader("Learning Space (text)")
+prompt = st.text_area(
+    "Ask Hermes AIHub",
+    value="Summarize current fleet state and tell me the next best learning and optimization action.",
+    height=120,
+)
+if st.button("Send to Hermes", use_container_width=True):
+    chat, chat_err = safe_post(
+        "/llm-chat",
+        {"prompt": prompt, "system_prompt": "You are Hermes AIHub fleet learning assistant.", "temperature": 0.25, "max_tokens": 700},
     )
-except Exception:
-    st.error("System is not ready yet. Start runtime and refresh.")
+    if chat_err:
+        st.error(f"Hermes text request failed: {chat_err}")
+    else:
+        st.session_state["last_chat"] = chat.get("response_text", "")
+        log_text("learning-space-chat", chat)
+        st.success("Hermes response ready.")
+if st.session_state.get("last_chat", ""):
+    st.text_area("Hermes Learning Response", value=st.session_state["last_chat"], height=220)
 
-mode = st.radio("Mode", ["Easy", "Max Hermes"], horizontal=True, index=1)
-max_mode = mode == "Max Hermes"
-
-col1, col2 = st.columns([2, 1])
-with col1:
-    if st.button("Run Automatic Training Now", use_container_width=True):
-        try:
-            result = run_auto_cycle(max_mode=max_mode)
-            log_text("auto-run", result)
-            st.success("Automatic training cycle complete.")
-            st.text_area("Result Summary", value=str(result), height=280)
-        except Exception as exc:
-            st.error(f"Automatic run failed: {exc}")
-with col2:
-    if st.button("Ask Hermes (Quick Text)", use_container_width=True):
-        try:
-            chat = api_post(
-                "/llm-chat",
-                {
-                    "prompt": "Give me the next best optimization step for this runtime.",
-                    "system_prompt": "You are Hermes AIHub assistant.",
-                },
-            )
-            log_text("quick-chat", chat)
-            st.success("Response received.")
-            st.text_area("Hermes Text", value=chat.get("response_text", ""), height=280)
-        except Exception as exc:
-            st.error(f"Hermes text request failed: {exc}")
+st.subheader("Fleet Data")
+if snapshot_err:
+    st.warning(f"Fleet snapshot unavailable: {snapshot_err}")
+else:
+    st.json(snapshot)
 
 if not st.session_state["auto_boot_done"]:
-    try:
-        warm = api_post("/learning-pulse", {"specialty": "fleet", "steps": 180, "candidates": 120}, timeout=90)
+    warm, warm_err = safe_post("/learning-pulse", {"specialty": "fleet", "steps": 260, "candidates": 180}, timeout=90)
+    if not warm_err:
         log_text("auto-boot-warmstart", warm)
         st.session_state["auto_boot_done"] = True
-        st.info("Automatic warm-start finished.")
-    except Exception:
+        st.info("Automatic warm-start completed.")
+    else:
         st.warning("Automatic warm-start pending.")
 
-with st.expander("Advanced (optional)"):
-    prompt = st.text_area("Custom Prompt", value="Optimize Hermes performance and safety for the next cycle.")
-    if st.button("Send Custom Prompt"):
-        try:
-            chat = api_post("/llm-chat", {"prompt": prompt, "system_prompt": "You are Hermes AIHub assistant."})
-            log_text("custom-chat", chat)
-            st.text_area("Custom Response", value=chat.get("response_text", ""), height=220)
-        except Exception as exc:
-            st.error(f"Custom prompt failed: {exc}")
-
-st.subheader("Text Log")
-for item in st.session_state.get("logs", []):
-    st.code(f"{item['label']}: {item['payload']}")
+with st.expander("Text Log"):
+    for item in st.session_state.get("logs", []):
+        st.code(f"{item['label']}: {item['payload']}")
