@@ -3,6 +3,8 @@ import sqlite3
 from datetime import datetime
 from typing import Dict, List, Tuple
 
+import streamlit as st
+
 from training_sql_intel import compute_sql_pattern_intel, ensure_training_sql
 from volume_setup import ensure_runtime_volume_setup, resolve_runtime_volume_root
 
@@ -11,6 +13,7 @@ def resolve_volume_root() -> str:
     return resolve_runtime_volume_root()
 
 
+@st.cache_data(ttl=4, show_spinner=False)
 def scan_volume_files(root: str, limit: int = 500) -> List[Dict[str, object]]:
     rows: List[Dict[str, object]] = []
     if not os.path.exists(root):
@@ -66,6 +69,7 @@ def initialize_volume_layout(root: str | None = None) -> Tuple[str, Dict[str, ob
     return ensure_runtime_volume_setup(root=root)
 
 
+@st.cache_data(ttl=4, show_spinner=False)
 def read_sql_training_intelligence(root: str) -> Dict[str, object]:
     try:
         ensure_training_sql(root)

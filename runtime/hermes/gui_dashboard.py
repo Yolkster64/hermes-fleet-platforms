@@ -1002,6 +1002,8 @@ vf3, vf4 = st.columns([1, 1])
 with vf3:
     if st.button("Initialize/Repair Volume Layout", use_container_width=True):
         root_out, manifest = initialize_volume_layout(volume_root)
+        scan_volume_files.clear()
+        read_sql_training_intelligence.clear()
         st.success(f"Volume layout ready at: {root_out}")
         log_text("volume-layout-init", manifest if isinstance(manifest, dict) else {"status": "ok"})
 volume_rows = scan_volume_files(volume_root, limit=file_limit)
