@@ -56,8 +56,57 @@ def ensure_training_sql(volume_root: str) -> str:
             )
             """
         )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_training_cycles_cycle ON training_cycles(cycle)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_training_cycles_created ON training_cycles(created_unix)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_vars_cycle ON hermes_agent_variables(cycle)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_vars_created ON hermes_agent_variables(created_unix)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_vars_hermes ON hermes_agent_variables(hermes_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_github_context_created ON github_context(created_unix)")
         conn.commit()
     return db
+
+
+def prune_training_sql(
+    volume_root: str,
+    max_cycles: int = 6000,
+    max_agent_rows: int = 24000,
+    max_github_rows: int = 4000,
+) -> Dict[str, int]:
+    db = ensure_training_sql(volume_root)
+    pruned = {"training_cycles": 0, "hermes_agent_variables": 0, "github_context": 0}
+    with sqlite3.connect(db) as conn:
+        conn.execute(
+            """
+            DELETE FROM training_cycles
+            WHERE id NOT IN (
+                SELECT id FROM training_cycles ORDER BY id DESC LIMIT ?
+            )
+            """,
+            (int(max_cycles),),
+        )
+        pruned["training_cycles"] = int(conn.total_changes)
+        conn.execute(
+            """
+            DELETE FROM hermes_agent_variables
+            WHERE id NOT IN (
+                SELECT id FROM hermes_agent_variables ORDER BY id DESC LIMIT ?
+            )
+            """,
+            (int(max_agent_rows),),
+        )
+        pruned["hermes_agent_variables"] = int(conn.total_changes) - pruned["training_cycles"]
+        conn.execute(
+            """
+            DELETE FROM github_context
+            WHERE id NOT IN (
+                SELECT id FROM github_context ORDER BY id DESC LIMIT ?
+            )
+            """,
+            (int(max_github_rows),),
+        )
+        pruned["github_context"] = int(conn.total_changes) - pruned["training_cycles"] - pruned["hermes_agent_variables"]
+        conn.commit()
+    return pruned
 
 
 def record_training_cycle(

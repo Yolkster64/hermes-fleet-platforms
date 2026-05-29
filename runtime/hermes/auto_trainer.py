@@ -10,6 +10,7 @@ from training_sql_intel import (
     compute_sql_pattern_intel,
     ensure_training_sql,
     ingest_github_context,
+    prune_training_sql,
     record_hermes_agent_variables,
     record_training_cycle,
 )
@@ -65,6 +66,9 @@ HIGH_LEVEL_LEARNING = max(0.0, min(1.0, float(os.getenv("HERMES_HIGH_LEVEL_LEARN
 ENABLE_MOVIE_AIHUB = os.getenv("HERMES_ENABLE_MOVIE_AIHUB", "true").lower() in ("1", "true", "yes", "on")
 ENABLE_GITHUB_KNOWLEDGE_SYNC = os.getenv("HERMES_ENABLE_GITHUB_KNOWLEDGE_SYNC", "true").lower() in ("1", "true", "yes", "on")
 FIELD_ADAPTATION_WEIGHT = max(0.0, min(1.0, float(os.getenv("HERMES_FIELD_ADAPTATION_WEIGHT", "0.35"))))
+SQL_MAX_CYCLE_ROWS = int(os.getenv("HERMES_SQL_MAX_CYCLE_ROWS", "6000"))
+SQL_MAX_AGENT_ROWS = int(os.getenv("HERMES_SQL_MAX_AGENT_ROWS", "24000"))
+SQL_MAX_GITHUB_ROWS = int(os.getenv("HERMES_SQL_MAX_GITHUB_ROWS", "4000"))
 SPECIALIST_MODES = [m.strip() for m in os.getenv("HERMES_SPECIALIST_MODES", "swarm,mesh,multipolar,specialist-mix").split(",") if m.strip()]
 AGENT_WORK_STYLES = [s.strip() for s in os.getenv("HERMES_AGENT_WORK_STYLES", "fast_micro,deep_specialist,balanced_hybrid").split(",") if s.strip()]
 AGENT_SKILLS_25 = [
@@ -875,6 +879,19 @@ def run_cycle() -> None:
                 ingest_github_context(_volume_root, repo_root=os.getcwd())
             sql_intel = compute_sql_pattern_intel(_volume_root, lookback=240)
             art_pattern = sql_intel.get("art_pattern", {}) if isinstance(sql_intel, dict) else {}
+            if _cycle % 10 == 0:
+                prune_stats = prune_training_sql(
+                    _volume_root,
+                    max_cycles=SQL_MAX_CYCLE_ROWS,
+                    max_agent_rows=SQL_MAX_AGENT_ROWS,
+                    max_github_rows=SQL_MAX_GITHUB_ROWS,
+                )
+                _emit_signal(
+                    "auto_trainer.sql_maintenance",
+                    0.75,
+                    {"cycle": _cycle, "prune_stats": prune_stats},
+                    timeout=20,
+                )
             _emit_signal(
                 "auto_trainer.sql_pattern",
                 float(sql_intel.get("pattern_score", signal_score)),
