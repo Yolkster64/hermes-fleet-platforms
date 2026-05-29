@@ -7,6 +7,9 @@ var app = builder.Build();
 var backendUrl = Environment.GetEnvironmentVariable("HERMES_BACKEND_URL") ?? "http://hermes-api:8787";
 var backendApiKey = Environment.GetEnvironmentVariable("HERMES_API_KEY") ?? "";
 var gatewayKey = Environment.GetEnvironmentVariable("HERMES_GATEWAY_KEY") ?? "";
+var unifiedEnabled = Environment.GetEnvironmentVariable("AIHUB_UNIFIED_ENABLED") ?? "true";
+var sharedModelId = Environment.GetEnvironmentVariable("AIHUB_SHARED_MODEL_ID") ?? "aihub-unified-v1";
+var sharedMlProfile = Environment.GetEnvironmentVariable("AIHUB_SHARED_ML_PROFILE") ?? "global-learning";
 
 bool Authorized(HttpContext context)
 {
@@ -43,6 +46,24 @@ app.MapGet("/snapshot", async (IHttpClientFactory factory, HttpContext context) 
     using var response = await client.GetAsync($"{backendUrl}/snapshot");
     var body = await response.Content.ReadAsStringAsync();
     return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
+});
+
+app.MapGet("/unified-config", (HttpContext context) =>
+{
+    if (!Authorized(context))
+        return Results.Unauthorized();
+    return Results.Json(new
+    {
+        single_exe_entrypoint = "hermes-gateway",
+        aihub_unified_enabled = unifiedEnabled,
+        aihub_shared_model_id = sharedModelId,
+        aihub_shared_ml_profile = sharedMlProfile,
+        security = new
+        {
+            gateway_key_enabled = !string.IsNullOrWhiteSpace(gatewayKey),
+            backend_api_key_enabled = !string.IsNullOrWhiteSpace(backendApiKey)
+        }
+    });
 });
 
 app.MapPost("/simulate", async (IHttpClientFactory factory, SimulateRequest request, HttpContext context) =>

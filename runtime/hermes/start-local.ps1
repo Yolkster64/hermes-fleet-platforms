@@ -31,3 +31,4 @@ for ($i = 0; $i -lt 20; $i++) {
 Write-Host "Hermes API: http://localhost:8787"
 Write-Host "Hermes Gateway (C# front): http://localhost:8788"
 Write-Host "Hermes GUI: http://localhost:8501"
+Write-Host "Unified config: http://localhost:8788/unified-config"

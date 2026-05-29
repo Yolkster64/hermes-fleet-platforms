@@ -355,6 +355,12 @@ class HermesSuperOrchestrator:
         gpu_target = float(os.getenv("HERMES_GPU_TARGET_UTILIZATION", "0.75"))
         cpu_target = float(os.getenv("HERMES_CPU_TARGET_UTILIZATION", "0.80"))
         self.governor = ResourceGovernor(gpu_target_utilization=gpu_target, cpu_target_utilization=cpu_target)
+        self.unified_config = {
+            "single_exe_entrypoint": os.getenv("HERMES_SINGLE_EXE_ENTRYPOINT", "hermes-gateway"),
+            "aihub_unified_enabled": os.getenv("AIHUB_UNIFIED_ENABLED", "true").lower() in ("1", "true", "yes", "on"),
+            "aihub_shared_model_id": os.getenv("AIHUB_SHARED_MODEL_ID", "aihub-unified-v1"),
+            "aihub_shared_ml_profile": os.getenv("AIHUB_SHARED_ML_PROFILE", "global-learning"),
+        }
         self.reward_weights = {
             "quality": 0.22,
             "speed": 0.16,
@@ -1076,6 +1082,7 @@ class HermesSuperOrchestrator:
             "long_haul_meta_memory_tail": self.algorithm_state["long_haul_meta_memory"][-20:],
             "aihub_bonus_memory_tail": self.algorithm_state["aihub_bonus_memory"][-20:],
             "agents": [asdict(a) for a in self.agents],
+            "unified_config": self.unified_config,
             "recent_events": self.store.recent_events(limit=10),
         }
 
@@ -1118,6 +1125,9 @@ class OrchestratorApi:
                     return
                 if self.path == "/aihub-bonus":
                     self._json({"aihub_bonus": orchestrator.compute_aihub_bonus()})
+                    return
+                if self.path == "/unified-config":
+                    self._json(orchestrator.unified_config)
                     return
                 self._json({"error": "not_found"}, status=404)
 

@@ -22,6 +22,12 @@ This runtime enables:
 - Continuous fleet auto-training via `hermes-trainer` service
 - C# performance front-end (`hermes-gateway`) for smoother API routing and integration
 - API security between gateway and backend via `HERMES_API_KEY`
+- Single EXE entrypoint through C# gateway publish (`runtime/hermes/build-single-exe.ps1`)
 - Resource targeting via env vars:
   - `HERMES_GPU_TARGET_UTILIZATION` (default `0.75`)
   - `HERMES_CPU_TARGET_UTILIZATION` (default `0.80`)
+- Unified AI/ML contract across AIHub + Hermes + security/optimization services:
+  - `AIHUB_UNIFIED_ENABLED` (default `true`)
+  - `AIHUB_SHARED_MODEL_ID` (default `aihub-unified-v1`)
+  - `AIHUB_SHARED_ML_PROFILE` (default `global-learning`)
+  - Inspect with `GET /unified-config` on gateway (`:8788`) or backend (`:8787`)

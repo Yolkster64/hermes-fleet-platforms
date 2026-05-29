@@ -11,6 +11,10 @@ services:
       HERMES_GPU_TARGET_UTILIZATION: "0.75"
       HERMES_CPU_TARGET_UTILIZATION: "0.80"
       HERMES_API_KEY: "local-hermes-dev-key"
+      HERMES_SINGLE_EXE_ENTRYPOINT: "hermes-gateway"
+      AIHUB_UNIFIED_ENABLED: "true"
+      AIHUB_SHARED_MODEL_ID: "aihub-unified-v1"
+      AIHUB_SHARED_ML_PROFILE: "global-learning"
     ports:
       - "8787:8787"
     volumes:
@@ -32,6 +36,9 @@ services:
     command: streamlit run runtime/hermes/gui_dashboard.py --server.port 8501 --server.address 0.0.0.0
     environment:
       HERMES_API_BASE_URL: http://hermes-gateway:8788
+      AIHUB_UNIFIED_ENABLED: "true"
+      AIHUB_SHARED_MODEL_ID: "aihub-unified-v1"
+      AIHUB_SHARED_ML_PROFILE: "global-learning"
     depends_on:
       - hermes-gateway
     ports:
@@ -51,6 +58,9 @@ services:
       HERMES_TRAIN_SPECIALTY: fleet
       HERMES_TRAIN_STEPS: "500"
       HERMES_TRAIN_INTERVAL_SECONDS: "15"
+      AIHUB_UNIFIED_ENABLED: "true"
+      AIHUB_SHARED_MODEL_ID: "aihub-unified-v1"
+      AIHUB_SHARED_ML_PROFILE: "global-learning"
     depends_on:
       - hermes-gateway
     volumes:
@@ -65,6 +75,9 @@ services:
     environment:
       HERMES_BACKEND_URL: http://hermes-api:8787
       HERMES_API_KEY: "local-hermes-dev-key"
+      AIHUB_UNIFIED_ENABLED: "true"
+      AIHUB_SHARED_MODEL_ID: "aihub-unified-v1"
+      AIHUB_SHARED_ML_PROFILE: "global-learning"
     depends_on:
       - hermes-api
     ports:
