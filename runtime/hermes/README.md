@@ -24,6 +24,11 @@ This runtime enables:
   - Output: `runtime/hermes/dist/HermesUnified.exe`
 - LLM API bridge for Hermes via `/llm-chat` (through gateway) uses a built-in temporary API by default (no env vars required)
 - GUI text training ground for direct prompt/response workflow against the shared AIHub model
+- Expanded text-first GUI control center with:
+  - Max Hermes mode presets
+  - Training-ground prompt console
+  - Text output panel for every operation (simulate/optimize/curate/pulse/dedupe/llm-chat)
+  - Built-in API key field in GUI sidebar (uses `X-Hermes-Key`)
 - Resource targeting via env vars:
   - `HERMES_GPU_TARGET_UTILIZATION` (default `0.75`)
   - `HERMES_CPU_TARGET_UTILIZATION` (default `0.80`)
@@ -32,3 +37,14 @@ This runtime enables:
   - `AIHUB_SHARED_MODEL_ID` (default `aihub-unified-v1`)
   - `AIHUB_SHARED_ML_PROFILE` (default `global-learning`)
   - Inspect with `GET /unified-config` on gateway (`:${MCP_DOCKER_PORT:-8788}`)
+- Auto trainer defaults are tuned for high throughput in Docker:
+  - `HERMES_TRAIN_STEPS=1200`
+  - `HERMES_TRAIN_INTERVAL_SECONDS=8`
+  - `HERMES_FLEET_OPTIMIZE_EVERY=2`
+  - `HERMES_FLEET_CANDIDATES=300`
+  - `HERMES_MAX_MODE=true`
+- Gateway API key is enabled by default in compose:
+  - `HERMES_GATEWAY_KEY=local-hermes-ui-key`
+  - GUI and trainer are pre-wired to use the same key
+- Startup script auto-opens both GUI and unified-config pages:
+  - `pwsh ./runtime/hermes/start-local.ps1`

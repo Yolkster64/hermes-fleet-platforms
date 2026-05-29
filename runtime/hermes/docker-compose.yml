@@ -34,6 +34,7 @@ services:
     command: streamlit run runtime/hermes/gui_dashboard.py --server.port 8501 --server.address 0.0.0.0
     environment:
       HERMES_API_BASE_URL: http://hermes-gateway:8788
+      HERMES_GUI_API_KEY: "local-hermes-ui-key"
       AIHUB_UNIFIED_ENABLED: "true"
       AIHUB_SHARED_MODEL_ID: "aihub-unified-v1"
       AIHUB_SHARED_ML_PROFILE: "global-learning"
@@ -53,9 +54,13 @@ services:
     command: python runtime/hermes/auto_trainer.py
     environment:
       HERMES_API_BASE_URL: http://hermes-gateway:8788
+      HERMES_GATEWAY_KEY: "local-hermes-ui-key"
       HERMES_TRAIN_SPECIALTY: fleet
-      HERMES_TRAIN_STEPS: "500"
-      HERMES_TRAIN_INTERVAL_SECONDS: "15"
+      HERMES_TRAIN_STEPS: "1200"
+      HERMES_TRAIN_INTERVAL_SECONDS: "8"
+      HERMES_FLEET_OPTIMIZE_EVERY: "2"
+      HERMES_FLEET_CANDIDATES: "300"
+      HERMES_MAX_MODE: "true"
       AIHUB_UNIFIED_ENABLED: "true"
       AIHUB_SHARED_MODEL_ID: "aihub-unified-v1"
       AIHUB_SHARED_ML_PROFILE: "global-learning"
@@ -73,6 +78,7 @@ services:
     environment:
       HERMES_BACKEND_URL: http://hermes-api:8787
       HERMES_API_KEY: "local-hermes-dev-key"
+      HERMES_GATEWAY_KEY: "local-hermes-ui-key"
       AIHUB_UNIFIED_ENABLED: "true"
       AIHUB_SHARED_MODEL_ID: "aihub-unified-v1"
       AIHUB_SHARED_ML_PROFILE: "global-learning"
