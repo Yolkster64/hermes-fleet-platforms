@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Tuple
 import streamlit as st
 from gui_api_client import API_BASE, log_text, run_logged_post_action, safe_get, safe_post
 from gui_insights import fleet_score_history, latest_learned_profile, render_learning_diagram, render_xp_bar
+from gui_sql_panels import render_sql_intelligence_panels
 from gui_volume_tools import (
     initialize_volume_layout,
     read_sql_training_intelligence,
@@ -1046,117 +1047,12 @@ else:
             preview_text = f"[binary preview] {len(preview_bytes)} bytes"
         st.text_area("Selected File Preview", value=preview_text[:120000], height=220)
 
-st.caption(
-    f"SQL training rows: {int(sql_intel.get('rows', 0))} | "
-    f"trend: {float(sql_intel.get('trend', 0.0)):+.4f} | "
-    f"signal avg: {float(sql_intel.get('signal_avg', 0.0)):.4f}"
+render_sql_intelligence_panels(
+    sql_intel=sql_intel if isinstance(sql_intel, dict) else {},
+    render_xp_bar=render_xp_bar,
+    run_logged_post_action=run_logged_post_action,
+    high_level_learning=float(st.session_state.get("ctl_high_level_learning", 0.72)),
 )
-art_pattern = sql_intel.get("art_pattern", {}) if isinstance(sql_intel, dict) else {}
-if isinstance(art_pattern, dict) and art_pattern:
-    ap1, ap2, ap3, ap4, ap5 = st.columns(5)
-    ap1.metric("Art Symmetry", f"{float(art_pattern.get('symmetry_index', 0.0)) * 100:.1f}%")
-    ap2.metric("Art Contrast", f"{float(art_pattern.get('contrast_index', 0.0)) * 100:.1f}%")
-    ap3.metric("Art Fractal Flow", f"{float(art_pattern.get('fractal_flow', 0.0)) * 100:.1f}%")
-    ap4.metric("Compression", f"{float(art_pattern.get('compression_ratio', 0.0)) * 100:.1f}%")
-    ap5.metric("3D Overlap", f"{float(art_pattern.get('overlap_3d', 0.0)) * 100:.1f}%")
-latest_github = sql_intel.get("latest_github", {}) if isinstance(sql_intel, dict) else {}
-if isinstance(latest_github, dict) and latest_github:
-    st.caption(
-        f"GitHub->Volume context: {latest_github.get('branch', 'unknown')} "
-        f"{latest_github.get('commit_sha', '')} "
-        f"({latest_github.get('changed_files', 0)} changed files)"
-    )
-    with st.expander("GitHub CLI connection"):
-        st.code(
-            "gh repo view --json name,defaultBranchRef\n"
-            "gh pr status\n"
-            "gh run list --limit 5"
-        )
-        st.caption("This feed trains volume SQL context and cross-links Hermes learning with repository reality.")
-variable_means = sql_intel.get("variable_means", {}) if isinstance(sql_intel, dict) else {}
-if isinstance(variable_means, dict) and variable_means:
-    top_vars = sorted(variable_means.items(), key=lambda item: abs(float(item[1]) - 0.5), reverse=True)[:10]
-    st.caption("Top SQL pattern variables")
-    st.dataframe(
-        [{"variable": k, "mean_value": float(v)} for k, v in top_vars],
-        use_container_width=True,
-        hide_index=True,
-    )
-benefits = sql_intel.get("benefits", []) if isinstance(sql_intel, dict) else []
-if isinstance(benefits, list) and benefits:
-    st.caption("Automatic SQL benefits")
-    for b in benefits[:5]:
-        st.success(str(b))
-ideas = sql_intel.get("ideas", []) if isinstance(sql_intel, dict) else []
-if isinstance(ideas, list) and ideas:
-    st.caption("Suggested next moves")
-    for tip in ideas[:4]:
-        st.info(str(tip))
-recent_profiles = sql_intel.get("recent_hermes_profiles", []) if isinstance(sql_intel, dict) else []
-if isinstance(recent_profiles, list) and recent_profiles:
-    st.caption("Latest per-Hermes saved variable profiles")
-    st.dataframe(
-        [
-            {
-                "hermes_id": row.get("hermes_id", ""),
-                "specialty": row.get("specialty", ""),
-                "signal_score": round(float(row.get("signal_score", 0.0)), 4),
-                "art_pattern_score": round(float(row.get("art_pattern_score", 0.0)), 4),
-                "level": int(row.get("level", 1)),
-                "xp": int(float(row.get("experience_xp", 0.0))),
-                "size": row.get("size_mode", "mid"),
-                "speed_bonus": round(float(row.get("speed_bonus", 0.0)) * 100.0, 1),
-                "token_power_gain": round(float(row.get("token_power_gain", 0.0)) * 100.0, 1),
-                "tools": ", ".join(row.get("tools", [])) if isinstance(row.get("tools", []), list) else "",
-                "specialties": ", ".join(row.get("specialties", [])) if isinstance(row.get("specialties", []), list) else "",
-            }
-            for row in recent_profiles[:12]
-            if isinstance(row, dict)
-        ],
-        use_container_width=True,
-        hide_index=True,
-    )
-    st.caption("Hermes XP and bonus bars")
-    for row in [r for r in recent_profiles[:6] if isinstance(r, dict)]:
-        hid = str(row.get("hermes_id", "hermes"))
-        render_xp_bar(f"{hid} XP", min(1.0, float(row.get("experience_xp", 0.0)) / 10000.0), "#52BE80")
-        render_xp_bar(f"{hid} Speed Bonus", float(row.get("speed_bonus", 0.0)), "#5DADE2")
-        render_xp_bar(f"{hid} Token Power Gain", float(row.get("token_power_gain", 0.0)), "#AF7AC5")
-
-lf1, lf2 = st.columns([1, 1])
-with lf1:
-    if st.button("Lock Fleet Tough Mode", use_container_width=True):
-        run_logged_post_action(
-            "fleet-lock-mode",
-            "/ingest-signal",
-            {
-                "source": "gui_fleet_lock_mode",
-                "signal_score": 0.92,
-                "payload": {
-                    "lock_mode": True,
-                    "policy": "tough-other-side",
-                    "goal": "stability-and-hard-problem-focus",
-                    "high_level_learning": st.session_state.get("ctl_high_level_learning", 0.72),
-                },
-            },
-            "Fleet lock mode sent.",
-            "Failed to lock fleet mode",
-            timeout=60,
-        )
-with lf2:
-    if st.button("Unlock Fleet Mode", use_container_width=True):
-        run_logged_post_action(
-            "fleet-unlock-mode",
-            "/ingest-signal",
-            {
-                "source": "gui_fleet_lock_mode",
-                "signal_score": 0.65,
-                "payload": {"lock_mode": False, "policy": "balanced-adaptive"},
-            },
-            "Fleet lock released.",
-            "Failed to unlock fleet mode",
-            timeout=60,
-        )
 
 st.subheader("Hermes Fleet Units")
 if snapshot_err:

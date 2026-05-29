@@ -92,6 +92,103 @@ def record_training_cycle(
         conn.commit()
 
 
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def _art_pattern_metrics(variable_means: Dict[str, float]) -> Dict[str, float]:
+    value_list = list(variable_means.values())
+    if value_list:
+        value_avg = sum(value_list) / len(value_list)
+        variance = sum((v - value_avg) ** 2 for v in value_list) / max(1, len(value_list))
+    else:
+        variance = 0.0
+    symmetry_index = _clamp01(1.0 - abs(variable_means.get("group_strength", 0.5) - variable_means.get("solo_strength", 0.5)))
+    contrast_index = _clamp01(math.sqrt(max(0.0, variance)) * 2.0)
+    quantized = [int(_clamp01(v) * 100.0) for v in value_list]
+    unique_bins = len(set(quantized)) if quantized else 0
+    compression_ratio = _clamp01(1.0 - (float(unique_bins) / float(max(1, len(quantized)))))
+    overlap_3d = _clamp01(
+        (
+            (1.0 - abs(variable_means.get("group_strength", 0.5) - variable_means.get("coordination_cohesion", 0.5)))
+            + (1.0 - abs(variable_means.get("solo_strength", 0.5) - variable_means.get("knowledge_transfer", 0.5)))
+            + (1.0 - abs(variable_means.get("reward_adaptation", 0.5) - variable_means.get("retention_strength", 0.5)))
+        )
+        / 3.0
+    )
+    fractal_flow = _clamp01(sum(abs(math.sin(v * math.pi * 2.0)) for v in value_list[:24]) / max(1, min(24, len(value_list))))
+    return {
+        "symmetry_index": float(symmetry_index),
+        "contrast_index": float(contrast_index),
+        "fractal_flow": float(fractal_flow),
+        "compression_ratio": float(compression_ratio),
+        "overlap_3d": float(overlap_3d),
+    }
+
+
+def _build_recent_hermes_profile(row: tuple) -> Dict[str, object]:
+    vars_payload = json.loads(row[4]) if isinstance(row[4], str) and row[4] else {}
+    if not isinstance(vars_payload, dict):
+        vars_payload = {}
+    xp = max(
+        0.0,
+        min(
+            10000.0,
+            (
+                float(row[2]) * 2200.0
+                + float(row[3]) * 1800.0
+                + float(vars_payload.get("retention_strength", 0.5)) * 1600.0
+                + float(vars_payload.get("knowledge_transfer", 0.5)) * 1400.0
+            ),
+        ),
+    )
+    level = max(1, min(99, int(1 + (xp / 140.0))))
+    speed_bonus = _clamp01(float(vars_payload.get("speed_efficiency", 0.5)) * 0.8 + float(vars_payload.get("position_score", 0.5)) * 0.2)
+    token_power_gain = _clamp01(float(vars_payload.get("yield_efficiency", 0.5)) * 0.7 + float(row[3]) * 0.3)
+    size_mode = "mini" if float(vars_payload.get("size_factor", 0.5)) < 0.45 else ("full" if float(vars_payload.get("size_factor", 0.5)) > 0.70 else "mid")
+    specialties = [
+        "pattern-hunter",
+        "sql-reasoner" if float(vars_payload.get("retention_strength", 0.5)) > 0.55 else "fast-explorer",
+        "aihub-bridge" if float(vars_payload.get("knowledge_transfer", 0.5)) > 0.55 else "field-adapter",
+    ]
+    tools = ["compression", "3d-overlap", "xp-memory", "token-optimizer"]
+    return {
+        "hermes_id": row[0],
+        "specialty": row[1],
+        "signal_score": float(row[2]),
+        "art_pattern_score": float(row[3]),
+        "experience_xp": float(xp),
+        "level": int(level),
+        "speed_bonus": float(speed_bonus),
+        "token_power_gain": float(token_power_gain),
+        "size_mode": size_mode,
+        "specialties": specialties,
+        "tools": tools,
+        "variables": vars_payload,
+    }
+
+
+def _benefits_and_ideas(art_pattern: Dict[str, float], trend: float) -> tuple[List[str], List[str]]:
+    compression_ratio = float(art_pattern.get("compression_ratio", 0.0))
+    overlap_3d = float(art_pattern.get("overlap_3d", 0.0))
+    fractal_flow = float(art_pattern.get("fractal_flow", 0.0))
+    benefits = [
+        f"Compression ratio: {compression_ratio * 100.0:.1f}% (higher = more reusable patterns).",
+        f"3D overlap coherence: {overlap_3d * 100.0:.1f}% (higher = better cross-variable alignment).",
+        f"Fractal flow: {fractal_flow * 100.0:.1f}% (higher = richer long-range pattern dynamics).",
+    ]
+    ideas: List[str] = []
+    if compression_ratio < 0.40:
+        ideas.append("Increase retention/knowledge-transfer variables to improve compression and reusable memory.")
+    if overlap_3d < 0.55:
+        ideas.append("Boost coordination_cohesion and reward_adaptation to tighten 3D overlap zones.")
+    if trend < 0.0:
+        ideas.append("Run lock mode and reduce wrongness tolerance for 2-3 cycles to stabilize gains.")
+    if not ideas:
+        ideas.append("Current SQL pattern layer is healthy; push more specialty diversity to find new high-value puzzles.")
+    return benefits, ideas
+
+
 def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str, object]:
     db = ensure_training_sql(volume_root)
     with sqlite3.connect(db) as conn:
@@ -137,37 +234,7 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
                 if isinstance(value, (int, float)):
                     var_buckets.setdefault(str(key), []).append(float(value))
     variable_means = {k: (sum(v) / len(v)) for k, v in var_buckets.items() if v}
-    value_list = list(variable_means.values())
-    if value_list:
-        value_avg = sum(value_list) / len(value_list)
-        variance = sum((v - value_avg) ** 2 for v in value_list) / max(1, len(value_list))
-    else:
-        value_avg = 0.5
-        variance = 0.0
-    symmetry_index = max(0.0, min(1.0, 1.0 - abs(variable_means.get("group_strength", 0.5) - variable_means.get("solo_strength", 0.5))))
-    contrast_index = max(0.0, min(1.0, math.sqrt(max(0.0, variance)) * 2.0))
-    quantized = [int(max(0.0, min(1.0, v)) * 100.0) for v in value_list]
-    unique_bins = len(set(quantized)) if quantized else 0
-    compression_ratio = max(0.0, min(1.0, 1.0 - (float(unique_bins) / float(max(1, len(quantized))))))
-    overlap_3d = max(
-        0.0,
-        min(
-            1.0,
-            (
-                (1.0 - abs(variable_means.get("group_strength", 0.5) - variable_means.get("coordination_cohesion", 0.5)))
-                + (1.0 - abs(variable_means.get("solo_strength", 0.5) - variable_means.get("knowledge_transfer", 0.5)))
-                + (1.0 - abs(variable_means.get("reward_adaptation", 0.5) - variable_means.get("retention_strength", 0.5)))
-            )
-            / 3.0,
-        ),
-    )
-    fractal_flow = max(
-        0.0,
-        min(
-            1.0,
-            sum(abs(math.sin(v * math.pi * 2.0)) for v in value_list[:24]) / max(1, min(24, len(value_list))),
-        ),
-    )
+    art_pattern = _art_pattern_metrics(variable_means)
     trend = signals[-1] - signals[0] if len(signals) > 1 else signals[-1]
     pattern_score = max(
         0.0,
@@ -177,11 +244,11 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
             + ((sum(rewards) / len(rewards)) * 0.20)
             + ((sum(truths) / len(truths)) * 0.16)
             + ((sum(shapes) / len(shapes)) * 0.12)
-            + (symmetry_index * 0.08)
-            + (fractal_flow * 0.07)
-            + (contrast_index * 0.06)
-            + (compression_ratio * 0.06)
-            + (overlap_3d * 0.05)
+            + (float(art_pattern.get("symmetry_index", 0.0)) * 0.08)
+            + (float(art_pattern.get("fractal_flow", 0.0)) * 0.07)
+            + (float(art_pattern.get("contrast_index", 0.0)) * 0.06)
+            + (float(art_pattern.get("compression_ratio", 0.0)) * 0.06)
+            + (float(art_pattern.get("overlap_3d", 0.0)) * 0.05)
             + (trend * 0.10),
         ),
     )
@@ -194,68 +261,8 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
             "changed_files": int(latest_github[3]),
             "created_unix": float(latest_github[4]),
         }
-    recent_hermes_profiles = []
-    for row in latest_agents:
-        vars_payload = json.loads(row[4]) if isinstance(row[4], str) and row[4] else {}
-        if not isinstance(vars_payload, dict):
-            vars_payload = {}
-        xp = max(
-            0.0,
-            min(
-                10000.0,
-                (
-                    float(row[2]) * 2200.0
-                    + float(row[3]) * 1800.0
-                    + float(vars_payload.get("retention_strength", 0.5)) * 1600.0
-                    + float(vars_payload.get("knowledge_transfer", 0.5)) * 1400.0
-                ),
-            ),
-        )
-        level = max(1, min(99, int(1 + (xp / 140.0))))
-        speed_bonus = max(0.0, min(1.0, float(vars_payload.get("speed_efficiency", 0.5)) * 0.8 + float(vars_payload.get("position_score", 0.5)) * 0.2))
-        token_power_gain = max(0.0, min(1.0, float(vars_payload.get("yield_efficiency", 0.5)) * 0.7 + float(row[3]) * 0.3))
-        size_mode = "mini" if float(vars_payload.get("size_factor", 0.5)) < 0.45 else ("full" if float(vars_payload.get("size_factor", 0.5)) > 0.70 else "mid")
-        specialties = [
-            "pattern-hunter",
-            "sql-reasoner" if float(vars_payload.get("retention_strength", 0.5)) > 0.55 else "fast-explorer",
-            "aihub-bridge" if float(vars_payload.get("knowledge_transfer", 0.5)) > 0.55 else "field-adapter",
-        ]
-        tools = [
-            "compression",
-            "3d-overlap",
-            "xp-memory",
-            "token-optimizer",
-        ]
-        recent_hermes_profiles.append(
-            {
-                "hermes_id": row[0],
-                "specialty": row[1],
-                "signal_score": float(row[2]),
-                "art_pattern_score": float(row[3]),
-                "experience_xp": float(xp),
-                "level": int(level),
-                "speed_bonus": float(speed_bonus),
-                "token_power_gain": float(token_power_gain),
-                "size_mode": size_mode,
-                "specialties": specialties,
-                "tools": tools,
-                "variables": vars_payload,
-            }
-        )
-    benefits = [
-        f"Compression ratio: {compression_ratio * 100.0:.1f}% (higher = more reusable patterns).",
-        f"3D overlap coherence: {overlap_3d * 100.0:.1f}% (higher = better cross-variable alignment).",
-        f"Fractal flow: {fractal_flow * 100.0:.1f}% (higher = richer long-range pattern dynamics).",
-    ]
-    ideas: List[str] = []
-    if compression_ratio < 0.40:
-        ideas.append("Increase retention/knowledge-transfer variables to improve compression and reusable memory.")
-    if overlap_3d < 0.55:
-        ideas.append("Boost coordination_cohesion and reward_adaptation to tighten 3D overlap zones.")
-    if trend < 0.0:
-        ideas.append("Run lock mode and reduce wrongness tolerance for 2-3 cycles to stabilize gains.")
-    if not ideas:
-        ideas.append("Current SQL pattern layer is healthy; push more specialty diversity to find new high-value puzzles.")
+    recent_hermes_profiles = [_build_recent_hermes_profile(row) for row in latest_agents]
+    benefits, ideas = _benefits_and_ideas(art_pattern, trend)
     return {
         "rows": len(rows),
         "pattern_score": float(pattern_score),
@@ -265,13 +272,7 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
         "truth_avg": float(sum(truths) / len(truths)),
         "shape_avg": float(sum(shapes) / len(shapes)),
         "variable_means": variable_means,
-        "art_pattern": {
-            "symmetry_index": float(symmetry_index),
-            "contrast_index": float(contrast_index),
-            "fractal_flow": float(fractal_flow),
-            "compression_ratio": float(compression_ratio),
-            "overlap_3d": float(overlap_3d),
-        },
+        "art_pattern": art_pattern,
         "latest_github": github_payload,
         "recent_hermes_profiles": recent_hermes_profiles,
         "benefits": benefits,

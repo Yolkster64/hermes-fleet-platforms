@@ -48,6 +48,7 @@ This runtime enables:
   - GUI API/action helper split: `runtime/hermes/gui_api_client.py`
   - GUI insights/render split: `runtime/hermes/gui_insights.py`
   - GUI volume explorer split: `runtime/hermes/gui_volume_tools.py`
+  - GUI SQL intelligence panels split: `runtime/hermes/gui_sql_panels.py`
   - Runtime volume bootstrap: `runtime/hermes/volume_setup.py` (shared by trainer + GUI)
   - SQL training intelligence: `runtime/hermes/training_sql_intel.py` (deep variable-pattern tracking + GitHub context)
   - Trainer alias: `runtime/hermes/apps/fleet_trainer_service.py`
