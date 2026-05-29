@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import sqlite3
 import subprocess
@@ -37,6 +38,20 @@ def ensure_training_sql(volume_root: str) -> str:
                 commit_sha TEXT NOT NULL,
                 commit_subject TEXT NOT NULL,
                 changed_files INTEGER NOT NULL,
+                created_unix REAL NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS hermes_agent_variables (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cycle INTEGER NOT NULL,
+                hermes_id TEXT NOT NULL,
+                specialty TEXT NOT NULL,
+                signal_score REAL NOT NULL,
+                art_pattern_score REAL NOT NULL,
+                variables_json TEXT NOT NULL,
                 created_unix REAL NOT NULL
             )
             """
@@ -97,6 +112,14 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
             LIMIT 1
             """
         ).fetchone()
+        latest_agents = conn.execute(
+            """
+            SELECT hermes_id, specialty, signal_score, art_pattern_score, variables_json
+            FROM hermes_agent_variables
+            ORDER BY id DESC
+            LIMIT 30
+            """
+        ).fetchall()
 
     if not rows:
         return {"rows": 0, "pattern_score": 0.0, "trend": 0.0, "variable_means": {}, "latest_github": {}}
@@ -114,8 +137,37 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
                 if isinstance(value, (int, float)):
                     var_buckets.setdefault(str(key), []).append(float(value))
     variable_means = {k: (sum(v) / len(v)) for k, v in var_buckets.items() if v}
+    value_list = list(variable_means.values())
+    if value_list:
+        value_avg = sum(value_list) / len(value_list)
+        variance = sum((v - value_avg) ** 2 for v in value_list) / max(1, len(value_list))
+    else:
+        value_avg = 0.5
+        variance = 0.0
+    symmetry_index = max(0.0, min(1.0, 1.0 - abs(variable_means.get("group_strength", 0.5) - variable_means.get("solo_strength", 0.5))))
+    contrast_index = max(0.0, min(1.0, math.sqrt(max(0.0, variance)) * 2.0))
+    fractal_flow = max(
+        0.0,
+        min(
+            1.0,
+            sum(abs(math.sin(v * math.pi * 2.0)) for v in value_list[:24]) / max(1, min(24, len(value_list))),
+        ),
+    )
     trend = signals[-1] - signals[0] if len(signals) > 1 else signals[-1]
-    pattern_score = max(0.0, min(1.0, ((sum(signals) / len(signals)) * 0.4) + ((sum(rewards) / len(rewards)) * 0.25) + ((sum(truths) / len(truths)) * 0.2) + ((sum(shapes) / len(shapes)) * 0.15) + (trend * 0.1)))
+    pattern_score = max(
+        0.0,
+        min(
+            1.0,
+            ((sum(signals) / len(signals)) * 0.36)
+            + ((sum(rewards) / len(rewards)) * 0.20)
+            + ((sum(truths) / len(truths)) * 0.16)
+            + ((sum(shapes) / len(shapes)) * 0.12)
+            + (symmetry_index * 0.08)
+            + (fractal_flow * 0.08)
+            + (contrast_index * 0.06)
+            + (trend * 0.10),
+        ),
+    )
     github_payload = {}
     if latest_github:
         github_payload = {
@@ -125,6 +177,18 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
             "changed_files": int(latest_github[3]),
             "created_unix": float(latest_github[4]),
         }
+    recent_hermes_profiles = []
+    for row in latest_agents:
+        vars_payload = json.loads(row[4]) if isinstance(row[4], str) and row[4] else {}
+        recent_hermes_profiles.append(
+            {
+                "hermes_id": row[0],
+                "specialty": row[1],
+                "signal_score": float(row[2]),
+                "art_pattern_score": float(row[3]),
+                "variables": vars_payload if isinstance(vars_payload, dict) else {},
+            }
+        )
     return {
         "rows": len(rows),
         "pattern_score": float(pattern_score),
@@ -134,7 +198,13 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
         "truth_avg": float(sum(truths) / len(truths)),
         "shape_avg": float(sum(shapes) / len(shapes)),
         "variable_means": variable_means,
+        "art_pattern": {
+            "symmetry_index": float(symmetry_index),
+            "contrast_index": float(contrast_index),
+            "fractal_flow": float(fractal_flow),
+        },
         "latest_github": github_payload,
+        "recent_hermes_profiles": recent_hermes_profiles,
     }
 
 
@@ -169,3 +239,50 @@ def ingest_github_context(volume_root: str, repo_root: str) -> Dict[str, object]
         )
         conn.commit()
     return payload
+
+
+def record_hermes_agent_variables(
+    volume_root: str,
+    cycle: int,
+    specialty: str,
+    signal_score: float,
+    training_variables: Dict[str, float],
+    micro_agents: int,
+) -> None:
+    db = ensure_training_sql(volume_root)
+    count = max(6, min(24, int(micro_agents // 12)))
+    base = {k: float(v) for k, v in training_variables.items() if isinstance(v, (int, float))}
+    with sqlite3.connect(db) as conn:
+        for idx in range(count):
+            ratio = (idx + 1) / max(1.0, float(count))
+            agent_vars = dict(base)
+            agent_vars["agent_focus"] = max(0.0, min(1.0, base.get("success_signal", 0.5) * (0.7 + ratio * 0.6)))
+            agent_vars["agent_exploration"] = max(0.0, min(1.0, base.get("wrongness_signal", 0.3) * (1.2 - ratio * 0.5)))
+            agent_vars["agent_memory_depth"] = max(0.0, min(1.0, base.get("retention_strength", 0.5) * (0.8 + ratio * 0.4)))
+            art_pattern_score = max(
+                0.0,
+                min(
+                    1.0,
+                    (agent_vars.get("agent_focus", 0.5) * 0.35)
+                    + ((1.0 - agent_vars.get("agent_exploration", 0.5)) * 0.20)
+                    + (agent_vars.get("agent_memory_depth", 0.5) * 0.20)
+                    + (agent_vars.get("coordination_cohesion", 0.5) * 0.25),
+                ),
+            )
+            conn.execute(
+                """
+                INSERT INTO hermes_agent_variables (
+                    cycle, hermes_id, specialty, signal_score, art_pattern_score, variables_json, created_unix
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    int(cycle),
+                    f"hermes-{idx + 1:03d}",
+                    str(specialty),
+                    float(signal_score),
+                    float(art_pattern_score),
+                    json.dumps(agent_vars, sort_keys=True),
+                    time.time(),
+                ),
+            )
+        conn.commit()

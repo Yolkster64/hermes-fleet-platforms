@@ -2118,6 +2118,8 @@ class HermesSuperOrchestrator:
         wrongness_signal = max(0.0, min(1.0, float(training_variables.get("wrongness_signal", 0.5))))
         sql_pattern_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("sql_pattern", lookback=120))))
         github_sync_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("github_knowledge_sync", lookback=120))))
+        art_pattern_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("art_pattern", lookback=120))))
+        aihub_bridge_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("aihub_bridge", lookback=120))))
         speed_priority = clamp01(speed_priority)
         energy_saver = clamp01(energy_saver)
 
@@ -2144,6 +2146,8 @@ class HermesSuperOrchestrator:
                 + ((1.0 - wrongness_signal) * cost_score * 0.04)
                 + (sql_pattern_signal * power_score * 0.07)
                 + (github_sync_signal * speed_score * 0.04)
+                + (art_pattern_signal * power_score * 0.05)
+                + (aihub_bridge_signal * power_score * 0.05)
                 + (speed_priority * speed_score * 0.06)
                 + (energy_saver * cost_score * 0.06)
             )
@@ -2170,6 +2174,8 @@ class HermesSuperOrchestrator:
                 "wrongness_signal": wrongness_signal,
                 "sql_pattern_signal": sql_pattern_signal,
                 "github_sync_signal": github_sync_signal,
+                "art_pattern_signal": art_pattern_signal,
+                "aihub_bridge_signal": aihub_bridge_signal,
             },
             "candidates": [
                 {
@@ -2187,6 +2193,9 @@ class HermesSuperOrchestrator:
         signal = self.store.recent_external_signal_score()
         movie_signal = self.store.recent_external_signal_score_by_source("movie")
         media_signal = self.store.recent_external_signal_score_by_source("media")
+        sql_pattern_signal = self.store.recent_external_signal_score_by_source("sql_pattern")
+        art_pattern_signal = self.store.recent_external_signal_score_by_source("art_pattern")
+        aihub_bridge_signal = self.store.recent_external_signal_score_by_source("aihub_bridge")
         movie_mesh_signal = self.store.knowledge_mesh_task_signal("movie")
         media_mesh_signal = self.store.knowledge_mesh_task_signal("media")
         movie_domain_signal = max(0.0, min(1.0, (movie_signal * 0.4) + (media_signal * 0.2) + (movie_mesh_signal * 0.25) + (media_mesh_signal * 0.15)))
@@ -2198,7 +2207,21 @@ class HermesSuperOrchestrator:
         fleet_avg = (sum(fleet_tail) / len(fleet_tail)) if fleet_tail else 0.5
         meta_avg = (sum(meta_tail) / len(meta_tail)) if meta_tail else 0.5
         adaptive_avg = (sum(adaptive_tail) / len(adaptive_tail)) if adaptive_tail else 0.5
-        bonus = max(0.0, min(1.0, (signal * 0.24) + (movie_domain_signal * 0.14) + (knaa_avg * 0.15) + (fleet_avg * 0.16) + (meta_avg * 0.16) + (adaptive_avg * 0.15)))
+        bonus = max(
+            0.0,
+            min(
+                1.0,
+                (signal * 0.20)
+                + (movie_domain_signal * 0.10)
+                + (knaa_avg * 0.13)
+                + (fleet_avg * 0.13)
+                + (meta_avg * 0.12)
+                + (adaptive_avg * 0.12)
+                + (sql_pattern_signal * 0.08)
+                + (art_pattern_signal * 0.06)
+                + (aihub_bridge_signal * 0.06),
+            ),
+        )
         if persist:
             mem = self.algorithm_state["aihub_bonus_memory"]
             mem.append(bonus)

@@ -1051,6 +1051,12 @@ st.caption(
     f"trend: {float(sql_intel.get('trend', 0.0)):+.4f} | "
     f"signal avg: {float(sql_intel.get('signal_avg', 0.0)):.4f}"
 )
+art_pattern = sql_intel.get("art_pattern", {}) if isinstance(sql_intel, dict) else {}
+if isinstance(art_pattern, dict) and art_pattern:
+    ap1, ap2, ap3 = st.columns(3)
+    ap1.metric("Art Symmetry", f"{float(art_pattern.get('symmetry_index', 0.0)) * 100:.1f}%")
+    ap2.metric("Art Contrast", f"{float(art_pattern.get('contrast_index', 0.0)) * 100:.1f}%")
+    ap3.metric("Art Fractal Flow", f"{float(art_pattern.get('fractal_flow', 0.0)) * 100:.1f}%")
 latest_github = sql_intel.get("latest_github", {}) if isinstance(sql_intel, dict) else {}
 if isinstance(latest_github, dict) and latest_github:
     st.caption(
@@ -1064,6 +1070,23 @@ if isinstance(variable_means, dict) and variable_means:
     st.caption("Top SQL pattern variables")
     st.dataframe(
         [{"variable": k, "mean_value": float(v)} for k, v in top_vars],
+        use_container_width=True,
+        hide_index=True,
+    )
+recent_profiles = sql_intel.get("recent_hermes_profiles", []) if isinstance(sql_intel, dict) else []
+if isinstance(recent_profiles, list) and recent_profiles:
+    st.caption("Latest per-Hermes saved variable profiles")
+    st.dataframe(
+        [
+            {
+                "hermes_id": row.get("hermes_id", ""),
+                "specialty": row.get("specialty", ""),
+                "signal_score": round(float(row.get("signal_score", 0.0)), 4),
+                "art_pattern_score": round(float(row.get("art_pattern_score", 0.0)), 4),
+            }
+            for row in recent_profiles[:12]
+            if isinstance(row, dict)
+        ],
         use_container_width=True,
         hide_index=True,
     )

@@ -6,7 +6,13 @@ import json
 
 import requests
 from volume_setup import ensure_runtime_volume_setup
-from training_sql_intel import compute_sql_pattern_intel, ensure_training_sql, ingest_github_context, record_training_cycle
+from training_sql_intel import (
+    compute_sql_pattern_intel,
+    ensure_training_sql,
+    ingest_github_context,
+    record_hermes_agent_variables,
+    record_training_cycle,
+)
 try:
     from core.hermes_variable_registry import VARIABLE_CATALOG, clamp01, compute_efficiency_profile
 except Exception:  # pragma: no cover
@@ -857,15 +863,48 @@ def run_cycle() -> None:
                 shape_score=learned_shape,
                 training_variables=training_variables,
             )
+            record_hermes_agent_variables(
+                volume_root=_volume_root,
+                cycle=_cycle,
+                specialty=dynamic_specialty,
+                signal_score=signal_score,
+                training_variables=training_variables,
+                micro_agents=dynamic_micro_agents,
+            )
             if _cycle % 4 == 0:
                 ingest_github_context(_volume_root, repo_root=os.getcwd())
             sql_intel = compute_sql_pattern_intel(_volume_root, lookback=240)
+            art_pattern = sql_intel.get("art_pattern", {}) if isinstance(sql_intel, dict) else {}
             _emit_signal(
                 "auto_trainer.sql_pattern",
                 float(sql_intel.get("pattern_score", signal_score)),
                 {
                     "cycle": _cycle,
                     "specialty": dynamic_specialty,
+                    "sql_intel": sql_intel,
+                    "training_variables": training_variables,
+                },
+                timeout=30,
+            )
+            _emit_signal(
+                "auto_trainer.art_pattern",
+                float(art_pattern.get("fractal_flow", signal_score if isinstance(signal_score, (int, float)) else 0.5)),
+                {
+                    "cycle": _cycle,
+                    "specialty": dynamic_specialty,
+                    "art_pattern": art_pattern,
+                    "pattern_score": sql_intel.get("pattern_score", signal_score),
+                    "training_variables": training_variables,
+                },
+                timeout=30,
+            )
+            _emit_signal(
+                "auto_trainer.aihub_bridge",
+                float(sql_intel.get("pattern_score", signal_score)),
+                {
+                    "cycle": _cycle,
+                    "specialty": dynamic_specialty,
+                    "bridge_mode": "sql-art-pattern-to-aihub",
                     "sql_intel": sql_intel,
                     "training_variables": training_variables,
                 },

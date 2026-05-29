@@ -93,6 +93,8 @@ This runtime enables:
   - Data Volume Explorer for `/workspace/runtime/hermes_persist` with file list, preview, and direct download
   - Volume setup controls in GUI: initialize/repair standard runtime folders + manifest for training/knowledge/export/log/cache
   - SQL-backed training intelligence now writes cycle data to volume (`training/hermes_training_intel.sqlite3`), computes deep variable-pattern summaries, and surfaces pattern/variable/GitHub context in GUI
+  - Per-Hermes variable profiles are now stored in SQL (`hermes_agent_variables`) with art-pattern scoring for each Hermes micro profile
+  - Docker services now explicitly set `HERMES_VOLUME_DATA_PATH=/workspace/runtime/hermes_persist` so SQL setup is auto-initialized in the mounted volume
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
   - Deep Auto Learning Zone (`♾️`) with study-area targeting and multi-round comparison
   - Advanced intelligence controls: KNAA/QNAA, quantization, multi-parallel swarm, multipolar strategy, gaussian pressure, permanent memory mode
