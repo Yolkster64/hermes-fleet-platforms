@@ -6,7 +6,7 @@ This folder contains architecture notes, setup guides, and operations playbooks 
 
 - [`GETTING_STARTED.md`](./GETTING_STARTED.md) - onboarding flow for local/dev deployment.
 - [`AI.md`](./AI.md) - AI integration model (local + cloud orchestration).
-- [`SECURITY.md`](./SECURITY.md) - security architecture and operational controls.
+- [`security.md`](./security.md) - security architecture and operational controls.
 - [`integration.md`](./integration.md) - integration patterns and best practices.
 - [`setup.md`](./setup.md) - setup checklist and baseline tooling.
 
@@ -20,4 +20,3 @@ This folder contains architecture notes, setup guides, and operations playbooks 
 ## Supporting References
 
 - [`llm-usage.md`](./llm-usage.md) - provider usage and prompt/runtime practices.
-- [`security.md`](./security.md) - generic security baseline checklist.
