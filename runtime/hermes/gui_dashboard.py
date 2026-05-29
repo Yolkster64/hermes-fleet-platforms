@@ -122,6 +122,24 @@ def _effective_internet_signal(raw_signal: float, low_cap: bool = False) -> floa
     return raw_signal
 
 
+def _initialize_session_state() -> None:
+    defaults: Dict[str, Any] = {
+        "api_key": DEFAULT_API_KEY,
+        "auto_boot_done": False,
+        "last_chat": "",
+        "ctl_study_areas": ["Optimization", "AIHub", "Truth & Safety", "Fleet Topology"],
+        "ctl_techniques": ["KNAA/QNAA reasoning", "Quantized compression", "Multi-parallel swarm", "Multipolar ensemble", "Natural pressure adaptation"],
+        "ctl_swarm_strategy": "hybrid",
+        "ctl_micro_agents": 200,
+        "ctl_gaussian_pressure": 0.88,
+        "ctl_permanent_intelligence": True,
+        "ctl_high_level_learning": 0.72,
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+
 def render_variable_guide() -> None:
     st.caption("Variable guide")
     st.markdown(
@@ -265,7 +283,7 @@ def deep_auto_learning_zone(max_mode: bool, study_areas: List[str], rounds: int,
                 "steps": steps + (i * 120),
                 "candidates": candidates,
                 "sql_signal": technique["sql_signal"],
-                "internet_signal": 0.0 if OFFLINE_ONLY_MODE else (min(0.14, technique["internet_signal"]) if USER_ROUTED_INTERNET else technique["internet_signal"]),
+                "internet_signal": _effective_internet_signal(technique["internet_signal"], low_cap=True),
                 "llm_signal": technique["llm_signal"],
                 "stability_bias": max(0.60, min(0.98, technique["stability_bias"] + (technique["gaussian_pressure"] * 0.05))),
             },
@@ -289,26 +307,7 @@ st.set_page_config(page_title="Hermes Super Easy", page_icon="🧠", layout="wid
 st.title("Hermes Fleet Command Center")
 st.caption("Super simple dashboard: what is happening now, how learning works, and one-click actions.")
 
-if "api_key" not in st.session_state:
-    st.session_state["api_key"] = DEFAULT_API_KEY
-if "auto_boot_done" not in st.session_state:
-    st.session_state["auto_boot_done"] = False
-if "last_chat" not in st.session_state:
-    st.session_state["last_chat"] = ""
-if "ctl_study_areas" not in st.session_state:
-    st.session_state["ctl_study_areas"] = ["Optimization", "AIHub", "Truth & Safety", "Fleet Topology"]
-if "ctl_techniques" not in st.session_state:
-    st.session_state["ctl_techniques"] = ["KNAA/QNAA reasoning", "Quantized compression", "Multi-parallel swarm", "Multipolar ensemble", "Natural pressure adaptation"]
-if "ctl_swarm_strategy" not in st.session_state:
-    st.session_state["ctl_swarm_strategy"] = "hybrid"
-if "ctl_micro_agents" not in st.session_state:
-    st.session_state["ctl_micro_agents"] = 200
-if "ctl_gaussian_pressure" not in st.session_state:
-    st.session_state["ctl_gaussian_pressure"] = 0.88
-if "ctl_permanent_intelligence" not in st.session_state:
-    st.session_state["ctl_permanent_intelligence"] = True
-if "ctl_high_level_learning" not in st.session_state:
-    st.session_state["ctl_high_level_learning"] = 0.72
+_initialize_session_state()
 
 with st.sidebar:
     st.subheader("Easy Connection")
