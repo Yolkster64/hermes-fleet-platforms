@@ -16,6 +16,7 @@ This folder contains architecture notes, setup guides, and operations playbooks 
   - multi-agent orchestration
   - SQL-backed training and telemetry
   - GitHub CLI-driven delivery flow (branch, PR, status, release)
+- [`HERMES_SUPER_ORCHESTRATION.md`](./HERMES_SUPER_ORCHESTRATION.md) - GPU-targeted orchestration profile with adaptive rewards, natural selection, SQL compression, and local API.
 
 ## Supporting References
 
