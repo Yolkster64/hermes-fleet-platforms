@@ -35,19 +35,17 @@ def run_cycle() -> None:
     ).raise_for_status()
     if _cycle % max(1, FLEET_OPTIMIZE_EVERY) == 0:
         requests.post(
-            f"{API_BASE}/optimize-fleet",
-            json={"specialty": SPECIALTY, "candidates": 100},
-            timeout=60,
-        ).raise_for_status()
-        requests.post(
-            f"{API_BASE}/curate-learning",
+            f"{API_BASE}/learning-pulse",
             json={
+                "specialty": SPECIALTY,
+                "steps": max(60, STEPS // 2),
+                "candidates": 100,
                 "sql_signal": data.get("avg_quantized_compression_score", 0.5),
                 "internet_signal": data.get("avg_fleet_shape_score", 0.5),
                 "llm_signal": data.get("avg_long_haul_meta_score", data.get("avg_knaa_qnaa_score", 0.5)),
                 "stability_bias": data.get("avg_truth_score", 0.6),
             },
-            timeout=30,
+            timeout=90,
         ).raise_for_status()
     print(
         f"[auto-trainer] steps={data.get('steps')} "

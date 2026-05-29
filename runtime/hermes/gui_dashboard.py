@@ -78,6 +78,18 @@ with col2:
             st.json(response.json())
         except Exception as exc:
             st.error(f"Curation failed: {exc}")
+    if st.button("Run full learning pulse"):
+        try:
+            response = requests.post(
+                f"{API_BASE}/learning-pulse",
+                json={"specialty": "fleet", "steps": 180, "candidates": 120},
+                timeout=60,
+            )
+            response.raise_for_status()
+            st.success("Learning pulse completed.")
+            st.json(response.json())
+        except Exception as exc:
+            st.error(f"Learning pulse failed: {exc}")
 
 st.subheader("Recent SQL horizon metrics")
 rows = read_latest_scores()

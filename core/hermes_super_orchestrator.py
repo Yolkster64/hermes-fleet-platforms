@@ -872,6 +872,39 @@ class HermesSuperOrchestrator:
         self.store.write_external_signal("curation", normalized[primary], plan)
         return plan
 
+    def learning_pulse(
+        self,
+        specialty: str = "fleet",
+        steps: int = 120,
+        candidates: int = 60,
+        sql_signal: float = 0.7,
+        internet_signal: float = 0.55,
+        llm_signal: float = 0.65,
+        stability_bias: float = 0.68,
+    ) -> Dict:
+        sim = self.run_simulations(steps=steps, specialty=specialty)
+        fleet = self.optimize_fleet_topology(specialty=specialty, candidates=candidates)
+        curation = self.curate_learning_plan(
+            sql_signal=sql_signal,
+            internet_signal=internet_signal,
+            llm_signal=llm_signal,
+            stability_bias=stability_bias,
+        )
+        pulse = {
+            "specialty": specialty,
+            "simulation": sim,
+            "fleet": fleet,
+            "curation": curation,
+            "pulse_score": (
+                sim["avg_long_haul_meta_score"] * 0.38
+                + sim["avg_fleet_shape_score"] * 0.24
+                + sim["avg_quantized_compression_score"] * 0.18
+                + sim["avg_truth_score"] * 0.20
+            ),
+        }
+        self.store.write_event("learning_pulse", pulse)
+        return pulse
+
     def rank_llm_output(
         self,
         output_text: str,
@@ -976,7 +1009,7 @@ class OrchestratorApi:
                 self._json({"error": "not_found"}, status=404)
 
             def do_POST(self):  # noqa: N802
-                if self.path not in ("/train-step", "/simulate", "/horizon-tests", "/rank-output", "/ingest-signal", "/optimize-fleet", "/curate-learning"):
+                if self.path not in ("/train-step", "/simulate", "/horizon-tests", "/rank-output", "/ingest-signal", "/optimize-fleet", "/curate-learning", "/learning-pulse"):
                     self._json({"error": "not_found"}, status=404)
                     return
                 length = int(self.headers.get("Content-Length", "0"))
@@ -1019,6 +1052,16 @@ class OrchestratorApi:
                             internet_signal=float(payload.get("internet_signal", 0.5)),
                             llm_signal=float(payload.get("llm_signal", 0.6)),
                             stability_bias=float(payload.get("stability_bias", 0.65)),
+                        )
+                    elif self.path == "/learning-pulse":
+                        result = orchestrator.learning_pulse(
+                            specialty=str(payload.get("specialty", "fleet")),
+                            steps=int(payload.get("steps", 120)),
+                            candidates=int(payload.get("candidates", 60)),
+                            sql_signal=float(payload.get("sql_signal", 0.7)),
+                            internet_signal=float(payload.get("internet_signal", 0.55)),
+                            llm_signal=float(payload.get("llm_signal", 0.65)),
+                            stability_bias=float(payload.get("stability_bias", 0.68)),
                         )
                     else:
                         result = orchestrator.rank_llm_output(
