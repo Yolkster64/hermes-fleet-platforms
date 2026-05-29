@@ -69,6 +69,7 @@ This runtime enables:
   - Deploy-all control (`🚀 Deploy All Hermes`)
   - Batch deploy and return controls (`🚚 Deploy 10 Hermes`, `↩️ Return Hermes`)
   - Mini vs full model lineup table with short descriptions in Learning Space
+  - Super-orchestration counts (recent train steps, learning pulses, big-decision replans)
   - Special Fleet Training action (`🛰️`) for deeper specialty runs
   - Per-Hermes symbol/bonus/progress/zone table with size-mode descriptions
   - 25-skill agent system with 3 active skills per Hermes unit
@@ -98,6 +99,8 @@ This runtime enables:
     - **Mid horizon** variables (drift/schema/alignment/coordination/reward adaptation)
     - **Long horizon** variables (retention/generalization/longevity/transfer/maturity stability)
   - Growth + maturity + softening factors are now baked into adaptive scoring and surfaced in snapshot/training UX
+  - Training variables now include professional monitors: `size_factor`, `position_score`, `success_signal`, `wrongness_signal`, and monitor comparison scores
+  - AIHub model routing now blends goal profile + training variables for smarter cost/speed/safety selection
   - Composite `value_brain` scoring blends ease/correctness/opposite-pressure/reward/truth/shape/special-reaction into one dynamic weighted score
   - Spatial overlap map compares strategy groups/setups in multi-analysis form (overlap + distance) for stronger setting selection
   - Strategy memory now updates with value-brain-assisted reward weighting for longer-term, smarter adaptation

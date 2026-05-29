@@ -381,6 +381,23 @@ def _horizon_growth_profile(data: dict, brain_value: dict[str, float], signal_sc
     }
 
 
+def _training_factor_profile(data: dict, horizon_profile: dict[str, float]) -> dict[str, float]:
+    active_agents = float(data.get("active_agents", data.get("agent_count", 120)))
+    size_factor = max(0.0, min(1.0, active_agents / 256.0))
+    position_score = max(0.0, min(1.0, float(data.get("avg_success_rate", data.get("avg_truth_score", 0.6)))))
+    success_signal = max(0.0, min(1.0, float(data.get("avg_reward_score", 0.5))))
+    wrongness_signal = max(0.0, min(1.0, 1.0 - float(data.get("avg_truth_score", 0.6))))
+    monitor_comparison = max(0.0, min(1.0, 1.0 - abs(float(data.get("avg_knaa_qnaa_score", 0.5)) - float(data.get("avg_fleet_shape_score", 0.5)))))
+    return {
+        "size_factor": size_factor,
+        "position_score": position_score,
+        "success_signal": success_signal,
+        "wrongness_signal": wrongness_signal,
+        "monitor_comparison": monitor_comparison,
+        "maturity_signal": float(horizon_profile.get("maturity_index", 0.5)),
+    }
+
+
 def _spatial_overlap_map(occasion: str) -> list[dict]:
     local = _strategy_memory.get(occasion, {})
     names = list(local.keys())
@@ -529,6 +546,7 @@ def _emit_strategy_feedback(
     shape: float,
     brain_value: dict[str, float],
     horizon_profile: dict[str, float],
+    training_variables: dict[str, float],
     chaos: tuple[float, float, float, float],
 ) -> None:
     leaderboard = sorted(_strategy_memory.get(occasion, {}).items(), key=lambda item: item[1], reverse=True)
@@ -557,6 +575,7 @@ def _emit_strategy_feedback(
                 "score_components": {"reward": reward, "truth": truth, "fleet_shape": shape},
                 "value_brain": brain_value,
                 "horizon_profile": horizon_profile,
+                "training_variables": training_variables,
                 "value_brain_history_tail": _value_brain_history[-40:],
                 "strategy_leaderboard": [{"strategy": s, "score": sc} for s, sc in leaderboard],
                 "evidence_top_combinations": _top_evidence(),
@@ -633,7 +652,13 @@ def _smart_actions(data: dict, cycle: int, active_specialty: str, skill_pack: li
         )
 
 
-def _emit_knowledge_sync(cycle: int, dynamic_specialty: str, signal_score: float, chaos: tuple[float, float, float, float]) -> None:
+def _emit_knowledge_sync(
+    cycle: int,
+    dynamic_specialty: str,
+    signal_score: float,
+    training_variables: dict[str, float],
+    chaos: tuple[float, float, float, float],
+) -> None:
     if not ENABLE_GITHUB_KNOWLEDGE_SYNC:
         return
     x, y, z, chaos_rate = chaos
@@ -648,6 +673,7 @@ def _emit_knowledge_sync(cycle: int, dynamic_specialty: str, signal_score: float
                 "github_training_enabled": True,
                 "field_adaptation_weight": FIELD_ADAPTATION_WEIGHT,
                 "knowledge_loop": "github_to_field_and_back",
+                "training_variables": training_variables,
                 "chaos_3d_vector": {"x": x, "y": y, "z": z, "chaos_rate": chaos_rate},
             },
         },
@@ -687,6 +713,7 @@ def run_cycle() -> None:
     factors = _chaotic_factor_pack(chaos_rate)
     brain_value = _composite_value_brain(data, factors, algo_profile, occasion, focus, chaos_rate)
     horizon_profile = _horizon_growth_profile(data, brain_value, signal_score)
+    training_variables = _training_factor_profile(data, horizon_profile)
     dynamic_specialty = f"{SPECIALTY}:{selected_strategy}:{focus}:m{horizon_profile['maturity_index']:.2f}"
     requests.post(
         f"{API_BASE}/ingest-signal",
@@ -790,9 +817,10 @@ def run_cycle() -> None:
         shape=learned_shape,
         brain_value=brain_value,
         horizon_profile=horizon_profile,
+        training_variables=training_variables,
         chaos=(x, y, z, chaos_rate),
     )
-    _emit_knowledge_sync(_cycle, dynamic_specialty, signal_score, (x, y, z, chaos_rate))
+    _emit_knowledge_sync(_cycle, dynamic_specialty, signal_score, training_variables, (x, y, z, chaos_rate))
     _smart_actions(data, _cycle, dynamic_specialty, skill_pack, agent_size, dynamic_micro_agents, (x, y, z, chaos_rate))
     _save_learning_state()
     print(

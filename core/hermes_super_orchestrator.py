@@ -949,6 +949,35 @@ class HermesSuperOrchestrator:
         }
         return {"short": short, "mid": mid, "long": long, "monitor_weights": monitor_weights, "goal_target": goal_target}
 
+    def _training_variable_vector(
+        self,
+        agent: AgentState,
+        activity_model: Dict[str, Dict[str, float]],
+        horizon_profile: Dict[str, float],
+    ) -> Dict[str, float]:
+        ranked = sorted(self.agents, key=lambda a: a.reward_score, reverse=True)
+        idx = 0
+        for i, item in enumerate(ranked):
+            if item.name == agent.name:
+                idx = i
+                break
+        active_agents = max(1, len([a for a in self.agents if a.active]))
+        size_factor = max(0.0, min(1.0, active_agents / max(1.0, float(self.max_agents))))
+        position_score = max(0.0, min(1.0, 1.0 - (idx / max(1.0, float(len(ranked) - 1)))))
+        success_signal = activity_model["short"]["success"]
+        wrongness_signal = activity_model["short"]["wrongness"]
+        group_vs_solo = activity_model["mid"]["group_strength"] - activity_model["mid"]["solo_strength"]
+        monitor_comparison = 1.0 - abs(group_vs_solo)
+        return {
+            "size_factor": size_factor,
+            "position_score": position_score,
+            "success_signal": success_signal,
+            "wrongness_signal": wrongness_signal,
+            "group_vs_solo_delta": max(-1.0, min(1.0, group_vs_solo)),
+            "monitor_comparison": max(0.0, min(1.0, monitor_comparison)),
+            "maturity_signal": horizon_profile["maturity_index"],
+        }
+
     def cpp_kernel_status(self) -> Dict:
         return {
             "available": self.native_bridge.available,
@@ -1555,6 +1584,7 @@ class HermesSuperOrchestrator:
                 user_profile=user_profile,
                 goal_target=goal_target,
             )
+            training_variables = self._training_variable_vector(agent, activity_model, horizon_profile)
             adaptive_variables = [
                 quality,
                 speed,
@@ -1582,6 +1612,11 @@ class HermesSuperOrchestrator:
                 activity_model["mid"]["solo_strength"],
                 activity_model["long"]["character_goal_fit"],
                 activity_model["long"]["learning_maturity"],
+                training_variables["size_factor"],
+                training_variables["position_score"],
+                training_variables["success_signal"],
+                training_variables["wrongness_signal"],
+                training_variables["monitor_comparison"],
             ]
             adaptive_weights = [
                 self.reward_weights["quality"],
@@ -1610,6 +1645,11 @@ class HermesSuperOrchestrator:
                 0.07,
                 0.09,
                 0.10,
+                0.08,
+                0.08,
+                0.09,
+                0.09,
+                0.07,
             ]
             adaptive_decision = self._adaptive_brain_decision(
                 variables=adaptive_variables,
@@ -1659,6 +1699,9 @@ class HermesSuperOrchestrator:
             objective_score += activity_model["long"]["character_goal_fit"] * 0.05
             objective_score += activity_model["mid"]["monitor_balance"] * 0.03
             objective_score -= activity_model["short"]["wrongness"] * (0.03 + (user_profile["wrongness_tolerance"] * 0.06))
+            objective_score += training_variables["position_score"] * 0.03
+            objective_score += training_variables["monitor_comparison"] * 0.025
+            objective_score += training_variables["size_factor"] * 0.02
             objective_score = (objective_score * 0.55) + (self._multi_objective_score(outcome) * 0.45)
             objective_score = self._soft_blend(objective_score, horizon_profile["growth_index"], alpha=(0.10 + (horizon_profile["softening_factor"] * 0.18)))
             delta = self._truth_gate_adjustment(objective_score, truth_score)
@@ -1718,6 +1761,7 @@ class HermesSuperOrchestrator:
                 "hard_fact": hard_fact,
                 "horizon_profile": horizon_profile,
                 "activity_variables": activity_model,
+                "training_variables": training_variables,
                 "user_activity_profile": user_profile,
                 "goal_target": goal_target,
                 "aihub_bonus": aihub_bonus,
@@ -1727,6 +1771,7 @@ class HermesSuperOrchestrator:
                 "capacity_scale": scale,
             }
             self.algorithm_state["last_activity_model"] = activity_model
+            self.algorithm_state["last_training_variables"] = training_variables
             if isinstance(big_decision_plan, dict):
                 self.store.write_event("big_decision_replan", big_decision_plan)
             self.store.write_event("train_step", event)
@@ -2005,11 +2050,15 @@ class HermesSuperOrchestrator:
             persist_telemetry=False,
         )
         aihub_bonus = self.compute_aihub_bonus()
+        user_profile = self._latest_user_activity_profile()
+        training_vars = self.algorithm_state.get("last_training_variables", {})
         multi_llm = self._multi_llm_optimizer(
             model_hint=llm_model,
             curated=curated,
             max_tokens=max_tokens,
             aihub_bonus=aihub_bonus,
+            goal_profile=str(user_profile.get("goal_profile", "balanced")),
+            training_variables=training_vars if isinstance(training_vars, dict) else {},
         )
         text = (
             f"[TEMP API::{multi_llm['selected_model']}] {system_prompt}\n"
@@ -2030,6 +2079,7 @@ class HermesSuperOrchestrator:
             "aihub_bonus": aihub_bonus,
             "temperature": temperature,
             "max_tokens": max_tokens,
+            "goal_profile": user_profile,
             "multi_llm_optimizer": multi_llm,
         }
 
@@ -2050,12 +2100,21 @@ class HermesSuperOrchestrator:
                 result["telemetry_warning"] = f"llm_chat_event_failed:{exc}"
         return result
 
-    def _multi_llm_optimizer(self, model_hint: str, curated: Dict, max_tokens: int, aihub_bonus: float) -> Dict:
+    def _multi_llm_optimizer(
+        self,
+        model_hint: str,
+        curated: Dict,
+        max_tokens: int,
+        aihub_bonus: float,
+        goal_profile: str = "balanced",
+        training_variables: Optional[Dict] = None,
+    ) -> Dict:
         # Simulated multi-LLM routing profiles for low-cost/high-power blended selection.
         profiles = [
             {"id": "hermes-mini-fast", "cost_per_1k": 0.0018, "speed_tps": 125.0, "quality": 0.68},
             {"id": "hermes-balanced-plus", "cost_per_1k": 0.0055, "speed_tps": 72.0, "quality": 0.82},
             {"id": "hermes-reasoning-max", "cost_per_1k": 0.0120, "speed_tps": 36.0, "quality": 0.94},
+            {"id": "hermes-guard-safe", "cost_per_1k": 0.0088, "speed_tps": 48.0, "quality": 0.90},
         ]
         if model_hint:
             hint = model_hint.lower()
@@ -2067,17 +2126,30 @@ class HermesSuperOrchestrator:
         stability = float(curated.get("stability_bias", 0.7))
         bonus_amp = max(0.0, min(1.0, aihub_bonus))
         token_load = max(1, int(max_tokens))
+        training_variables = training_variables or {}
+        maturity_signal = max(0.0, min(1.0, float(training_variables.get("maturity_signal", 0.5))))
+        position_score = max(0.0, min(1.0, float(training_variables.get("position_score", 0.5))))
+        monitor_comparison = max(0.0, min(1.0, float(training_variables.get("monitor_comparison", 0.5))))
 
         scored = []
         for p in profiles:
             speed_score = min(1.0, p["speed_tps"] / 130.0)
             cost_score = max(0.0, min(1.0, 1.0 - (p["cost_per_1k"] / 0.013)))
             power_score = p["quality"]
+            goal_speed = 1.0 if goal_profile == "speed" else 0.0
+            goal_cost = 1.0 if goal_profile == "cost" else 0.0
+            goal_safe = 1.0 if goal_profile == "safe" else 0.0
             blend = (
                 power_score * (0.40 + (llm_weight * 0.25))
                 + speed_score * (0.25 + ((1.0 - stability) * 0.15))
                 + cost_score * (0.25 + (stability * 0.10))
                 + bonus_amp * 0.10
+                + (goal_speed * speed_score * 0.10)
+                + (goal_cost * cost_score * 0.10)
+                + (goal_safe * power_score * 0.10)
+                + (maturity_signal * power_score * 0.08)
+                + (position_score * speed_score * 0.05)
+                + (monitor_comparison * cost_score * 0.04)
             )
             scored.append((blend, p, speed_score, cost_score, power_score))
 
@@ -2086,13 +2158,19 @@ class HermesSuperOrchestrator:
         selected = top[1]
         estimated_cost = (token_load / 1000.0) * selected["cost_per_1k"] * (1.0 - (bonus_amp * 0.22))
         token_efficiency = max(0.0, min(1.0, (top[2] * 0.35) + (top[3] * 0.40) + (top[4] * 0.25)))
-        blend_mode = "cost-speed-power-amplified" if bonus_amp > 0.55 else "cost-speed-power-balanced"
+        blend_mode = f"{goal_profile}-cost-speed-power-amplified" if bonus_amp > 0.55 else f"{goal_profile}-cost-speed-power-balanced"
         return {
             "selected_model": selected["id"],
             "blend_mode": blend_mode,
             "estimated_cost_usd": float(max(0.0001, estimated_cost)),
             "estimated_tokens_per_sec": float(selected["speed_tps"] * (1.0 + (bonus_amp * 0.08))),
             "token_efficiency": float(token_efficiency),
+            "goal_profile": goal_profile,
+            "training_bias": {
+                "maturity_signal": maturity_signal,
+                "position_score": position_score,
+                "monitor_comparison": monitor_comparison,
+            },
             "candidates": [
                 {
                     "model": item[1]["id"],
@@ -2194,6 +2272,7 @@ class HermesSuperOrchestrator:
         p = self.governor.pressure()
         growth = self.growth_metrics()
         aihub_live = self.compute_aihub_bonus(persist=False)
+        recent_events = self.store.recent_events(limit=120)
         horizon_profile = self._brain_horizon_profile(
             short_variables={"latency_pressure": 0.5, "cache_hit_proxy": 0.5, "io_efficiency": 0.5, "response_consistency": 0.5, "micro_recovery": 0.5},
             mid_variables={"stability_drift": 0.5, "schema_health": 0.5, "agent_alignment": 0.5, "coordination_cohesion": 0.5, "reward_adaptation": 0.5},
@@ -2216,11 +2295,19 @@ class HermesSuperOrchestrator:
             "brain_horizon_catalog": self._horizon_variable_catalog(),
             "brain_horizon_profile": horizon_profile,
             "activity_variable_model": self.algorithm_state.get("last_activity_model", {}),
+            "training_variables": self.algorithm_state.get("last_training_variables", {}),
             "cpp_kernel": self.cpp_kernel_status(),
             "knowledge_mesh": self.knowledge_mesh_state(),
             "aihub_bonus_live": aihub_live,
             "learning_state_path": self._resolved_learning_state_path(),
-            "recent_events": self.store.recent_events(limit=10),
+            "super_orchestration_counts": {
+                "total_agents": len(self.agents),
+                "active_agents": len([a for a in self.agents if a.active]),
+                "recent_train_steps": len([e for e in recent_events if e.get("event_type") == "train_step"]),
+                "recent_learning_pulses": len([e for e in recent_events if e.get("event_type") == "learning_pulse"]),
+                "recent_big_decisions": len([e for e in recent_events if e.get("event_type") == "big_decision_replan"]),
+            },
+            "recent_events": recent_events[:10],
             "external_signals_tail": self.store.recent_external_signals(limit=20),
         }
 
@@ -2279,7 +2366,15 @@ class HermesSuperOrchestrator:
             "brain_horizon_catalog": self._horizon_variable_catalog(),
             "growth": self.growth_metrics(),
             "activity_variable_model": activity_model,
+            "training_variables": self.algorithm_state.get("last_training_variables", {}),
             "monitor_weights": monitor_weights,
+            "super_orchestration_counts": {
+                "total_agents": len(self.agents),
+                "active_agents": len([a for a in self.agents if a.active]),
+                "recent_train_steps": len([e for e in recent_events if e.get("event_type") == "train_step"]),
+                "recent_learning_pulses": len([e for e in recent_events if e.get("event_type") == "learning_pulse"]),
+                "recent_big_decisions": len([e for e in recent_events if e.get("event_type") == "big_decision_replan"]),
+            },
             "rules": rules,
             "rule_score": f"{passing_rules}/{len(rules)}",
             "recommended_action": "continue_training" if training_active else "trigger_learning_pulse_or_auto_trainer",

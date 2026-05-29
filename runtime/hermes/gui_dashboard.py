@@ -470,6 +470,12 @@ c2.metric("Hermes Amount", str(total_hermes), delta=f"runtime {runtime_hermes} |
 c3.metric("Active Hermes", str(active_hermes))
 c4.metric("AIHub Bonus", f"{aihub_bonus * 100:.1f}%")
 c5.metric("Model", str(unified.get("aihub_shared_model_id", "aihub-unified-v1")))
+orchestration_counts = snapshot.get("super_orchestration_counts", {}) if isinstance(snapshot, dict) else {}
+if orchestration_counts:
+    oc1, oc2, oc3 = st.columns(3)
+    oc1.metric("Super Orchestration Train Steps", str(int(orchestration_counts.get("recent_train_steps", 0))))
+    oc2.metric("Super Orchestration Pulses", str(int(orchestration_counts.get("recent_learning_pulses", 0))))
+    oc3.metric("Super Orchestration Big Decisions", str(int(orchestration_counts.get("recent_big_decisions", 0))))
 
 if unified_err:
     st.error(f"Gateway not ready: {unified_err}")
@@ -513,6 +519,7 @@ if st.button("Force Training Pulse Now", use_container_width=True):
 
 brain_catalog = snapshot_data.get("brain_horizon_catalog", {}) if isinstance(snapshot_data, dict) else {}
 brain_profile = snapshot_data.get("brain_horizon_profile", {}) if isinstance(snapshot_data, dict) else {}
+training_variables = snapshot_data.get("training_variables", {}) if isinstance(snapshot_data, dict) else {}
 with st.expander("Brain Variables: Short / Mid / Long + Growth Maturity", expanded=False):
     if brain_profile:
         st.caption("Live integrated profile")
@@ -539,6 +546,13 @@ with st.expander("Brain Variables: Short / Mid / Long + Growth Maturity", expand
         if rows:
             st.caption("Tracked brain variables")
             st.dataframe(rows, use_container_width=True, hide_index=True)
+    if training_variables:
+        st.caption("Training variables (size / position / success monitors)")
+        st.dataframe(
+            [{k: round(float(v), 4) if isinstance(v, (int, float)) else v for k, v in training_variables.items()}],
+            use_container_width=True,
+            hide_index=True,
+        )
 
 cpp1, cpp2, cpp3 = st.columns(3)
 cpp_available = bool(cpp_kernel.get("available", False)) if not cpp_kernel_err else False
