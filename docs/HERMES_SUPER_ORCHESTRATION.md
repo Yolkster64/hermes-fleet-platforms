@@ -45,6 +45,12 @@ Example simulation sweep:
 curl -X POST http://127.0.0.1:8787/simulate -H "Content-Type: application/json" -d "{\"specialty\":\"llm_orchestration\",\"steps\":2000}"
 ```
 
+Build native kernel DLL on Windows (MSVC Developer Prompt):
+
+```bash
+cl /LD /O2 core\\native\\hermes_learning_kernel.cpp /Fe:core\\native\\hermes_learning_kernel.dll
+```
+
 ## Optimization Model
 
 Each train step computes a 4D optimization envelope:
@@ -92,11 +98,18 @@ Tables:
 The baseline includes a `cpp_ml_kernels` specialty and can route C++ kernel work to a dedicated agent.
 Use this with native kernels for critical hot paths and keep orchestration in Python/C#.
 
+Implemented paths:
+
+1. C++ kernel: `core/native/hermes_learning_kernel.cpp`
+2. Python bridge: `core/hermes_cpp_native_bridge.py`
+3. C# bridge: `src/MonadoBlade.Core/Services/NativeHermesLearningBridge.cs`
+
 Recommended split:
 
 1. C++: tight kernels, quantization, high-throughput transforms
 2. Python: orchestration, experimentation, reward tuning
 3. SQL: telemetry, retention, analytics, policy triggers
+4. C#: application integration boundary for native kernels and service orchestration
 
 ## Security Notes
 

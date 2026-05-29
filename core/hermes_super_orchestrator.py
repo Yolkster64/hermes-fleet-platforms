@@ -8,7 +8,15 @@ from dataclasses import dataclass, asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Dict, List, Optional
 
-import psutil
+try:
+    from .hermes_cpp_native_bridge import HermesCppNativeBridge
+except ImportError:
+    from hermes_cpp_native_bridge import HermesCppNativeBridge
+
+try:
+    import psutil
+except ImportError:  # Optional dependency
+    psutil = None
 
 try:
     import torch
@@ -125,8 +133,12 @@ class ResourceGovernor:
         return float(used) / float(total)
 
     def pressure(self) -> Dict[str, float]:
-        cpu = psutil.cpu_percent(interval=0.05) / 100.0
-        mem = psutil.virtual_memory().percent / 100.0
+        if psutil:
+            cpu = psutil.cpu_percent(interval=0.05) / 100.0
+            mem = psutil.virtual_memory().percent / 100.0
+        else:
+            cpu = 0.5
+            mem = 0.5
         gpu = self._gpu_pressure()
         return {"cpu": cpu, "memory": mem, "gpu": gpu}
 
@@ -145,6 +157,7 @@ class HermesSuperOrchestrator:
         self.governor = ResourceGovernor(gpu_target_utilization=0.75)
         self.reward_weights = {"quality": 0.32, "speed": 0.20, "cost": 0.16, "truth": 0.22, "novelty": 0.10}
         self.truth_threshold = 0.68
+        self.native_bridge = HermesCppNativeBridge()
         self.algorithm_state = {
             "bandit_values": {},  # specialty -> value
             "q_table": {},  # (specialty, bin) -> value
@@ -169,12 +182,20 @@ class HermesSuperOrchestrator:
             self.reward_weights[k] = max(0.01, self.reward_weights[k]) / total
 
     def _multi_objective_score(self, outcome: InteractionOutcome) -> float:
-        return (
-            outcome.quality * self.reward_weights["quality"]
-            + outcome.speed * self.reward_weights["speed"]
-            + outcome.cost_efficiency * self.reward_weights["cost"]
-            + outcome.truth_score * self.reward_weights["truth"]
-            + outcome.novelty * self.reward_weights["novelty"]
+        weights = [
+            self.reward_weights["quality"],
+            self.reward_weights["speed"],
+            self.reward_weights["cost"],
+            self.reward_weights["truth"],
+            self.reward_weights["novelty"],
+        ]
+        return self.native_bridge.reward_update(
+            quality=outcome.quality,
+            speed=outcome.speed,
+            cost_efficiency=outcome.cost_efficiency,
+            truth_score=outcome.truth_score,
+            novelty=outcome.novelty,
+            weights=weights,
         )
 
     def _truth_gate_adjustment(self, score: float, truth_score: float) -> float:
