@@ -49,6 +49,9 @@ This runtime enables:
   - Auto-trainer now includes `nano-swarm` (ultra micro-agent strategy above hybrid) with adaptive strategy switching by occasion
   - Chaotic factor randomization (`sql/internet/llm/stability/steps/candidates` ratios) is applied per cycle for broader search
   - Evidence matrix tracks strategy + ratio + agent-size combinations and feeds top-performing combinations back through `/ingest-signal`
+  - Composite `value_brain` scoring blends ease/correctness/opposite-pressure/reward/truth/shape/special-reaction into one dynamic weighted score
+  - Spatial overlap map compares strategy groups/setups in multi-analysis form (overlap + distance) for stronger setting selection
+  - Strategy memory now updates with value-brain-assisted reward weighting for longer-term, smarter adaptation
   - Full auto cycle button (simulate + pulse + optimize + curate + dedupe)
   - Built-in API key field in GUI sidebar (uses `X-Hermes-Key`)
 - Resource targeting via env vars:

@@ -57,6 +57,7 @@ _strategy_memory: dict[str, dict[str, float]] = {
     "exploration": {k: 0.0 for k in ("nano-swarm", "hybrid", "swarm", "mesh", "multipolar", "specialist-mix")},
 }
 _evidence_matrix: dict[str, dict[str, float]] = {}
+_value_brain_history: list[float] = []
 
 STRATEGY_ALGOS: dict[str, dict[str, float]] = {
     "nano-swarm": {"sql_boost": 0.05, "internet_boost": 0.09, "llm_boost": 0.06, "stability_boost": -0.02, "step_mult": 0.82, "candidate_mult": 1.35},
@@ -215,6 +216,90 @@ def _top_evidence(limit: int = 8) -> list[dict]:
     return out
 
 
+def _value_weight_pack(occasion: str, focus: str) -> dict[str, float]:
+    base = {
+        "ease": 0.10,
+        "correctness": 0.28,
+        "opposite_correctness_pressure": 0.08,
+        "reward": 0.20,
+        "truth": 0.20,
+        "shape": 0.14,
+        "special_reaction": 0.10,
+    }
+    if occasion == "speed":
+        base["reward"] += 0.06
+        base["ease"] += 0.04
+    if occasion == "quality":
+        base["truth"] += 0.06
+        base["shape"] += 0.04
+    if occasion == "recovery":
+        base["correctness"] += 0.07
+        base["opposite_correctness_pressure"] += 0.06
+    if focus == "meta-optimization":
+        base["special_reaction"] += 0.06
+    total = sum(base.values())
+    return {k: v / total for k, v in base.items()}
+
+
+def _composite_value_brain(data: dict, factors: dict[str, float], algo: dict[str, float], occasion: str, focus: str, chaos_rate: float) -> dict[str, float]:
+    reward = float(data.get("avg_reward_score", 0.5))
+    truth = float(data.get("avg_truth_score", 0.6))
+    shape = float(data.get("avg_fleet_shape_score", 0.55))
+    ease = max(0.0, min(1.0, 1.0 - (chaos_rate * 0.6)))
+    correctness = max(0.0, min(1.0, truth))
+    opposite_correctness_pressure = max(0.0, min(1.0, abs(0.92 - correctness)))
+    special_reaction = max(
+        0.0,
+        min(
+            1.0,
+            (algo["llm_boost"] * 2.4)
+            + (algo["internet_boost"] * 1.5)
+            + (factors["ratio_llm"] * 0.20)
+            + (factors["ratio_internet"] * 0.15),
+        ),
+    )
+    weights = _value_weight_pack(occasion, focus)
+    value = (
+        (ease * weights["ease"])
+        + (correctness * weights["correctness"])
+        + ((1.0 - opposite_correctness_pressure) * weights["opposite_correctness_pressure"])
+        + (reward * weights["reward"])
+        + (truth * weights["truth"])
+        + (shape * weights["shape"])
+        + (special_reaction * weights["special_reaction"])
+    )
+    composite = max(0.0, min(1.0, value))
+    _value_brain_history.append(composite)
+    if len(_value_brain_history) > 250:
+        del _value_brain_history[: len(_value_brain_history) - 250]
+    return {
+        "value": composite,
+        "ease": ease,
+        "correctness": correctness,
+        "opposite_correctness_pressure": opposite_correctness_pressure,
+        "special_reaction": special_reaction,
+        "reward": reward,
+        "truth": truth,
+        "shape": shape,
+    }
+
+
+def _spatial_overlap_map(occasion: str) -> list[dict]:
+    local = _strategy_memory.get(occasion, {})
+    names = list(local.keys())
+    out: list[dict] = []
+    for i in range(len(names)):
+        for j in range(i + 1, len(names)):
+            s1 = names[i]
+            s2 = names[j]
+            v1 = local.get(s1, 0.0)
+            v2 = local.get(s2, 0.0)
+            overlap = max(0.0, 1.0 - abs(v1 - v2))
+            out.append({"a": s1, "b": s2, "overlap": overlap, "distance": abs(v1 - v2)})
+    out.sort(key=lambda item: item["overlap"], reverse=True)
+    return out[:12]
+
+
 def _comparison_upgrade_pass(occasion: str, focus: str, cycle: int, base_steps: int, base_candidates: int) -> None:
     contenders = sorted(_strategy_memory.get(occasion, {}).items(), key=lambda item: item[1], reverse=True)
     top = [s for s, _ in contenders[:3]]
@@ -297,6 +382,7 @@ def _emit_strategy_feedback(
     reward: float,
     truth: float,
     shape: float,
+    brain_value: dict[str, float],
     chaos: tuple[float, float, float, float],
 ) -> None:
     leaderboard = sorted(_strategy_memory.get(occasion, {}).items(), key=lambda item: item[1], reverse=True)
@@ -321,8 +407,11 @@ def _emit_strategy_feedback(
                     "stability_bias": stability_bias,
                 },
                 "score_components": {"reward": reward, "truth": truth, "fleet_shape": shape},
+                "value_brain": brain_value,
+                "value_brain_history_tail": _value_brain_history[-40:],
                 "strategy_leaderboard": [{"strategy": s, "score": sc} for s, sc in leaderboard],
                 "evidence_top_combinations": _top_evidence(),
+                "spatial_overlap_map": _spatial_overlap_map(occasion),
                 "chaos_3d_vector": {"x": chaos[0], "y": chaos[1], "z": chaos[2], "chaos_rate": chaos[3]},
             },
         },
@@ -398,6 +487,7 @@ def run_cycle() -> None:
     selected_strategy = _pick_strategy(occasion, chaos_rate, _cycle)
     algo_profile = _algo_live.get(selected_strategy, STRATEGY_ALGOS["hybrid"])
     factors = _chaotic_factor_pack(chaos_rate)
+    brain_value = _composite_value_brain(data, factors, algo_profile, occasion, focus, chaos_rate)
     dynamic_specialty = f"{SPECIALTY}:{selected_strategy}:{focus}"
     requests.post(
         f"{API_BASE}/ingest-signal",
@@ -415,6 +505,7 @@ def run_cycle() -> None:
                 "selected_strategy": selected_strategy,
                 "strategy_algorithm": algo_profile,
                 "chaotic_factor_pack": factors,
+                "value_brain": brain_value,
                 "chaos_3d_vector": {"x": x, "y": y, "z": z, "chaos_rate": chaos_rate},
             },
         },
@@ -466,7 +557,8 @@ def run_cycle() -> None:
     learned_reward = float(pulse_out.get("avg_reward", data.get("avg_reward_score", 0.5)))
     learned_truth = float(data.get("avg_truth_score", 0.6))
     learned_shape = float(data.get("avg_fleet_shape_score", 0.55))
-    _update_strategy_memory(occasion, selected_strategy, learned_reward, learned_truth, learned_shape)
+    weighted_reward = max(0.0, min(1.0, (learned_reward * 0.75) + (brain_value["value"] * 0.25)))
+    _update_strategy_memory(occasion, selected_strategy, weighted_reward, learned_truth, learned_shape)
     _record_evidence(occasion, selected_strategy, agent_size, factors, learned_reward, learned_truth, learned_shape)
     _emit_strategy_feedback(
         cycle=_cycle,
@@ -484,6 +576,7 @@ def run_cycle() -> None:
         reward=learned_reward,
         truth=learned_truth,
         shape=learned_shape,
+        brain_value=brain_value,
         chaos=(x, y, z, chaos_rate),
     )
     _smart_actions(data, _cycle, dynamic_specialty, skill_pack, agent_size, dynamic_micro_agents, (x, y, z, chaos_rate))
