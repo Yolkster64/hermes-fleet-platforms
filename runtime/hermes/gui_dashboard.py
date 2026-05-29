@@ -6,6 +6,22 @@ from typing import Any, Dict, List, Tuple
 
 import requests
 import streamlit as st
+try:
+    from core.hermes_variable_registry import VARIABLE_CATALOG, default_user_entry_profile
+except Exception:  # pragma: no cover
+    VARIABLE_CATALOG = {}
+
+    def default_user_entry_profile() -> Dict[str, Any]:
+        return {
+            "goal_profile": "balanced",
+            "success_priority": 0.72,
+            "wrongness_tolerance": 0.22,
+            "group_preference": 0.58,
+            "solo_preference": 0.42,
+            "dynamic_response": 0.62,
+            "speed_priority": 0.65,
+            "energy_saver": 0.55,
+        }
 
 API_BASE = os.getenv("HERMES_API_BASE_URL", "http://localhost:8788")
 DEFAULT_API_KEY = os.getenv("HERMES_GUI_API_KEY", "local-hermes-ui-key")
@@ -538,6 +554,8 @@ if st.button("Force Training Pulse Now", use_container_width=True):
     )
 
 brain_catalog = snapshot_data.get("brain_horizon_catalog", {}) if isinstance(snapshot_data, dict) else {}
+if not isinstance(brain_catalog, dict) or not brain_catalog:
+    brain_catalog = dict(VARIABLE_CATALOG)
 brain_profile = snapshot_data.get("brain_horizon_profile", {}) if isinstance(snapshot_data, dict) else {}
 training_variables = snapshot_data.get("training_variables", {}) if isinstance(snapshot_data, dict) else {}
 with st.expander("Brain Variables: Short / Mid / Long + Growth Maturity", expanded=False):
@@ -658,12 +676,53 @@ with st.expander("Advanced Intelligence Techniques"):
     render_variable_guide()
 
 st.subheader("Activity Goal Profile (Fast User Controls)")
-goal_profile = st.selectbox("Goal character", ["balanced", "speed", "safe", "cost"], key="ctl_goal_profile")
-success_priority = st.slider("Success priority", min_value=0.0, max_value=1.0, value=0.72, step=0.01, key="ctl_success_priority")
-wrongness_tolerance = st.slider("Wrongness tolerance", min_value=0.0, max_value=1.0, value=0.22, step=0.01, key="ctl_wrongness_tolerance")
-group_preference = st.slider("Group analysis weight", min_value=0.0, max_value=1.0, value=0.58, step=0.01, key="ctl_group_preference")
-solo_preference = st.slider("Solo analysis weight", min_value=0.0, max_value=1.0, value=0.42, step=0.01, key="ctl_solo_preference")
-dynamic_response = st.slider("Dynamic monitor response", min_value=0.0, max_value=1.0, value=0.62, step=0.01, key="ctl_dynamic_response")
+entry_defaults = default_user_entry_profile()
+goal_profile = st.selectbox(
+    "Goal character",
+    ["balanced", "speed", "safe", "cost"],
+    index=["balanced", "speed", "safe", "cost"].index(str(entry_defaults.get("goal_profile", "balanced"))),
+    key="ctl_goal_profile",
+)
+success_priority = st.slider(
+    "Success priority",
+    min_value=0.0,
+    max_value=1.0,
+    value=float(entry_defaults.get("success_priority", 0.72)),
+    step=0.01,
+    key="ctl_success_priority",
+)
+wrongness_tolerance = st.slider(
+    "Wrongness tolerance",
+    min_value=0.0,
+    max_value=1.0,
+    value=float(entry_defaults.get("wrongness_tolerance", 0.22)),
+    step=0.01,
+    key="ctl_wrongness_tolerance",
+)
+group_preference = st.slider(
+    "Group analysis weight",
+    min_value=0.0,
+    max_value=1.0,
+    value=float(entry_defaults.get("group_preference", 0.58)),
+    step=0.01,
+    key="ctl_group_preference",
+)
+solo_preference = st.slider(
+    "Solo analysis weight",
+    min_value=0.0,
+    max_value=1.0,
+    value=float(entry_defaults.get("solo_preference", 0.42)),
+    step=0.01,
+    key="ctl_solo_preference",
+)
+dynamic_response = st.slider(
+    "Dynamic monitor response",
+    min_value=0.0,
+    max_value=1.0,
+    value=float(entry_defaults.get("dynamic_response", 0.62)),
+    step=0.01,
+    key="ctl_dynamic_response",
+)
 activity_profile = {
     "goal_profile": goal_profile,
     "success_priority": success_priority,

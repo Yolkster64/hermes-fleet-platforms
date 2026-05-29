@@ -43,7 +43,7 @@ This runtime enables:
   - `hermes-data` persists compressed mesh links, 3D evidence shapes, and cross-agent transfer signals in SQLite (`knowledge_mesh_links`)
 - Continuous fleet auto-training via `hermes-trainer` service
 - Canonical runtime script names:
-  - Unified app entry: `runtime/hermes/apps/runtime_entrypoint.py` (`--app gui|trainer`)
+  - Unified app entry: `runtime/hermes/apps/runtime_entrypoint.py` (`--app gui|dashboard|trainer|train`)
   - GUI alias: `runtime/hermes/apps/gui_control_center.py`
   - Trainer alias: `runtime/hermes/apps/fleet_trainer_service.py`
   - Startup helpers: `runtime/hermes/scripts/startup/helpers.ps1`
@@ -100,6 +100,7 @@ This runtime enables:
     - **Long horizon** variables (retention/generalization/longevity/transfer/maturity stability)
   - Growth + maturity + softening factors are now baked into adaptive scoring and surfaced in snapshot/training UX
   - Training variables now include professional monitors: `size_factor`, `position_score`, `success_signal`, `wrongness_signal`, and monitor comparison scores
+  - Shared variable registry now powers super-orchestrator + trainer + GUI defaults for consistent entry profiles and variable semantics
   - AIHub model routing now blends goal profile + training variables for smarter cost/speed/safety selection
   - Composite `value_brain` scoring blends ease/correctness/opposite-pressure/reward/truth/shape/special-reaction into one dynamic weighted score
   - Spatial overlap map compares strategy groups/setups in multi-analysis form (overlap + distance) for stronger setting selection

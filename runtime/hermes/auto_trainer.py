@@ -5,6 +5,33 @@ import random
 import json
 
 import requests
+try:
+    from core.hermes_variable_registry import VARIABLE_CATALOG, clamp01, compute_efficiency_profile
+except Exception:  # pragma: no cover
+    VARIABLE_CATALOG = {}
+
+    def clamp01(value: float) -> float:
+        return max(0.0, min(1.0, float(value)))
+
+    def compute_efficiency_profile(training_variables: dict[str, float]) -> dict[str, float]:
+        size_factor = clamp01(training_variables.get("size_factor", 0.5))
+        position_score = clamp01(training_variables.get("position_score", 0.5))
+        success_signal = clamp01(training_variables.get("success_signal", 0.5))
+        wrongness_signal = clamp01(training_variables.get("wrongness_signal", 0.5))
+        monitor = clamp01(training_variables.get("monitor_comparison", 0.5))
+        maturity = clamp01(training_variables.get("maturity_signal", 0.5))
+        energy_efficiency = clamp01((success_signal * 0.35) + (monitor * 0.25) + (maturity * 0.20) + ((1.0 - wrongness_signal) * 0.20))
+        speed_efficiency = clamp01((position_score * 0.40) + (success_signal * 0.30) + (size_factor * 0.20) + (monitor * 0.10))
+        yield_efficiency = clamp01((energy_efficiency * 0.45) + (speed_efficiency * 0.35) + (maturity * 0.20))
+        return {
+            "energy_efficiency": energy_efficiency,
+            "speed_efficiency": speed_efficiency,
+            "yield_efficiency": yield_efficiency,
+        }
+
+
+def _clamp01(value: float) -> float:
+    return clamp01(value)
 
 API_BASE = os.getenv("HERMES_API_BASE_URL", "http://hermes-api:8787")
 LEARNING_STATE_PATH = os.getenv("HERMES_LEARNING_STATE_PATH", "runtime/auto/hermes_learning_state.json")
@@ -78,10 +105,6 @@ STRATEGY_ALGOS: dict[str, dict[str, float]] = {
     "specialist-mix": {"sql_boost": 0.05, "internet_boost": 0.02, "llm_boost": 0.06, "stability_boost": 0.04, "step_mult": 1.10, "candidate_mult": 0.90},
 }
 _algo_live: dict[str, dict[str, float]] = {k: dict(v) for k, v in STRATEGY_ALGOS.items()}
-
-
-def _clamp01(value: float) -> float:
-    return max(0.0, min(1.0, float(value)))
 
 
 def _resolved_state_path() -> str:
@@ -392,14 +415,27 @@ def _training_factor_profile(data: dict, horizon_profile: dict[str, float]) -> d
     success_signal = _clamp01(float(data.get("avg_reward_score", 0.5)))
     wrongness_signal = _clamp01(1.0 - float(data.get("avg_truth_score", 0.6)))
     monitor_comparison = _clamp01(1.0 - abs(float(data.get("avg_knaa_qnaa_score", 0.5)) - float(data.get("avg_fleet_shape_score", 0.5))))
-    return {
+    profile = {
         "size_factor": size_factor,
         "position_score": position_score,
         "success_signal": success_signal,
         "wrongness_signal": wrongness_signal,
         "monitor_comparison": monitor_comparison,
+        "group_strength": _clamp01(float(data.get("avg_fleet_shape_score", 0.55))),
+        "solo_strength": _clamp01(float(data.get("avg_truth_score", 0.60))),
+        "coordination_cohesion": _clamp01(1.0 - abs(float(data.get("avg_reward_score", 0.5)) - float(data.get("avg_fleet_shape_score", 0.55)))),
+        "reward_adaptation": _clamp01(float(data.get("avg_reward_score", 0.5))),
+        "retention_strength": _clamp01(float(data.get("avg_long_haul_meta_score", 0.55))),
+        "knowledge_transfer": _clamp01(float(data.get("avg_knaa_qnaa_score", 0.55))),
         "maturity_signal": float(horizon_profile.get("maturity_index", 0.5)),
+        "growth_index": _clamp01(float(horizon_profile.get("growth_index", 0.5))),
+        "character_goal_fit": _clamp01(float(horizon_profile.get("softening_factor", 0.5))),
+        "latency_pressure": _clamp01(1.0 - float(data.get("avg_quality", 0.5))),
+        "response_softness": _clamp01(float(horizon_profile.get("softening_factor", 0.5))),
+        "micro_recovery": _clamp01(float(data.get("avg_truth_score", 0.6))),
     }
+    profile.update(compute_efficiency_profile(profile))
+    return profile
 
 
 def _spatial_overlap_map(occasion: str) -> list[dict]:
@@ -718,6 +754,18 @@ def run_cycle() -> None:
     brain_value = _composite_value_brain(data, factors, algo_profile, occasion, focus, chaos_rate)
     horizon_profile = _horizon_growth_profile(data, brain_value, signal_score)
     training_variables = _training_factor_profile(data, horizon_profile)
+    if VARIABLE_CATALOG:
+        ordered: dict[str, float] = {}
+        for section in ("short", "mid", "long", "optimization"):
+            entries = VARIABLE_CATALOG.get(section, {})
+            if isinstance(entries, dict):
+                for key in entries.keys():
+                    if key in training_variables:
+                        ordered[key] = training_variables[key]
+        for key, value in training_variables.items():
+            if key not in ordered:
+                ordered[key] = value
+        training_variables = ordered
     dynamic_specialty = f"{SPECIALTY}:{selected_strategy}:{focus}:m{horizon_profile['maturity_index']:.2f}"
     requests.post(
         f"{API_BASE}/ingest-signal",
