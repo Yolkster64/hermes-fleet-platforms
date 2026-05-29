@@ -311,14 +311,14 @@ def deep_auto_learning_zone(max_mode: bool, study_areas: List[str], rounds: int,
     return {"rounds": rounds, "study_areas": study_areas, "technique_profile": technique, "results": outputs}
 
 
-st.set_page_config(page_title="Hermes Super Easy", page_icon="🧠", layout="wide")
-st.title("Hermes Fleet Command Center")
-st.caption("Super simple dashboard: what is happening now, how learning works, and one-click actions.")
+st.set_page_config(page_title="Hermes Control Dashboard", page_icon="🧠", layout="wide")
+st.title("Hermes Fleet Control Dashboard")
+st.caption("Clear control view: runtime status, SQL intelligence, and one-click fleet actions.")
 
 _initialize_session_state()
 
 with st.sidebar:
-    st.subheader("Easy Connection")
+    st.subheader("Connection")
     st.text_input("API Key", key="api_key", type="password")
     st.caption(f"Gateway: {API_BASE}")
     st.caption("Default Docker key is pre-filled.")

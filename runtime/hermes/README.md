@@ -43,7 +43,8 @@ This runtime enables:
   - `hermes-data` persists compressed mesh links, 3D evidence shapes, and cross-agent transfer signals in SQLite (`knowledge_mesh_links`)
 - Continuous fleet auto-training via `hermes-trainer` service
 - Canonical runtime script names:
-  - Unified app entry: `runtime/hermes/apps/runtime_entrypoint.py` (`--app gui|dashboard|trainer|train`, auto bootstraps volume + SQL intelligence)
+  - Unified app entry: `runtime/hermes/apps/runtime_entrypoint.py` (`--app gui|dashboard|control-center|trainer|train|fleet-trainer`, auto bootstraps volume + SQL intelligence)
+  - Clean launch aliases: `runtime/hermes/apps/dashboard.py`, `runtime/hermes/apps/trainer.py`
   - GUI alias: `runtime/hermes/apps/gui_control_center.py`
   - GUI API/action helper split: `runtime/hermes/gui_api_client.py`
   - GUI insights/render split: `runtime/hermes/gui_insights.py`

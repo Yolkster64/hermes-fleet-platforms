@@ -12,8 +12,10 @@ def _normalize_app(app: str) -> str:
     aliases = {
         "gui": "gui",
         "dashboard": "gui",
+        "control-center": "gui",
         "trainer": "trainer",
         "train": "trainer",
+        "fleet-trainer": "trainer",
     }
     if app not in aliases:
         raise ValueError(f"Unknown app target: {app}")
@@ -51,6 +53,11 @@ def run_app(app: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Hermes runtime app entrypoint")
-    parser.add_argument("--app", choices=["gui", "dashboard", "trainer", "train"], required=True, help="App target to run")
+    parser.add_argument(
+        "--app",
+        choices=["gui", "dashboard", "control-center", "trainer", "train", "fleet-trainer"],
+        required=True,
+        help="App target to run",
+    )
     args = parser.parse_args()
     run_app(args.app)
