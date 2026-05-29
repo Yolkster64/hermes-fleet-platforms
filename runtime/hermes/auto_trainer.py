@@ -5,6 +5,7 @@ import random
 import json
 
 import requests
+from requests.adapters import HTTPAdapter
 from volume_setup import ensure_runtime_volume_setup
 from training_sql_intel import (
     compute_sql_pattern_intel,
@@ -108,6 +109,10 @@ _strategy_memory: dict[str, dict[str, float]] = {
 }
 _evidence_matrix: dict[str, dict[str, float]] = {}
 _value_brain_history: list[float] = []
+_REQUEST_HEADERS = {"X-Hermes-Key": GATEWAY_KEY.strip()} if GATEWAY_KEY.strip() else {}
+_HTTP_SESSION = requests.Session()
+_HTTP_SESSION.mount("http://", HTTPAdapter(pool_connections=24, pool_maxsize=24, max_retries=0))
+_HTTP_SESSION.mount("https://", HTTPAdapter(pool_connections=12, pool_maxsize=12, max_retries=0))
 
 STRATEGY_ALGOS: dict[str, dict[str, float]] = {
     "nano-swarm": {"sql_boost": 0.05, "internet_boost": 0.09, "llm_boost": 0.06, "stability_boost": -0.02, "step_mult": 0.82, "candidate_mult": 1.35},
@@ -176,17 +181,11 @@ def _save_learning_state() -> None:
         )
 
 
-def _headers():
-    if GATEWAY_KEY.strip():
-        return {"X-Hermes-Key": GATEWAY_KEY.strip()}
-    return {}
-
-
 def _post(path: str, payload: dict, timeout: int = 120) -> dict:
     last_error = None
     for attempt in range(4):
         try:
-            response = requests.post(f"{API_BASE}{path}", json=payload, headers=_headers(), timeout=timeout)
+            response = _HTTP_SESSION.post(f"{API_BASE}{path}", json=payload, headers=_REQUEST_HEADERS, timeout=timeout)
             response.raise_for_status()
             return response.json()
         except requests.RequestException as exc:
@@ -196,7 +195,7 @@ def _post(path: str, payload: dict, timeout: int = 120) -> dict:
 
 
 def _get(path: str, timeout: int = 30) -> dict:
-    response = requests.get(f"{API_BASE}{path}", headers=_headers(), timeout=timeout)
+    response = _HTTP_SESSION.get(f"{API_BASE}{path}", headers=_REQUEST_HEADERS, timeout=timeout)
     response.raise_for_status()
     return response.json()
 
@@ -955,7 +954,6 @@ def run_cycle() -> None:
     )
     _emit_knowledge_sync(_cycle, dynamic_specialty, signal_score, training_variables, (x, y, z, chaos_rate))
     _smart_actions(data, _cycle, dynamic_specialty, skill_pack, agent_size, dynamic_micro_agents, (x, y, z, chaos_rate))
-    _save_learning_state()
     print(
         f"[auto-trainer] cycle={_cycle} mode={'MAX' if MAX_MODE else 'BALANCED'} strategy={selected_strategy} "
         f"specialty={dynamic_specialty} size={agent_size} micro_agents={dynamic_micro_agents} "
