@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <vector>
 
 namespace {
 double sigmoid(double x) {
@@ -133,6 +134,42 @@ __declspec(dllexport) double hermes_fleet_shape_score(
         0.0,
         1.0
     );
+}
+
+__declspec(dllexport) double hermes_quantized_compression_score(
+    const double* values,
+    std::size_t len) {
+    if (values == nullptr || len == 0) {
+        return 0.0;
+    }
+
+    double min_v = values[0];
+    double max_v = values[0];
+    for (std::size_t i = 1; i < len; ++i) {
+        min_v = std::min(min_v, values[i]);
+        max_v = std::max(max_v, values[i]);
+    }
+
+    const double range = std::max(0.000001, max_v - min_v);
+    std::vector<unsigned char> q(len, 0);
+    std::vector<double> deq(len, 0.0);
+
+    for (std::size_t i = 0; i < len; ++i) {
+        const double norm = std::clamp((values[i] - min_v) / range, 0.0, 1.0);
+        q[i] = static_cast<unsigned char>(std::round(norm * 255.0));
+        deq[i] = min_v + (static_cast<double>(q[i]) / 255.0) * range;
+    }
+
+    double mse = 0.0;
+    for (std::size_t i = 0; i < len; ++i) {
+        const double d = values[i] - deq[i];
+        mse += d * d;
+    }
+    mse /= static_cast<double>(len);
+
+    const double fidelity = 1.0 / (1.0 + mse * 200.0);
+    const double compression_ratio = 1.0 - (8.0 / 64.0); // 64-bit input to 8-bit
+    return std::clamp((fidelity * 0.72) + (compression_ratio * 0.28), 0.0, 1.0);
 }
 
 }

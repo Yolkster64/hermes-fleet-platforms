@@ -7,9 +7,13 @@ API_BASE = os.getenv("HERMES_API_BASE_URL", "http://hermes-api:8787")
 SPECIALTY = os.getenv("HERMES_TRAIN_SPECIALTY", "fleet")
 STEPS = int(os.getenv("HERMES_TRAIN_STEPS", "400"))
 SLEEP_SECONDS = int(os.getenv("HERMES_TRAIN_INTERVAL_SECONDS", "12"))
+FLEET_OPTIMIZE_EVERY = int(os.getenv("HERMES_FLEET_OPTIMIZE_EVERY", "6"))
+_cycle = 0
 
 
 def run_cycle() -> None:
+    global _cycle
+    _cycle += 1
     payload = {"steps": STEPS, "specialty": SPECIALTY}
     response = requests.post(f"{API_BASE}/simulate", json=payload, timeout=120)
     response.raise_for_status()
@@ -28,6 +32,12 @@ def run_cycle() -> None:
         },
         timeout=30,
     ).raise_for_status()
+    if _cycle % max(1, FLEET_OPTIMIZE_EVERY) == 0:
+        requests.post(
+            f"{API_BASE}/optimize-fleet",
+            json={"specialty": SPECIALTY, "candidates": 100},
+            timeout=60,
+        ).raise_for_status()
     print(
         f"[auto-trainer] steps={data.get('steps')} "
         f"avg_reward={data.get('avg_reward_score'):.4f} "

@@ -62,6 +62,14 @@ class HermesCppNativeBridge:
             self._dll.hermes_fleet_shape_score.restype = c_double
         except AttributeError:
             pass
+        try:
+            self._dll.hermes_quantized_compression_score.argtypes = [
+                ctypes.POINTER(c_double),
+                c_size_t,
+            ]
+            self._dll.hermes_quantized_compression_score.restype = c_double
+        except AttributeError:
+            pass
 
     @property
     def available(self) -> bool:
@@ -208,3 +216,23 @@ class HermesCppNativeBridge:
                 c_double(memory_retention),
             )
         )
+
+    def quantized_compression_score(self, values: list[float]) -> float:
+        if not values:
+            return 0.0
+        if not self._dll or not hasattr(self._dll, "hermes_quantized_compression_score"):
+            min_v = min(values)
+            max_v = max(values)
+            r = max(0.000001, max_v - min_v)
+            deq = []
+            for v in values:
+                norm = max(0.0, min(1.0, (v - min_v) / r))
+                q = round(norm * 255.0)
+                deq.append(min_v + (q / 255.0) * r)
+            mse = sum((a - b) ** 2 for a, b in zip(values, deq)) / len(values)
+            fidelity = 1.0 / (1.0 + mse * 200.0)
+            compression_ratio = 1.0 - (8.0 / 64.0)
+            return max(0.0, min(1.0, (fidelity * 0.72) + (compression_ratio * 0.28)))
+
+        arr = (c_double * len(values))(*values)
+        return float(self._dll.hermes_quantized_compression_score(arr, c_size_t(len(values))))

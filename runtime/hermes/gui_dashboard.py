@@ -58,6 +58,14 @@ with col2:
             st.json(response.json())
         except Exception as exc:
             st.error(f"Horizon call failed: {exc}")
+    if st.button("Optimize fleet topology"):
+        try:
+            response = requests.post(f"{API_BASE}/optimize-fleet", json={"candidates": 120, "specialty": "fleet"}, timeout=30)
+            response.raise_for_status()
+            st.success("Fleet topology optimization completed.")
+            st.json(response.json())
+        except Exception as exc:
+            st.error(f"Fleet optimization failed: {exc}")
 
 st.subheader("Recent SQL horizon metrics")
 rows = read_latest_scores()
