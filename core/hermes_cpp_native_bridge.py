@@ -50,6 +50,18 @@ class HermesCppNativeBridge:
             self._dll.hermes_knaa_qnaa_score.restype = c_double
         except AttributeError:
             pass
+        try:
+            self._dll.hermes_fleet_shape_score.argtypes = [
+                c_double,
+                c_double,
+                c_double,
+                c_double,
+                c_double,
+                c_double,
+            ]
+            self._dll.hermes_fleet_shape_score.restype = c_double
+        except AttributeError:
+            pass
 
     @property
     def available(self) -> bool:
@@ -64,7 +76,7 @@ class HermesCppNativeBridge:
         novelty: float,
         weights: list[float],
     ) -> float:
-        if not self._dll or not hasattr(self._dll, "hermes_knaa_qnaa_score"):
+        if not self._dll or not hasattr(self._dll, "hermes_reward_update"):
             score = (
                 quality * weights[0]
                 + speed * weights[1]
@@ -154,5 +166,45 @@ class HermesCppNativeBridge:
                 c_double(truth_score),
                 c_double(reward_score),
                 c_double(exploration_rate),
+            )
+        )
+
+    def fleet_shape_score(
+        self,
+        active_agents: float,
+        latency_ms: float,
+        throughput_rps: float,
+        error_rate: float,
+        diversity: float,
+        memory_retention: float,
+    ) -> float:
+        if not self._dll or not hasattr(self._dll, "hermes_fleet_shape_score"):
+            agent_factor = 1.0 / (1.0 + pow(2.718281828, -((active_agents - 8.0) * 0.28)))
+            latency_factor = 1.0 / (1.0 + pow(2.718281828, -((220.0 - latency_ms) / 45.0)))
+            throughput_factor = 1.0 / (1.0 + pow(2.718281828, -((throughput_rps - 140.0) / 30.0)))
+            reliability = 1.0 - max(0.0, min(1.0, error_rate))
+            diversity_factor = max(0.0, min(1.0, diversity))
+            retention_factor = max(0.0, min(1.0, memory_retention))
+            return max(
+                0.0,
+                min(
+                    1.0,
+                    (agent_factor * 0.20)
+                    + (latency_factor * 0.22)
+                    + (throughput_factor * 0.22)
+                    + (reliability * 0.18)
+                    + (diversity_factor * 0.08)
+                    + (retention_factor * 0.10),
+                ),
+            )
+
+        return float(
+            self._dll.hermes_fleet_shape_score(
+                c_double(active_agents),
+                c_double(latency_ms),
+                c_double(throughput_rps),
+                c_double(error_rate),
+                c_double(diversity),
+                c_double(memory_retention),
             )
         )

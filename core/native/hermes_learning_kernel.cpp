@@ -109,4 +109,30 @@ __declspec(dllexport) double hermes_knaa_qnaa_score(
     return std::clamp((knaa * 0.64) + (qnaa * 0.36) + explore, 0.0, 1.0);
 }
 
+__declspec(dllexport) double hermes_fleet_shape_score(
+    double active_agents,
+    double latency_ms,
+    double throughput_rps,
+    double error_rate,
+    double diversity,
+    double memory_retention) {
+    const double agent_factor = sigmoid((active_agents - 8.0) * 0.28);
+    const double latency_factor = sigmoid((220.0 - latency_ms) / 45.0);
+    const double throughput_factor = sigmoid((throughput_rps - 140.0) / 30.0);
+    const double reliability = 1.0 - std::clamp(error_rate, 0.0, 1.0);
+    const double diversity_factor = std::clamp(diversity, 0.0, 1.0);
+    const double retention_factor = std::clamp(memory_retention, 0.0, 1.0);
+
+    return std::clamp(
+        (agent_factor * 0.20)
+        + (latency_factor * 0.22)
+        + (throughput_factor * 0.22)
+        + (reliability * 0.18)
+        + (diversity_factor * 0.08)
+        + (retention_factor * 0.10),
+        0.0,
+        1.0
+    );
+}
+
 }

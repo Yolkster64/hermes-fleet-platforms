@@ -114,6 +114,29 @@ class SqlTelemetryStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS temporal_memory_bands (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts REAL NOT NULL,
+                    band TEXT NOT NULL,
+                    ttl_class TEXT NOT NULL,
+                    retention_score REAL NOT NULL,
+                    payload_compressed BLOB NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS external_signals (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts REAL NOT NULL,
+                    source TEXT NOT NULL,
+                    signal_score REAL NOT NULL,
+                    payload_compressed BLOB NOT NULL
+                )
+                """
+            )
 
     def write_metric(self, agent: AgentProfile) -> None:
         with self._conn() as conn:
@@ -208,6 +231,43 @@ class SqlTelemetryStore:
                 ),
             )
 
+    def write_memory_band(self, band: str, ttl_class: str, retention_score: float, payload: Dict) -> None:
+        compressed = zlib.compress(json.dumps(payload).encode("utf-8"))
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO temporal_memory_bands(ts, band, ttl_class, retention_score, payload_compressed)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (time.time(), band, ttl_class, retention_score, compressed),
+            )
+
+    def write_external_signal(self, source: str, signal_score: float, payload: Dict) -> None:
+        compressed = zlib.compress(json.dumps(payload).encode("utf-8"))
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO external_signals(ts, source, signal_score, payload_compressed)
+                VALUES (?, ?, ?, ?)
+                """,
+                (time.time(), source, signal_score, compressed),
+            )
+
+    def recent_external_signal_score(self, lookback: int = 40) -> float:
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT signal_score
+                FROM external_signals
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (lookback,),
+            ).fetchall()
+        if not rows:
+            return 0.5
+        return sum(r[0] for r in rows) / len(rows)
+
 
 class ResourceGovernor:
     def __init__(self, gpu_target_utilization: float = 0.75, cpu_target_utilization: float = 0.8) -> None:
@@ -272,6 +332,8 @@ class HermesSuperOrchestrator:
             "beta_priors": {},  # specialty -> (alpha, beta)
             "horizon_memory": {"short": [], "mid": [], "long": []},
             "knaa_qnaa_memory": [],
+            "punishment_memory": [],
+            "fleet_shape_memory": [],
         }
         self.goal_shape_targets = {
             "quality": (0.90, 0.62, 0.52),
@@ -401,6 +463,65 @@ class HermesSuperOrchestrator:
             del mem[: len(mem) - 2000]
         return score
 
+    def _fleet_shape_score(
+        self,
+        active_agents: int,
+        latency_ms: float,
+        throughput_rps: float,
+        error_rate: float,
+        diversity: float,
+        memory_retention: float,
+    ) -> float:
+        score = self.native_bridge.fleet_shape_score(
+            active_agents=float(active_agents),
+            latency_ms=latency_ms,
+            throughput_rps=throughput_rps,
+            error_rate=error_rate,
+            diversity=diversity,
+            memory_retention=memory_retention,
+        )
+        mem = self.algorithm_state["fleet_shape_memory"]
+        mem.append(score)
+        if len(mem) > 2000:
+            del mem[: len(mem) - 2000]
+        return score
+
+    def _punishment_correction(self, truth_score: float, quality: float, drift: float) -> float:
+        if truth_score >= self.truth_threshold and quality >= 0.6:
+            correction = min(0.18, (truth_score - self.truth_threshold) * 0.25 + quality * 0.05)
+        else:
+            truth_gap = max(0.0, self.truth_threshold - truth_score)
+            correction = -min(0.6, truth_gap * 1.35 + drift * 0.22)
+        pmem = self.algorithm_state["punishment_memory"]
+        pmem.append(correction)
+        if len(pmem) > 2000:
+            del pmem[: len(pmem) - 2000]
+        return correction
+
+    def _persist_temporal_memory_bands(self, event: Dict) -> None:
+        short_payload = {
+            "agent": event["agent"],
+            "specialty": event["specialty"],
+            "short_score": event["short_score"],
+            "knaa_qnaa_score": event["knaa_qnaa_score"],
+            "fleet_shape_score": event["fleet_shape_score"],
+        }
+        mid_payload = {
+            "objective_score": event["objective_score"],
+            "truth_score": event["truth_score"],
+            "compression_gain": event["compression_gain"],
+            "external_signal_score": event["external_signal_score"],
+        }
+        long_payload = {
+            "long_score": event["long_score"],
+            "retention_score": event["long_variables"]["retention_score"],
+            "correction": event["punishment_correction"],
+            "reward_score": event["reward_score"],
+        }
+        self.store.write_memory_band("short", "short_ttl", short_payload["short_score"], short_payload)
+        self.store.write_memory_band("mid", "mid_ttl", event["mid_score"], mid_payload)
+        self.store.write_memory_band("long", "long_ttl", long_payload["retention_score"], long_payload)
+
     def _natural_selection(self) -> None:
         inactive_candidates = [a for a in self.agents if a.success_rate < 0.2 and a.reward_score < 0.1]
         if inactive_candidates and len(self.agents) > 6:
@@ -452,6 +573,7 @@ class HermesSuperOrchestrator:
                 "generalization": max(0.0, min(1.0, random.gauss(0.65, 0.23))),
                 "compression_longevity": max(0.0, min(1.0, random.gauss(0.63, 0.21))),
             }
+            external_signal_score = max(0.0, min(1.0, self.store.recent_external_signal_score()))
             outcome = InteractionOutcome(
                 quality=quality,
                 speed=speed,
@@ -485,9 +607,25 @@ class HermesSuperOrchestrator:
                 truth_score=truth_score,
                 reward_score=agent.reward_score / 10.0,
             )
+            fleet_shape_score = self._fleet_shape_score(
+                active_agents=len([a for a in self.agents if a.active]),
+                latency_ms=max(25.0, 400.0 * (1.0 - speed)),
+                throughput_rps=max(1.0, 40.0 + quality * 220.0),
+                error_rate=max(0.0, 1.0 - truth_score),
+                diversity=pattern_diversity,
+                memory_retention=long_variables["retention_score"],
+            )
+            punishment_correction = self._punishment_correction(
+                truth_score=truth_score,
+                quality=quality,
+                drift=mid_variables["stability_drift"],
+            )
             objective_score += knaa_qnaa_score * 0.12
+            objective_score += fleet_shape_score * 0.08
+            objective_score += external_signal_score * 0.05
             objective_score = (objective_score * 0.55) + (self._multi_objective_score(outcome) * 0.45)
             delta = self._truth_gate_adjustment(objective_score, truth_score)
+            delta += punishment_correction
 
             agent.reward_score = max(0.0, min(10.0, agent.reward_score + (delta - 0.28)))
             agent.success_rate = max(0.0, min(1.0, (agent.success_rate * 0.86) + (success * 0.14)))
@@ -524,12 +662,16 @@ class HermesSuperOrchestrator:
                 "mid_variables": mid_variables,
                 "long_variables": long_variables,
                 "knaa_qnaa_score": knaa_qnaa_score,
+                "fleet_shape_score": fleet_shape_score,
+                "external_signal_score": external_signal_score,
+                "punishment_correction": punishment_correction,
                 "objective_score": objective_score,
                 "reward_score": agent.reward_score,
                 "success_rate": agent.success_rate,
                 "capacity_scale": scale,
             }
             self.store.write_event("train_step", event)
+            self._persist_temporal_memory_bands(event)
             return event
 
     def run_simulations(self, steps: int = 250, specialty: str = "general") -> Dict:
@@ -548,6 +690,7 @@ class HermesSuperOrchestrator:
         avg_mid = sum(r["mid_score"] for r in results) / len(results)
         avg_long = sum(r["long_score"] for r in results) / len(results)
         avg_knaa_qnaa = sum(r["knaa_qnaa_score"] for r in results) / len(results)
+        avg_fleet_shape = sum(r["fleet_shape_score"] for r in results) / len(results)
         truth_violations = len([r for r in results if r["truth_score"] < self.truth_threshold])
         return {
             "steps": steps,
@@ -560,6 +703,7 @@ class HermesSuperOrchestrator:
             "avg_mid_score": avg_mid,
             "avg_long_score": avg_long,
             "avg_knaa_qnaa_score": avg_knaa_qnaa,
+            "avg_fleet_shape_score": avg_fleet_shape,
             "truth_violations": truth_violations,
             "reward_weights": self.reward_weights,
         }
@@ -632,6 +776,8 @@ class HermesSuperOrchestrator:
             "resource_pressure": p,
             "reward_weights": self.reward_weights,
             "knaa_qnaa_memory_tail": self.algorithm_state["knaa_qnaa_memory"][-20:],
+            "fleet_shape_memory_tail": self.algorithm_state["fleet_shape_memory"][-20:],
+            "punishment_memory_tail": self.algorithm_state["punishment_memory"][-20:],
             "agents": [asdict(a) for a in self.agents],
             "recent_events": self.store.recent_events(limit=10),
         }
@@ -665,7 +811,7 @@ class OrchestratorApi:
                 self._json({"error": "not_found"}, status=404)
 
             def do_POST(self):  # noqa: N802
-                if self.path not in ("/train-step", "/simulate", "/horizon-tests", "/rank-output"):
+                if self.path not in ("/train-step", "/simulate", "/horizon-tests", "/rank-output", "/ingest-signal"):
                     self._json({"error": "not_found"}, status=404)
                     return
                 length = int(self.headers.get("Content-Length", "0"))
@@ -689,6 +835,14 @@ class OrchestratorApi:
                             mid_steps=int(payload.get("mid_steps", 300)),
                             long_steps=int(payload.get("long_steps", 1200)),
                         )
+                    elif self.path == "/ingest-signal":
+                        source = str(payload.get("source", "external"))
+                        signal_score = max(0.0, min(1.0, float(payload.get("signal_score", 0.5))))
+                        signal_payload = payload.get("payload", {})
+                        if not isinstance(signal_payload, dict):
+                            signal_payload = {"value": str(signal_payload)}
+                        orchestrator.store.write_external_signal(source, signal_score, signal_payload)
+                        result = {"ok": True, "source": source, "signal_score": signal_score}
                     else:
                         result = orchestrator.rank_llm_output(
                             output_text=str(payload.get("output", "")),

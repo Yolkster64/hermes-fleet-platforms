@@ -9,6 +9,7 @@
 
 This runtime enables:
 - QNAA/KNAA training simulations through `/simulate` and `/horizon-tests`
+- External/online signal ingest through `/ingest-signal` for cross-model learning influence
 - SQL telemetry in `runtime/auto/hermes_super_orchestrator.db`
 - Continuous fleet auto-training via `hermes-trainer` service
 - Resource targeting via env vars:

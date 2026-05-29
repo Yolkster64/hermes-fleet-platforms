@@ -1,5 +1,7 @@
 namespace MonadoBlade.Core.Services;
 
+using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 /// <summary>
@@ -29,6 +31,27 @@ public sealed class NativeHermesLearningBridge
         double targetY,
         double targetZ,
         double sigma);
+
+    [DllImport(NativeDll, EntryPoint = "hermes_knaa_qnaa_score", CallingConvention = CallingConvention.Cdecl)]
+    private static extern double HermesKnaaQnaaScoreNative(
+        double[] shortValues,
+        nuint shortLen,
+        double[] midValues,
+        nuint midLen,
+        double[] longValues,
+        nuint longLen,
+        double truthScore,
+        double rewardScore,
+        double explorationRate);
+
+    [DllImport(NativeDll, EntryPoint = "hermes_fleet_shape_score", CallingConvention = CallingConvention.Cdecl)]
+    private static extern double HermesFleetShapeScoreNative(
+        double activeAgents,
+        double latencyMs,
+        double throughputRps,
+        double errorRate,
+        double diversity,
+        double memoryRetention);
 
     /// <summary>
     /// Computes reward using native C++ kernels when available.
@@ -125,4 +148,108 @@ public sealed class NativeHermesLearningBridge
         var dist2 = (dx * dx) + (dy * dy) + (dz * dz);
         return Math.Exp(-(dist2 / (2.0d * safeSigma * safeSigma)));
     }
+
+    public double ComputeKnaaQnaaScore(
+        double[] shortValues,
+        double[] midValues,
+        double[] longValues,
+        double truthScore,
+        double rewardScore,
+        double explorationRate = 0.1d)
+    {
+        var safeShort = shortValues ?? Array.Empty<double>();
+        var safeMid = midValues ?? Array.Empty<double>();
+        var safeLong = longValues ?? Array.Empty<double>();
+        try
+        {
+            return HermesKnaaQnaaScoreNative(
+                safeShort,
+                (nuint)safeShort.Length,
+                safeMid,
+                (nuint)safeMid.Length,
+                safeLong,
+                (nuint)safeLong.Length,
+                truthScore,
+                rewardScore,
+                explorationRate);
+        }
+        catch (DllNotFoundException)
+        {
+            return ComputeKnaaQnaaManagedFallback(safeShort, safeMid, safeLong, truthScore, rewardScore, explorationRate);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return ComputeKnaaQnaaManagedFallback(safeShort, safeMid, safeLong, truthScore, rewardScore, explorationRate);
+        }
+    }
+
+    public double ComputeFleetShapeScore(
+        double activeAgents,
+        double latencyMs,
+        double throughputRps,
+        double errorRate,
+        double diversity,
+        double memoryRetention)
+    {
+        try
+        {
+            return HermesFleetShapeScoreNative(activeAgents, latencyMs, throughputRps, errorRate, diversity, memoryRetention);
+        }
+        catch (DllNotFoundException)
+        {
+            return ComputeFleetShapeManagedFallback(activeAgents, latencyMs, throughputRps, errorRate, diversity, memoryRetention);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return ComputeFleetShapeManagedFallback(activeAgents, latencyMs, throughputRps, errorRate, diversity, memoryRetention);
+        }
+    }
+
+    private static double ComputeKnaaQnaaManagedFallback(
+        double[] shortValues,
+        double[] midValues,
+        double[] longValues,
+        double truthScore,
+        double rewardScore,
+        double explorationRate)
+    {
+        static double Mean(double[] values) => values.Length == 0 ? 0.0d : values.Average();
+        var shortAvg = Mean(shortValues);
+        var midAvg = Mean(midValues);
+        var longAvg = Mean(longValues);
+        var knaa = (shortAvg * 0.42d) + (midAvg * 0.34d) + (longAvg * 0.24d);
+        var qnaa =
+            (Sigmoid((truthScore - 0.5d) * 7.0d) * 0.62d) +
+            (Sigmoid((rewardScore - 0.5d) * 5.0d) * 0.38d);
+        var explore = Math.Clamp(explorationRate, 0.0d, 1.0d) * 0.14d;
+        return Math.Clamp((knaa * 0.64d) + (qnaa * 0.36d) + explore, 0.0d, 1.0d);
+    }
+
+    private static double ComputeFleetShapeManagedFallback(
+        double activeAgents,
+        double latencyMs,
+        double throughputRps,
+        double errorRate,
+        double diversity,
+        double memoryRetention)
+    {
+        var agentFactor = Sigmoid((activeAgents - 8.0d) * 0.28d);
+        var latencyFactor = Sigmoid((220.0d - latencyMs) / 45.0d);
+        var throughputFactor = Sigmoid((throughputRps - 140.0d) / 30.0d);
+        var reliability = 1.0d - Math.Clamp(errorRate, 0.0d, 1.0d);
+        var diversityFactor = Math.Clamp(diversity, 0.0d, 1.0d);
+        var retentionFactor = Math.Clamp(memoryRetention, 0.0d, 1.0d);
+
+        return Math.Clamp(
+            (agentFactor * 0.20d) +
+            (latencyFactor * 0.22d) +
+            (throughputFactor * 0.22d) +
+            (reliability * 0.18d) +
+            (diversityFactor * 0.08d) +
+            (retentionFactor * 0.10d),
+            0.0d,
+            1.0d);
+    }
+
+    private static double Sigmoid(double value) => 1.0d / (1.0d + Math.Exp(-value));
 }

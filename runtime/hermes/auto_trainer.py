@@ -14,11 +14,26 @@ def run_cycle() -> None:
     response = requests.post(f"{API_BASE}/simulate", json=payload, timeout=120)
     response.raise_for_status()
     data = response.json()
+    signal_score = max(0.0, min(1.0, (data.get("avg_truth_score", 0.5) * 0.6) + (data.get("avg_quality", 0.5) * 0.4)))
+    requests.post(
+        f"{API_BASE}/ingest-signal",
+        json={
+            "source": "auto_trainer",
+            "signal_score": signal_score,
+            "payload": {
+                "avg_reward_score": data.get("avg_reward_score"),
+                "avg_knaa_qnaa_score": data.get("avg_knaa_qnaa_score"),
+                "avg_fleet_shape_score": data.get("avg_fleet_shape_score"),
+            },
+        },
+        timeout=30,
+    ).raise_for_status()
     print(
         f"[auto-trainer] steps={data.get('steps')} "
         f"avg_reward={data.get('avg_reward_score'):.4f} "
         f"avg_truth={data.get('avg_truth_score'):.4f} "
-        f"avg_knaa_qnaa={data.get('avg_knaa_qnaa_score', 0.0):.4f}"
+        f"avg_knaa_qnaa={data.get('avg_knaa_qnaa_score', 0.0):.4f} "
+        f"avg_fleet_shape={data.get('avg_fleet_shape_score', 0.0):.4f}"
     )
 
 
