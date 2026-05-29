@@ -10,26 +10,26 @@ builder.Services.AddHttpClient("hermes", client =>
 });
 var app = builder.Build();
 
+bool ReadBoolEnv(string key, bool defaultValue)
+{
+    var raw = Environment.GetEnvironmentVariable(key);
+    if (string.IsNullOrWhiteSpace(raw))
+        return defaultValue;
+    return raw.Trim().ToLowerInvariant() is "1" or "true" or "yes" or "on";
+}
+
 var backendUrl = Environment.GetEnvironmentVariable("HERMES_BACKEND_URL") ?? "http://hermes-api:8787";
 var backendApiKey = Environment.GetEnvironmentVariable("HERMES_API_KEY") ?? "";
 var gatewayKey = Environment.GetEnvironmentVariable("HERMES_GATEWAY_KEY") ?? "";
-var allowInsecureNoKey = (Environment.GetEnvironmentVariable("HERMES_ALLOW_INSECURE_NO_KEY") ?? "false")
-    .Trim()
-    .ToLowerInvariant() is "1" or "true" or "yes" or "on";
+var allowInsecureNoKey = ReadBoolEnv("HERMES_ALLOW_INSECURE_NO_KEY", false);
 var unifiedEnabled = Environment.GetEnvironmentVariable("AIHUB_UNIFIED_ENABLED") ?? "true";
 var sharedModelId = Environment.GetEnvironmentVariable("AIHUB_SHARED_MODEL_ID") ?? "hermes-fleet-latest";
 var sharedMlProfile = Environment.GetEnvironmentVariable("AIHUB_SHARED_ML_PROFILE") ?? "global-learning";
 var fleetModelLabel = Environment.GetEnvironmentVariable("HERMES_FLEET_MODEL_LABEL") ?? "hermes-fleet-newest";
 var mcpServer = Environment.GetEnvironmentVariable("HERMES_MCP_SERVER") ?? "github";
-var lowBandwidthMode = (Environment.GetEnvironmentVariable("HERMES_LOW_BANDWIDTH_MODE") ?? "true")
-    .Trim()
-    .ToLowerInvariant() is "1" or "true" or "yes" or "on";
-var offlineOnlyMode = (Environment.GetEnvironmentVariable("HERMES_OFFLINE_ONLY") ?? "false")
-    .Trim()
-    .ToLowerInvariant() is "1" or "true" or "yes" or "on";
-var userRoutedInternet = (Environment.GetEnvironmentVariable("HERMES_USER_ROUTED_INTERNET") ?? "true")
-    .Trim()
-    .ToLowerInvariant() is "1" or "true" or "yes" or "on";
+var lowBandwidthMode = ReadBoolEnv("HERMES_LOW_BANDWIDTH_MODE", true);
+var offlineOnlyMode = ReadBoolEnv("HERMES_OFFLINE_ONLY", false);
+var userRoutedInternet = ReadBoolEnv("HERMES_USER_ROUTED_INTERNET", true);
 var sessionTtlHours = Math.Max(1, int.TryParse(Environment.GetEnvironmentVariable("HERMES_SESSION_TTL_HOURS"), out var ttl) ? ttl : 12);
 var authSessions = new ConcurrentDictionary<string, DateTimeOffset>();
 
@@ -99,6 +99,20 @@ async Task<IResult> ProxyGetStreamed(
     return Results.Empty;
 }
 
+async Task<IResult> ProxyGetJson(
+    IHttpClientFactory factory,
+    HttpContext context,
+    string path)
+{
+    if (!Authorized(context))
+        return Results.Unauthorized();
+    using var client = factory.CreateClient("hermes");
+    AttachBackendKey(client);
+    using var response = await client.GetAsync($"{backendUrl}{path}", context.RequestAborted);
+    var body = await response.Content.ReadAsStringAsync(context.RequestAborted);
+    return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
+}
+
 async Task<IResult> ProxyPostJson(
     IHttpClientFactory factory,
     HttpContext context,
@@ -161,13 +175,7 @@ app.MapPost("/auth/login", async (HttpContext context) =>
 
 app.MapGet("/health", async (IHttpClientFactory factory, HttpContext context) =>
 {
-    if (!Authorized(context))
-        return Results.Unauthorized();
-    using var client = factory.CreateClient("hermes");
-    AttachBackendKey(client);
-    using var response = await client.GetAsync($"{backendUrl}/health");
-    var body = await response.Content.ReadAsStringAsync();
-    return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
+    return await ProxyGetJson(factory, context, "/health");
 });
 
 app.MapGet("/snapshot", async (IHttpClientFactory factory, HttpContext context) =>
@@ -177,13 +185,7 @@ app.MapGet("/snapshot", async (IHttpClientFactory factory, HttpContext context) 
 
 app.MapGet("/learning-growth", async (IHttpClientFactory factory, HttpContext context) =>
 {
-    if (!Authorized(context))
-        return Results.Unauthorized();
-    using var client = factory.CreateClient("hermes");
-    AttachBackendKey(client);
-    using var response = await client.GetAsync($"{backendUrl}/learning-growth");
-    var body = await response.Content.ReadAsStringAsync();
-    return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
+    return await ProxyGetJson(factory, context, "/learning-growth");
 });
 
 app.MapGet("/learning-state", async (IHttpClientFactory factory, HttpContext context) =>
@@ -193,24 +195,12 @@ app.MapGet("/learning-state", async (IHttpClientFactory factory, HttpContext con
 
 app.MapGet("/cpp-kernel-status", async (IHttpClientFactory factory, HttpContext context) =>
 {
-    if (!Authorized(context))
-        return Results.Unauthorized();
-    using var client = factory.CreateClient("hermes");
-    AttachBackendKey(client);
-    using var response = await client.GetAsync($"{backendUrl}/cpp-kernel-status");
-    var body = await response.Content.ReadAsStringAsync();
-    return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
+    return await ProxyGetJson(factory, context, "/cpp-kernel-status");
 });
 
 app.MapGet("/knowledge-mesh", async (IHttpClientFactory factory, HttpContext context) =>
 {
-    if (!Authorized(context))
-        return Results.Unauthorized();
-    using var client = factory.CreateClient("hermes");
-    AttachBackendKey(client);
-    using var response = await client.GetAsync($"{backendUrl}/knowledge-mesh");
-    var body = await response.Content.ReadAsStringAsync();
-    return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
+    return await ProxyGetJson(factory, context, "/knowledge-mesh");
 });
 
 app.MapGet("/unified-config", (HttpContext context) =>
@@ -239,25 +229,15 @@ app.MapGet("/unified-config", (HttpContext context) =>
 
 app.MapPost("/simulate", async (IHttpClientFactory factory, SimulateRequest request, HttpContext context) =>
 {
-    if (!Authorized(context))
-        return Results.Unauthorized();
-    using var client = factory.CreateClient("hermes");
-    AttachBackendKey(client);
-    using var response = await client.PostAsJsonAsync(
-        $"{backendUrl}/simulate",
-        new { steps = request.Steps, specialty = request.Specialty });
-    var body = await response.Content.ReadAsStringAsync();
-    return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
+    return await ProxyPostJson(factory, context, "/simulate", new { steps = request.Steps, specialty = request.Specialty });
 });
 
 app.MapPost("/learning-pulse", async (IHttpClientFactory factory, LearningPulseRequest request, HttpContext context) =>
 {
-    if (!Authorized(context))
-        return Results.Unauthorized();
-    using var client = factory.CreateClient("hermes");
-    AttachBackendKey(client);
-    using var response = await client.PostAsJsonAsync(
-        $"{backendUrl}/learning-pulse",
+    return await ProxyPostJson(
+        factory,
+        context,
+        "/learning-pulse",
         new
         {
             specialty = request.Specialty,
@@ -268,21 +248,15 @@ app.MapPost("/learning-pulse", async (IHttpClientFactory factory, LearningPulseR
             llm_signal = request.LlmSignal,
             stability_bias = request.StabilityBias,
         });
-    var body = await response.Content.ReadAsStringAsync();
-    return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
 });
 
 app.MapPost("/optimize-fleet", async (IHttpClientFactory factory, OptimizeFleetRequest request, HttpContext context) =>
 {
-    if (!Authorized(context))
-        return Results.Unauthorized();
-    using var client = factory.CreateClient("hermes");
-    AttachBackendKey(client);
-    using var response = await client.PostAsJsonAsync(
-        $"{backendUrl}/optimize-fleet",
+    return await ProxyPostJson(
+        factory,
+        context,
+        "/optimize-fleet",
         new { specialty = request.Specialty, candidates = request.Candidates });
-    var body = await response.Content.ReadAsStringAsync();
-    return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
 });
 
 app.MapPost("/runtime-orchestrate/deploy", async (IHttpClientFactory factory, RuntimeDeployRequest request, HttpContext context) =>
@@ -370,12 +344,10 @@ app.MapPost("/runtime-bridge/transfer", async (IHttpClientFactory factory, Runti
 
 app.MapPost("/curate-learning", async (IHttpClientFactory factory, CurateLearningRequest request, HttpContext context) =>
 {
-    if (!Authorized(context))
-        return Results.Unauthorized();
-    using var client = factory.CreateClient("hermes");
-    AttachBackendKey(client);
-    using var response = await client.PostAsJsonAsync(
-        $"{backendUrl}/curate-learning",
+    return await ProxyPostJson(
+        factory,
+        context,
+        "/curate-learning",
         new
         {
             sql_signal = request.SqlSignal,
@@ -383,21 +355,15 @@ app.MapPost("/curate-learning", async (IHttpClientFactory factory, CurateLearnin
             llm_signal = request.LlmSignal,
             stability_bias = request.StabilityBias,
         });
-    var body = await response.Content.ReadAsStringAsync();
-    return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
 });
 
 app.MapPost("/dedupe-optimize", async (IHttpClientFactory factory, DedupeRequest request, HttpContext context) =>
 {
-    if (!Authorized(context))
-        return Results.Unauthorized();
-    using var client = factory.CreateClient("hermes");
-    AttachBackendKey(client);
-    using var response = await client.PostAsJsonAsync(
-        $"{backendUrl}/dedupe-optimize",
+    return await ProxyPostJson(
+        factory,
+        context,
+        "/dedupe-optimize",
         new { roots = request.Roots, max_file_mb = request.MaxFileMb });
-    var body = await response.Content.ReadAsStringAsync();
-    return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
 });
 
 app.MapPost("/llm-chat", async (IHttpClientFactory factory, HttpContext context) =>
@@ -412,10 +378,10 @@ app.MapPost("/llm-chat", async (IHttpClientFactory factory, HttpContext context)
     var model = payload.TryGetProperty("model", out var modelNode) ? modelNode.GetString() : null;
     var temperature = payload.TryGetProperty("temperature", out var tempNode) && tempNode.TryGetDouble(out var t) ? t : 0.3;
     var maxTokens = payload.TryGetProperty("max_tokens", out var tokNode) && tokNode.TryGetInt32(out var mt) ? mt : 512;
-    using var client = factory.CreateClient("hermes");
-    AttachBackendKey(client);
-    using var response = await client.PostAsJsonAsync(
-        $"{backendUrl}/llm-chat",
+    return await ProxyPostJson(
+        factory,
+        context,
+        "/llm-chat",
         new
         {
             prompt,
@@ -424,43 +390,23 @@ app.MapPost("/llm-chat", async (IHttpClientFactory factory, HttpContext context)
             temperature,
             max_tokens = maxTokens,
         });
-    var body = await response.Content.ReadAsStringAsync();
-    return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
 });
 
 app.MapPost("/learning-state/import", async (IHttpClientFactory factory, HttpContext context) =>
 {
-    if (!Authorized(context))
-        return Results.Unauthorized();
     var payload = await context.Request.ReadFromJsonAsync<JsonElement>();
-    using var client = factory.CreateClient("hermes");
-    AttachBackendKey(client);
-    using var response = await client.PostAsJsonAsync($"{backendUrl}/learning-state/import", payload);
-    var body = await response.Content.ReadAsStringAsync();
-    return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
+    return await ProxyPostJson(factory, context, "/learning-state/import", payload);
 });
 
 app.MapPost("/ingest-knowledge-mesh", async (IHttpClientFactory factory, HttpContext context) =>
 {
-    if (!Authorized(context))
-        return Results.Unauthorized();
     var payload = await context.Request.ReadFromJsonAsync<JsonElement>();
-    using var client = factory.CreateClient("hermes");
-    AttachBackendKey(client);
-    using var response = await client.PostAsJsonAsync($"{backendUrl}/ingest-knowledge-mesh", payload);
-    var body = await response.Content.ReadAsStringAsync();
-    return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
+    return await ProxyPostJson(factory, context, "/ingest-knowledge-mesh", payload);
 });
 
 app.MapGet("/aihub-bonus", async (IHttpClientFactory factory, HttpContext context) =>
 {
-    if (!Authorized(context))
-        return Results.Unauthorized();
-    using var client = factory.CreateClient("hermes");
-    AttachBackendKey(client);
-    using var response = await client.GetAsync($"{backendUrl}/aihub-bonus");
-    var body = await response.Content.ReadAsStringAsync();
-    return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
+    return await ProxyGetJson(factory, context, "/aihub-bonus");
 });
 
 app.Run("http://0.0.0.0:8788");
