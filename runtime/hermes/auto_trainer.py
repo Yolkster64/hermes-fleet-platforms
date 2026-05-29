@@ -38,6 +38,16 @@ def run_cycle() -> None:
             json={"specialty": SPECIALTY, "candidates": 100},
             timeout=60,
         ).raise_for_status()
+        requests.post(
+            f"{API_BASE}/curate-learning",
+            json={
+                "sql_signal": data.get("avg_quantized_compression_score", 0.5),
+                "internet_signal": data.get("avg_fleet_shape_score", 0.5),
+                "llm_signal": data.get("avg_knaa_qnaa_score", 0.5),
+                "stability_bias": data.get("avg_truth_score", 0.6),
+            },
+            timeout=30,
+        ).raise_for_status()
     print(
         f"[auto-trainer] steps={data.get('steps')} "
         f"avg_reward={data.get('avg_reward_score'):.4f} "

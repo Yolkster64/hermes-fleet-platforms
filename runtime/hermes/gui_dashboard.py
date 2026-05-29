@@ -66,6 +66,18 @@ with col2:
             st.json(response.json())
         except Exception as exc:
             st.error(f"Fleet optimization failed: {exc}")
+    if st.button("Curate learning sources"):
+        try:
+            response = requests.post(
+                f"{API_BASE}/curate-learning",
+                json={"sql_signal": 0.75, "internet_signal": 0.55, "llm_signal": 0.70, "stability_bias": 0.72},
+                timeout=30,
+            )
+            response.raise_for_status()
+            st.success("Learning curation completed.")
+            st.json(response.json())
+        except Exception as exc:
+            st.error(f"Curation failed: {exc}")
 
 st.subheader("Recent SQL horizon metrics")
 rows = read_latest_scores()

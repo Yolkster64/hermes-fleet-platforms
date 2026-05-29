@@ -53,6 +53,11 @@ public sealed class NativeHermesLearningBridge
         double diversity,
         double memoryRetention);
 
+    [DllImport(NativeDll, EntryPoint = "hermes_quantized_compression_score", CallingConvention = CallingConvention.Cdecl)]
+    private static extern double HermesQuantizedCompressionScoreNative(
+        double[] values,
+        nuint valueLen);
+
     /// <summary>
     /// Computes reward using native C++ kernels when available.
     /// </summary>
@@ -205,6 +210,23 @@ public sealed class NativeHermesLearningBridge
         }
     }
 
+    public double ComputeQuantizedCompressionScore(double[] values)
+    {
+        var safeValues = values ?? Array.Empty<double>();
+        try
+        {
+            return HermesQuantizedCompressionScoreNative(safeValues, (nuint)safeValues.Length);
+        }
+        catch (DllNotFoundException)
+        {
+            return ComputeQuantizedCompressionManagedFallback(safeValues);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return ComputeQuantizedCompressionManagedFallback(safeValues);
+        }
+    }
+
     private static double ComputeKnaaQnaaManagedFallback(
         double[] shortValues,
         double[] midValues,
@@ -249,6 +271,35 @@ public sealed class NativeHermesLearningBridge
             (retentionFactor * 0.10d),
             0.0d,
             1.0d);
+    }
+
+    private static double ComputeQuantizedCompressionManagedFallback(double[] values)
+    {
+        if (values.Length == 0)
+            return 0.0d;
+
+        var minV = values.Min();
+        var maxV = values.Max();
+        var range = Math.Max(0.000001d, maxV - minV);
+        var deq = new double[values.Length];
+        for (var i = 0; i < values.Length; i++)
+        {
+            var norm = Math.Clamp((values[i] - minV) / range, 0.0d, 1.0d);
+            var q = Math.Round(norm * 255.0d);
+            deq[i] = minV + ((q / 255.0d) * range);
+        }
+
+        var mse = 0.0d;
+        for (var i = 0; i < values.Length; i++)
+        {
+            var d = values[i] - deq[i];
+            mse += d * d;
+        }
+
+        mse /= values.Length;
+        var fidelity = 1.0d / (1.0d + (mse * 200.0d));
+        var compressionRatio = 1.0d - (8.0d / 64.0d);
+        return Math.Clamp((fidelity * 0.72d) + (compressionRatio * 0.28d), 0.0d, 1.0d);
     }
 
     private static double Sigmoid(double value) => 1.0d / (1.0d + Math.Exp(-value));
