@@ -10,6 +10,7 @@
 This runtime enables:
 - QNAA/KNAA training simulations through `/simulate` and `/horizon-tests`
 - SQL telemetry in `runtime/auto/hermes_super_orchestrator.db`
+- Continuous fleet auto-training via `hermes-trainer` service
 - Resource targeting via env vars:
   - `HERMES_GPU_TARGET_UTILIZATION` (default `0.75`)
   - `HERMES_CPU_TARGET_UTILIZATION` (default `0.80`)

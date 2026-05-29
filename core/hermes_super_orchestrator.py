@@ -271,6 +271,7 @@ class HermesSuperOrchestrator:
             "q_table": {},  # (specialty, bin) -> value
             "beta_priors": {},  # specialty -> (alpha, beta)
             "horizon_memory": {"short": [], "mid": [], "long": []},
+            "knaa_qnaa_memory": [],
         }
         self.goal_shape_targets = {
             "quality": (0.90, 0.62, 0.52),
@@ -374,6 +375,32 @@ class HermesSuperOrchestrator:
             sigma=sigma,
         )
 
+    def _knaa_qnaa_score(
+        self,
+        short_variables: Dict[str, float],
+        mid_variables: Dict[str, float],
+        long_variables: Dict[str, float],
+        truth_score: float,
+        reward_score: float,
+    ) -> float:
+        short_values = [max(0.0, min(1.0, v)) for v in short_variables.values()]
+        mid_values = [max(0.0, min(1.0, v)) for v in mid_variables.values()]
+        long_values = [max(0.0, min(1.0, v)) for v in long_variables.values()]
+        exploration_rate = max(0.01, min(0.6, 1.0 - truth_score))
+        score = self.native_bridge.knaa_qnaa_score(
+            short_values=short_values,
+            mid_values=mid_values,
+            long_values=long_values,
+            truth_score=truth_score,
+            reward_score=reward_score,
+            exploration_rate=exploration_rate,
+        )
+        mem = self.algorithm_state["knaa_qnaa_memory"]
+        mem.append(score)
+        if len(mem) > 2000:
+            del mem[: len(mem) - 2000]
+        return score
+
     def _natural_selection(self) -> None:
         inactive_candidates = [a for a in self.agents if a.success_rate < 0.2 and a.reward_score < 0.1]
         if inactive_candidates and len(self.agents) > 6:
@@ -451,6 +478,14 @@ class HermesSuperOrchestrator:
                 + mid_variables["agent_alignment"] * 0.02
                 + long_variables["retention_score"] * 0.03
             )
+            knaa_qnaa_score = self._knaa_qnaa_score(
+                short_variables=short_variables,
+                mid_variables=mid_variables,
+                long_variables=long_variables,
+                truth_score=truth_score,
+                reward_score=agent.reward_score / 10.0,
+            )
+            objective_score += knaa_qnaa_score * 0.12
             objective_score = (objective_score * 0.55) + (self._multi_objective_score(outcome) * 0.45)
             delta = self._truth_gate_adjustment(objective_score, truth_score)
 
@@ -488,6 +523,7 @@ class HermesSuperOrchestrator:
                 "short_variables": short_variables,
                 "mid_variables": mid_variables,
                 "long_variables": long_variables,
+                "knaa_qnaa_score": knaa_qnaa_score,
                 "objective_score": objective_score,
                 "reward_score": agent.reward_score,
                 "success_rate": agent.success_rate,
@@ -511,6 +547,7 @@ class HermesSuperOrchestrator:
         avg_short = sum(r["short_score"] for r in results) / len(results)
         avg_mid = sum(r["mid_score"] for r in results) / len(results)
         avg_long = sum(r["long_score"] for r in results) / len(results)
+        avg_knaa_qnaa = sum(r["knaa_qnaa_score"] for r in results) / len(results)
         truth_violations = len([r for r in results if r["truth_score"] < self.truth_threshold])
         return {
             "steps": steps,
@@ -522,6 +559,7 @@ class HermesSuperOrchestrator:
             "avg_short_score": avg_short,
             "avg_mid_score": avg_mid,
             "avg_long_score": avg_long,
+            "avg_knaa_qnaa_score": avg_knaa_qnaa,
             "truth_violations": truth_violations,
             "reward_weights": self.reward_weights,
         }
@@ -593,6 +631,7 @@ class HermesSuperOrchestrator:
         return {
             "resource_pressure": p,
             "reward_weights": self.reward_weights,
+            "knaa_qnaa_memory_tail": self.algorithm_state["knaa_qnaa_memory"][-20:],
             "agents": [asdict(a) for a in self.agents],
             "recent_events": self.store.recent_events(limit=10),
         }

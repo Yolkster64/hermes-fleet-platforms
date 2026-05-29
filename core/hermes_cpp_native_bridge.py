@@ -35,6 +35,21 @@ class HermesCppNativeBridge:
             c_double,
         ]
         self._dll.hermes_gaussian_3d_score.restype = c_double
+        try:
+            self._dll.hermes_knaa_qnaa_score.argtypes = [
+                ctypes.POINTER(c_double),
+                c_size_t,
+                ctypes.POINTER(c_double),
+                c_size_t,
+                ctypes.POINTER(c_double),
+                c_size_t,
+                c_double,
+                c_double,
+                c_double,
+            ]
+            self._dll.hermes_knaa_qnaa_score.restype = c_double
+        except AttributeError:
+            pass
 
     @property
     def available(self) -> bool:
@@ -49,7 +64,7 @@ class HermesCppNativeBridge:
         novelty: float,
         weights: list[float],
     ) -> float:
-        if not self._dll:
+        if not self._dll or not hasattr(self._dll, "hermes_knaa_qnaa_score"):
             score = (
                 quality * weights[0]
                 + speed * weights[1]
@@ -101,5 +116,43 @@ class HermesCppNativeBridge:
                 c_double(target_y),
                 c_double(target_z),
                 c_double(sigma),
+            )
+        )
+
+    def knaa_qnaa_score(
+        self,
+        short_values: list[float],
+        mid_values: list[float],
+        long_values: list[float],
+        truth_score: float,
+        reward_score: float,
+        exploration_rate: float = 0.1,
+    ) -> float:
+        if not self._dll:
+            short_avg = sum(short_values) / max(1, len(short_values))
+            mid_avg = sum(mid_values) / max(1, len(mid_values))
+            long_avg = sum(long_values) / max(1, len(long_values))
+            knaa = (short_avg * 0.42) + (mid_avg * 0.34) + (long_avg * 0.24)
+            qnaa = (
+                (1.0 / (1.0 + pow(2.718281828, -((truth_score - 0.5) * 7.0)))) * 0.62
+                + (1.0 / (1.0 + pow(2.718281828, -((reward_score - 0.5) * 5.0)))) * 0.38
+            )
+            explore = max(0.0, min(1.0, exploration_rate)) * 0.14
+            return max(0.0, min(1.0, (knaa * 0.64) + (qnaa * 0.36) + explore))
+
+        short_arr = (c_double * len(short_values))(*short_values)
+        mid_arr = (c_double * len(mid_values))(*mid_values)
+        long_arr = (c_double * len(long_values))(*long_values)
+        return float(
+            self._dll.hermes_knaa_qnaa_score(
+                short_arr,
+                c_size_t(len(short_values)),
+                mid_arr,
+                c_size_t(len(mid_values)),
+                long_arr,
+                c_size_t(len(long_values)),
+                c_double(truth_score),
+                c_double(reward_score),
+                c_double(exploration_rate),
             )
         )

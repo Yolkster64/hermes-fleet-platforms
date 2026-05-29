@@ -38,3 +38,20 @@ services:
     volumes:
       - ../../:/workspace
       - ../auto:/workspace/runtime/auto
+
+  hermes-trainer:
+    build:
+      context: ../..
+      dockerfile: runtime/hermes/Dockerfile
+    container_name: hermes-trainer
+    command: python runtime/hermes/auto_trainer.py
+    environment:
+      HERMES_API_BASE_URL: http://hermes-api:8787
+      HERMES_TRAIN_SPECIALTY: fleet
+      HERMES_TRAIN_STEPS: "500"
+      HERMES_TRAIN_INTERVAL_SECONDS: "15"
+    depends_on:
+      - hermes-api
+    volumes:
+      - ../../:/workspace
+      - ../auto:/workspace/runtime/auto
