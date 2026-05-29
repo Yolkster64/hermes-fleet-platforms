@@ -35,9 +35,15 @@ This runtime enables:
   - 25-skill agent system with 3 active skills per Hermes unit
   - Learning Space text panel (prompt -> Hermes response)
   - Automatic Learning Zone with timed smart cycles
+  - Intelligent shuffle mode that adapts each automatic cycle using recent learned fleet profile
+  - Bidirectional carryover controls:
+    - `Send GUI Profile to Fleet` writes current GUI strategy/technique profile into `/ingest-signal`
+    - `Apply Fleet Learned Profile` imports latest learned profile from fleet signals back into GUI controls
+  - Live trend charts for AIHub bonus memory and fleet score trajectory
   - Visual learning flow diagram + multiple XP bars
   - Fleet Data section (`/snapshot`) for live runtime context (raw hidden by default)
   - Fleet Summary text and instant Fleet Health Report action
+  - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
   - Deep Auto Learning Zone (`♾️`) with study-area targeting and multi-round comparison
   - Advanced intelligence controls: KNAA/QNAA, quantization, multi-parallel swarm, multipolar strategy, gaussian pressure, permanent memory mode
   - Full auto cycle button (simulate + pulse + optimize + curate + dedupe)

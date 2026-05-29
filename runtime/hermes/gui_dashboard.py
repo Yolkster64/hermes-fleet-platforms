@@ -97,23 +97,25 @@ def pull_metric(payload: Any, names: Tuple[str, ...], default: float = 0.0) -> f
 
 
 def build_technique_profile(
-    techniques: List[str], swarm_strategy: str, micro_agents: int, gaussian_pressure: float, permanent_intelligence: bool
+    techniques: List[str], swarm_strategy: str, micro_agents: int, gaussian_pressure: float, permanent_intelligence: bool, high_level_learning: float
 ) -> Dict[str, Any]:
     has_knaa = "KNAA/QNAA reasoning" in techniques
     has_quant = "Quantized compression" in techniques
     has_parallel = "Multi-parallel swarm" in techniques
     has_multipolar = "Multipolar ensemble" in techniques
     has_natural = "Natural pressure adaptation" in techniques
+    learning_bias = max(0.0, min(1.0, high_level_learning))
     return {
         "techniques": techniques,
         "swarm_strategy": swarm_strategy,
         "micro_agents": micro_agents,
         "gaussian_pressure": gaussian_pressure,
         "permanent_intelligence": permanent_intelligence,
-        "sql_signal": min(0.98, 0.80 + (0.06 if has_knaa else 0.0) + (0.04 if has_natural else 0.0)),
-        "internet_signal": min(0.98, 0.78 + (0.10 if has_parallel else 0.0) + (0.06 if has_multipolar else 0.0)),
-        "llm_signal": min(0.99, 0.82 + (0.07 if has_knaa else 0.0) + (0.05 if has_quant else 0.0)),
-        "stability_bias": min(0.96, 0.74 + (0.08 if permanent_intelligence else 0.0) + (0.06 if has_quant else 0.0)),
+        "high_level_learning": learning_bias,
+        "sql_signal": min(0.98, 0.80 + (0.06 if has_knaa else 0.0) + (0.04 if has_natural else 0.0) + (learning_bias * 0.04)),
+        "internet_signal": min(0.98, 0.78 + (0.10 if has_parallel else 0.0) + (0.06 if has_multipolar else 0.0) + (learning_bias * 0.06)),
+        "llm_signal": min(0.99, 0.82 + (0.07 if has_knaa else 0.0) + (0.05 if has_quant else 0.0) + (learning_bias * 0.05)),
+        "stability_bias": min(0.96, 0.72 + (0.10 if permanent_intelligence else 0.0) + (0.06 if has_quant else 0.0) + ((1.0 - learning_bias) * 0.08)),
     }
 
 
@@ -301,6 +303,32 @@ digraph learning {
     )
 
 
+def latest_learned_profile(snapshot_data: Dict[str, Any]) -> Dict[str, Any]:
+    signals = snapshot_data.get("external_signals_tail", [])
+    for item in signals:
+        payload = item.get("payload", {})
+        if not isinstance(payload, dict):
+            continue
+        if "high_level_learning" in payload or "strategy" in payload or "swarm_strategy" in payload:
+            return payload
+    return {}
+
+
+def fleet_score_history(snapshot_data: Dict[str, Any]) -> List[float]:
+    scores: List[float] = []
+    for event in reversed(snapshot_data.get("recent_events", [])):
+        payload = event.get("payload", {})
+        if not isinstance(payload, dict):
+            continue
+        reward = payload.get("reward_score")
+        truth = payload.get("truth_score")
+        shape = payload.get("fleet_shape_score")
+        if isinstance(reward, (int, float)) and isinstance(truth, (int, float)) and isinstance(shape, (int, float)):
+            score = max(0.0, min(100.0, ((float(reward) * 0.35) + (float(truth) * 0.35) + (float(shape) * 0.30)) * 100.0))
+            scores.append(score)
+    return scores
+
+
 st.set_page_config(page_title="Hermes Super Easy", page_icon="🧠", layout="wide")
 st.title("Hermes Fleet Command Center")
 st.caption("Super simple dashboard: what is happening now, how learning works, and one-click actions.")
@@ -311,6 +339,20 @@ if "auto_boot_done" not in st.session_state:
     st.session_state["auto_boot_done"] = False
 if "last_chat" not in st.session_state:
     st.session_state["last_chat"] = ""
+if "ctl_study_areas" not in st.session_state:
+    st.session_state["ctl_study_areas"] = ["Optimization", "AIHub", "Truth & Safety", "Fleet Topology"]
+if "ctl_techniques" not in st.session_state:
+    st.session_state["ctl_techniques"] = ["KNAA/QNAA reasoning", "Quantized compression", "Multi-parallel swarm", "Multipolar ensemble", "Natural pressure adaptation"]
+if "ctl_swarm_strategy" not in st.session_state:
+    st.session_state["ctl_swarm_strategy"] = "hybrid"
+if "ctl_micro_agents" not in st.session_state:
+    st.session_state["ctl_micro_agents"] = 128
+if "ctl_gaussian_pressure" not in st.session_state:
+    st.session_state["ctl_gaussian_pressure"] = 0.88
+if "ctl_permanent_intelligence" not in st.session_state:
+    st.session_state["ctl_permanent_intelligence"] = True
+if "ctl_high_level_learning" not in st.session_state:
+    st.session_state["ctl_high_level_learning"] = 0.72
 
 with st.sidebar:
     st.subheader("Easy Connection")
@@ -356,7 +398,7 @@ max_mode = mode == "Near Max Hermes"
 study_areas = st.multiselect(
     "Study Areas",
     ["Security", "Optimization", "AIHub", "Fleet Topology", "Learning Retention", "Truth & Safety", "Internet Signals", "Cost Efficiency"],
-    default=["Optimization", "AIHub", "Truth & Safety", "Fleet Topology"],
+    key="ctl_study_areas",
 )
 with st.expander("Advanced Intelligence Techniques"):
     techniques = st.multiselect(
@@ -369,12 +411,19 @@ with st.expander("Advanced Intelligence Techniques"):
             "Natural pressure adaptation",
             "Cross-agent communication mesh",
         ],
-        default=["KNAA/QNAA reasoning", "Quantized compression", "Multi-parallel swarm", "Multipolar ensemble", "Natural pressure adaptation"],
+        key="ctl_techniques",
     )
-    swarm_strategy = st.selectbox("Swarm strategy", ["hybrid", "swarm", "mesh", "multipolar", "specialist-mix"], index=0)
-    micro_agents = st.slider("Micro Hermes agents", min_value=16, max_value=256, value=128, step=16)
-    gaussian_pressure = st.slider("Gaussian learning pressure", min_value=0.40, max_value=1.00, value=0.88, step=0.02)
-    permanent_intelligence = st.checkbox("Permanent intelligence memory mode", value=True)
+    swarm_strategy = st.selectbox("Swarm strategy", ["hybrid", "swarm", "mesh", "multipolar", "specialist-mix"], key="ctl_swarm_strategy")
+    micro_agents = st.slider("Micro Hermes agents", min_value=16, max_value=256, step=16, key="ctl_micro_agents")
+    gaussian_pressure = st.slider("Gaussian learning pressure", min_value=0.40, max_value=1.00, step=0.02, key="ctl_gaussian_pressure")
+    permanent_intelligence = st.checkbox("Permanent intelligence memory mode", key="ctl_permanent_intelligence")
+    high_level_learning = st.slider(
+        "High-level learning focus (performance -> long-term learning)",
+        min_value=0.0,
+        max_value=1.0,
+        step=0.01,
+        key="ctl_high_level_learning",
+    )
 
 technique_profile = build_technique_profile(
     techniques=techniques,
@@ -382,13 +431,64 @@ technique_profile = build_technique_profile(
     micro_agents=micro_agents,
     gaussian_pressure=gaussian_pressure,
     permanent_intelligence=permanent_intelligence,
+    high_level_learning=high_level_learning,
 )
 st.caption(
     "Active upgrades: "
     f"{', '.join(technique_profile['techniques']) if technique_profile['techniques'] else 'standard'} | "
-    f"swarm={technique_profile['swarm_strategy']} | micro_agents={technique_profile['micro_agents']}"
+    f"swarm={technique_profile['swarm_strategy']} | micro_agents={technique_profile['micro_agents']} | "
+    f"high_level_learning={technique_profile['high_level_learning']:.2f}"
 )
 st.caption("Agent skill system: 25 total skills, 3 active skills per Hermes unit.")
+
+learned_profile = latest_learned_profile(snapshot)
+sync1, sync2, sync3 = st.columns([1.1, 1.1, 2.2])
+with sync1:
+    if st.button("Send GUI Profile to Fleet", use_container_width=True):
+        gui_sync_payload = {
+            "source": "gui_profile",
+            "signal_score": max(0.0, min(1.0, 0.55 + (technique_profile["high_level_learning"] * 0.25))),
+            "payload": {
+                "swarm_strategy": technique_profile["swarm_strategy"],
+                "micro_agents": technique_profile["micro_agents"],
+                "gaussian_pressure": technique_profile["gaussian_pressure"],
+                "high_level_learning": technique_profile["high_level_learning"],
+                "techniques": technique_profile["techniques"],
+                "study_areas": study_areas,
+            },
+        }
+        _, sync_err = safe_post("/ingest-signal", gui_sync_payload, timeout=60)
+        if sync_err:
+            st.error(f"Sync failed: {sync_err}")
+        else:
+            st.success("GUI profile synced to fleet memory.")
+with sync2:
+    if st.button("Apply Fleet Learned Profile", use_container_width=True):
+        if learned_profile:
+            st.session_state["ctl_swarm_strategy"] = str(learned_profile.get("swarm_strategy", learned_profile.get("strategy", st.session_state["ctl_swarm_strategy"])))
+            micro_val = learned_profile.get("micro_agents", st.session_state["ctl_micro_agents"])
+            if isinstance(micro_val, (int, float)):
+                st.session_state["ctl_micro_agents"] = int(max(16, min(256, micro_val)))
+            gp_val = learned_profile.get("gaussian_pressure", learned_profile.get("dynamic_chaos", st.session_state["ctl_gaussian_pressure"]))
+            if isinstance(gp_val, (int, float)):
+                st.session_state["ctl_gaussian_pressure"] = float(max(0.40, min(1.00, gp_val)))
+            hll_val = learned_profile.get("high_level_learning", st.session_state["ctl_high_level_learning"])
+            if isinstance(hll_val, (int, float)):
+                st.session_state["ctl_high_level_learning"] = float(max(0.0, min(1.0, hll_val)))
+            if isinstance(learned_profile.get("techniques"), list) and learned_profile.get("techniques"):
+                st.session_state["ctl_techniques"] = [str(t) for t in learned_profile["techniques"][:6]]
+            st.success("Fleet learned profile applied to GUI controls.")
+            st.rerun()
+        else:
+            st.warning("No learned profile found in recent fleet signals.")
+with sync3:
+    if learned_profile:
+        st.caption(
+            f"Carryover active: strategy={learned_profile.get('swarm_strategy', learned_profile.get('strategy', 'hybrid'))}, "
+            f"high_level_learning={float(learned_profile.get('high_level_learning', 0.0)):.2f}"
+        )
+    else:
+        st.caption("Carryover ready: run an auto cycle to generate learned profile signals.")
 
 fleet_reward = pull_metric(snapshot, ("avg_reward_score", "reward_score", "reward"), default=0.0)
 fleet_truth = pull_metric(snapshot, ("avg_truth_score", "truth_score", "truth"), default=0.0)
@@ -406,6 +506,18 @@ with xp3:
     render_xp_bar("Truth XP", fleet_truth, "#5DADE2")
 with xp4:
     render_xp_bar("Fleet Shape XP", fleet_shape, "#AF7AC5")
+
+trend1, trend2 = st.columns(2)
+with trend1:
+    st.caption("AIHub bonus memory (recent)")
+    bonus_tail = snapshot.get("aihub_bonus_memory_tail", [])[-20:]
+    if bonus_tail:
+        st.line_chart(bonus_tail)
+with trend2:
+    st.caption("Fleet score trend (recent)")
+    score_tail = fleet_score_history(snapshot)
+    if score_tail:
+        st.line_chart(score_tail[-20:])
 
 summary_left, summary_right = st.columns([2, 1])
 with summary_left:
@@ -497,11 +609,36 @@ with act5:
 st.subheader("Automatic Learning Zone")
 auto_enabled = st.checkbox("Always run automatic smart learning", value=True)
 auto_interval = st.slider("Auto interval (seconds)", min_value=20, max_value=300, value=45, step=5)
+intelligent_shuffle = st.checkbox("Intelligent shuffle + adaptive profile each cycle", value=True)
 if "last_auto_run_ts" not in st.session_state:
     st.session_state["last_auto_run_ts"] = 0.0
 now_ts = time.time()
 if auto_enabled and (now_ts - float(st.session_state.get("last_auto_run_ts", 0.0))) >= auto_interval:
-    auto_result = run_auto_cycle(max_mode=max_mode, technique=technique_profile)
+    auto_profile = dict(technique_profile)
+    if intelligent_shuffle and learned_profile:
+        learned_hll = float(learned_profile.get("high_level_learning", auto_profile["high_level_learning"]))
+        auto_profile["high_level_learning"] = max(0.0, min(1.0, (auto_profile["high_level_learning"] * 0.65) + (learned_hll * 0.35)))
+        if isinstance(learned_profile.get("swarm_strategy"), str):
+            auto_profile["swarm_strategy"] = learned_profile["swarm_strategy"]
+        if isinstance(learned_profile.get("micro_agents"), (int, float)):
+            auto_profile["micro_agents"] = int(max(16, min(256, learned_profile["micro_agents"])))
+    auto_result = run_auto_cycle(max_mode=max_mode, technique=auto_profile)
+    safe_post(
+        "/ingest-signal",
+        {
+            "source": "gui_auto_sync",
+            "signal_score": max(0.0, min(1.0, 0.52 + (auto_profile["high_level_learning"] * 0.28))),
+            "payload": {
+                "swarm_strategy": auto_profile["swarm_strategy"],
+                "micro_agents": auto_profile["micro_agents"],
+                "gaussian_pressure": auto_profile["gaussian_pressure"],
+                "high_level_learning": auto_profile["high_level_learning"],
+                "techniques": auto_profile["techniques"],
+                "mode": "auto_cycle",
+            },
+        },
+        timeout=60,
+    )
     log_text("automatic-learning-zone", auto_result)
     st.session_state["last_auto_run_ts"] = now_ts
     st.info("Automatic smart learning cycle executed.")

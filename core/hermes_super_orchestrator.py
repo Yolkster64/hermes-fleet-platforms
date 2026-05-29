@@ -304,6 +304,29 @@ class SqlTelemetryStore:
             return 0.5
         return sum(r[0] for r in rows) / len(rows)
 
+    def recent_external_signals(self, limit: int = 20) -> List[Dict]:
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT ts, source, signal_score, payload_compressed
+                FROM external_signals
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        out: List[Dict] = []
+        for ts, source, signal_score, payload in rows:
+            out.append(
+                {
+                    "ts": ts,
+                    "source": source,
+                    "signal_score": signal_score,
+                    "payload": json.loads(zlib.decompress(payload).decode("utf-8")),
+                }
+            )
+        return out
+
     def write_fleet_optimization_run(self, specialty: str, team_shape: str, active_agents: int, score: float, payload: Dict) -> None:
         compressed = zlib.compress(json.dumps(payload).encode("utf-8"))
         with self._conn() as conn:
@@ -1145,6 +1168,7 @@ class HermesSuperOrchestrator:
             "agents": [asdict(a) for a in self.agents],
             "unified_config": self.unified_config,
             "recent_events": self.store.recent_events(limit=10),
+            "external_signals_tail": self.store.recent_external_signals(limit=20),
         }
 
 
