@@ -1,5 +1,7 @@
 import os
 import time
+import math
+import random
 
 import requests
 
@@ -17,6 +19,7 @@ SWARM_STRATEGY = os.getenv("HERMES_SWARM_STRATEGY", "hybrid")
 MICRO_AGENT_COUNT = int(os.getenv("HERMES_MICRO_AGENT_COUNT", "128"))
 GAUSSIAN_PRESSURE = float(os.getenv("HERMES_GAUSSIAN_PRESSURE", "0.88"))
 PERMANENT_INTELLIGENCE = os.getenv("HERMES_PERMANENT_INTELLIGENCE", "true").lower() in ("1", "true", "yes", "on")
+HIGH_LEVEL_LEARNING = max(0.0, min(1.0, float(os.getenv("HERMES_HIGH_LEVEL_LEARNING", "0.70"))))
 SPECIALIST_MODES = [m.strip() for m in os.getenv("HERMES_SPECIALIST_MODES", "swarm,mesh,multipolar,specialist-mix").split(",") if m.strip()]
 AGENT_WORK_STYLES = [s.strip() for s in os.getenv("HERMES_AGENT_WORK_STYLES", "fast_micro,deep_specialist,balanced_hybrid").split(",") if s.strip()]
 AGENT_SKILLS_25 = [
@@ -47,6 +50,23 @@ AGENT_SKILLS_25 = [
     "reliability_engineering",
 ]
 _cycle = 0
+_strategy_memory: dict[str, dict[str, float]] = {
+    "speed": {k: 0.0 for k in ("nano-swarm", "hybrid", "swarm", "mesh", "multipolar", "specialist-mix")},
+    "quality": {k: 0.0 for k in ("nano-swarm", "hybrid", "swarm", "mesh", "multipolar", "specialist-mix")},
+    "recovery": {k: 0.0 for k in ("nano-swarm", "hybrid", "swarm", "mesh", "multipolar", "specialist-mix")},
+    "exploration": {k: 0.0 for k in ("nano-swarm", "hybrid", "swarm", "mesh", "multipolar", "specialist-mix")},
+}
+_evidence_matrix: dict[str, dict[str, float]] = {}
+
+STRATEGY_ALGOS: dict[str, dict[str, float]] = {
+    "nano-swarm": {"sql_boost": 0.05, "internet_boost": 0.09, "llm_boost": 0.06, "stability_boost": -0.02, "step_mult": 0.82, "candidate_mult": 1.35},
+    "hybrid": {"sql_boost": 0.03, "internet_boost": 0.03, "llm_boost": 0.04, "stability_boost": 0.03, "step_mult": 1.00, "candidate_mult": 1.00},
+    "swarm": {"sql_boost": 0.02, "internet_boost": 0.07, "llm_boost": 0.02, "stability_boost": -0.01, "step_mult": 0.90, "candidate_mult": 1.12},
+    "mesh": {"sql_boost": 0.03, "internet_boost": 0.05, "llm_boost": 0.03, "stability_boost": 0.02, "step_mult": 1.02, "candidate_mult": 1.05},
+    "multipolar": {"sql_boost": 0.01, "internet_boost": 0.04, "llm_boost": 0.08, "stability_boost": 0.01, "step_mult": 1.08, "candidate_mult": 0.95},
+    "specialist-mix": {"sql_boost": 0.05, "internet_boost": 0.02, "llm_boost": 0.06, "stability_boost": 0.04, "step_mult": 1.10, "candidate_mult": 0.90},
+}
+_algo_live: dict[str, dict[str, float]] = {k: dict(v) for k, v in STRATEGY_ALGOS.items()}
 
 
 def _headers():
@@ -98,16 +118,225 @@ def _base_signals(data: dict) -> tuple[float, float, float, float]:
         internet_signal = min(0.99, max(internet_signal, 0.89))
         llm_signal = min(0.99, max(llm_signal, 0.92))
         stability_bias = min(0.99, max(stability_bias, 0.83))
-    stability_bias = max(0.55, min(0.99, stability_bias + (GAUSSIAN_PRESSURE * 0.04)))
+    # HIGH_LEVEL_LEARNING near 1.0 biases retention/learning quality; near 0.0 biases raw speed/perf.
+    stability_bias = max(0.55, min(0.99, stability_bias + (GAUSSIAN_PRESSURE * (0.02 + (0.04 * HIGH_LEVEL_LEARNING)))))
+    llm_signal = max(0.60, min(0.99, llm_signal + (0.06 * HIGH_LEVEL_LEARNING)))
+    internet_signal = max(0.55, min(0.99, internet_signal + (0.05 * (1.0 - HIGH_LEVEL_LEARNING))))
     return sql_signal, internet_signal, llm_signal, stability_bias
 
 
-def _smart_actions(data: dict, cycle: int, active_specialty: str, skill_pack: list[str], agent_size: str, dynamic_micro_agents: int) -> None:
+def _chaos_vector(cycle: int, data: dict) -> tuple[float, float, float, float]:
+    reward = float(data.get("avg_reward_score", 0.5))
+    truth = float(data.get("avg_truth_score", 0.6))
+    shape = float(data.get("avg_fleet_shape_score", 0.55))
+    x = math.sin(cycle * 0.31 + reward * 2.7)
+    y = math.cos(cycle * 0.23 + truth * 3.1)
+    z = math.sin(cycle * 0.17 + shape * 2.3)
+    chaos_rate = max(0.02, min(0.35, abs(x * y * z) * (0.4 + (1.0 - HIGH_LEVEL_LEARNING))))
+    return x, y, z, chaos_rate
+
+
+def _occasion_focus(data: dict) -> str:
+    truth = float(data.get("avg_truth_score", 0.7))
+    shape = float(data.get("avg_fleet_shape_score", 0.6))
+    reward = float(data.get("avg_reward_score", 0.6))
+    if truth < 0.63:
+        return "truth-recovery"
+    if shape < 0.56:
+        return "topology-balance"
+    if reward < 0.58:
+        return "reward-boost"
+    return "meta-optimization"
+
+
+def _occasion_type(focus: str) -> str:
+    if focus == "truth-recovery":
+        return "recovery"
+    if focus == "reward-boost":
+        return "speed"
+    if focus == "topology-balance":
+        return "quality"
+    return "exploration"
+
+
+def _pick_strategy(occasion: str, chaos_rate: float, cycle: int) -> str:
+    memory = _strategy_memory.get(occasion, {})
+    if not memory:
+        return SWARM_STRATEGY
+    explore = max(0.12, min(0.40, chaos_rate + (0.05 if cycle % 7 == 0 else 0.0)))
+    if random.random() < explore:
+        return random.choice(list(memory.keys()))
+    return max(memory.items(), key=lambda item: item[1])[0]
+
+
+def _chaotic_factor_pack(chaos_rate: float) -> dict[str, float]:
+    return {
+        "ratio_sql": max(0.70, min(1.30, 1.0 + random.uniform(-1.0, 1.0) * chaos_rate)),
+        "ratio_internet": max(0.70, min(1.30, 1.0 + random.uniform(-1.0, 1.0) * chaos_rate)),
+        "ratio_llm": max(0.70, min(1.30, 1.0 + random.uniform(-1.0, 1.0) * chaos_rate)),
+        "ratio_stability": max(0.75, min(1.25, 1.0 + random.uniform(-1.0, 1.0) * (chaos_rate * 0.7))),
+        "ratio_steps": max(0.70, min(1.35, 1.0 + random.uniform(-1.0, 1.0) * chaos_rate)),
+        "ratio_candidates": max(0.70, min(1.45, 1.0 + random.uniform(-1.0, 1.0) * chaos_rate)),
+    }
+
+
+def _record_evidence(occasion: str, strategy: str, agent_size: str, factors: dict[str, float], reward: float, truth: float, shape: float) -> None:
+    ratio_key = f"{factors['ratio_sql']:.2f}/{factors['ratio_internet']:.2f}/{factors['ratio_llm']:.2f}/{factors['ratio_stability']:.2f}"
+    key = f"{occasion}|{strategy}|{agent_size}|{ratio_key}"
+    score = (reward * 0.45) + (truth * 0.35) + (shape * 0.20)
+    prev = _evidence_matrix.get(key, {}).get("score", 0.0)
+    _evidence_matrix[key] = {
+        "score": max(0.0, min(1.0, (prev * 0.84) + (score * 0.16))),
+        "reward": reward,
+        "truth": truth,
+        "shape": shape,
+        "count": _evidence_matrix.get(key, {}).get("count", 0.0) + 1.0,
+    }
+
+
+def _top_evidence(limit: int = 8) -> list[dict]:
+    items = sorted(_evidence_matrix.items(), key=lambda item: item[1].get("score", 0.0), reverse=True)[:limit]
+    out: list[dict] = []
+    for key, val in items:
+        occasion, strategy, agent_size, ratio_key = key.split("|", 3)
+        out.append(
+            {
+                "occasion": occasion,
+                "strategy": strategy,
+                "agent_size": agent_size,
+                "ratio_key": ratio_key,
+                "score": val.get("score", 0.0),
+                "reward": val.get("reward", 0.0),
+                "truth": val.get("truth", 0.0),
+                "shape": val.get("shape", 0.0),
+                "count": val.get("count", 0.0),
+            }
+        )
+    return out
+
+
+def _comparison_upgrade_pass(occasion: str, focus: str, cycle: int, base_steps: int, base_candidates: int) -> None:
+    contenders = sorted(_strategy_memory.get(occasion, {}).items(), key=lambda item: item[1], reverse=True)
+    top = [s for s, _ in contenders[:3]]
+    if "nano-swarm" not in top:
+        top = ["nano-swarm"] + top[:2]
+    results: list[tuple[str, float]] = []
+    for strategy in top:
+        algo = _algo_live.get(strategy, STRATEGY_ALGOS["hybrid"])
+        try:
+            out = _post(
+                "/learning-pulse",
+                {
+                    "specialty": f"{SPECIALTY}:{strategy}:comparison:{focus}",
+                    "steps": max(80, min(260, int(base_steps * 0.65 * algo["step_mult"]))),
+                    "candidates": max(48, min(220, int(base_candidates * 0.70 * algo["candidate_mult"]))),
+                    "sql_signal": max(0.55, min(0.99, 0.82 + algo["sql_boost"])),
+                    "internet_signal": max(0.55, min(0.99, 0.82 + algo["internet_boost"])),
+                    "llm_signal": max(0.60, min(0.99, 0.86 + algo["llm_boost"])),
+                    "stability_bias": max(0.55, min(0.99, 0.84 + algo["stability_boost"])),
+                },
+                timeout=70,
+            )
+            score = float(out.get("avg_reward", 0.0))
+        except requests.RequestException:
+            score = -1.0
+        results.append((strategy, score))
+    winners = sorted(results, key=lambda item: item[1], reverse=True)
+    if not winners:
+        return
+    winner = winners[0][0]
+    loser = winners[-1][0]
+    tune = 0.008 + (0.006 if focus == "meta-optimization" else 0.0)
+    if winner in _algo_live:
+        _algo_live[winner]["llm_boost"] = max(0.0, min(0.15, _algo_live[winner]["llm_boost"] + tune))
+        _algo_live[winner]["internet_boost"] = max(0.0, min(0.15, _algo_live[winner]["internet_boost"] + (tune * 0.6)))
+    if loser in _algo_live:
+        _algo_live[loser]["stability_boost"] = max(-0.03, min(0.12, _algo_live[loser]["stability_boost"] + (tune * 0.4)))
+        _algo_live[loser]["candidate_mult"] = max(0.75, min(1.50, _algo_live[loser]["candidate_mult"] * 0.995))
+    requests.post(
+        f"{API_BASE}/ingest-signal",
+        json={
+            "source": "auto_trainer.comparison_upgrade",
+            "signal_score": 0.88,
+            "payload": {
+                "cycle": cycle,
+                "occasion": occasion,
+                "focus": focus,
+                "comparison_results": [{"strategy": s, "score": sc} for s, sc in winners],
+                "winner": winner,
+                "loser": loser,
+                "algo_live_winner": _algo_live.get(winner, {}),
+            },
+        },
+        headers=_headers(),
+        timeout=45,
+    ).raise_for_status()
+
+
+def _update_strategy_memory(occasion: str, strategy: str, reward: float, truth: float, shape: float) -> None:
+    if occasion not in _strategy_memory or strategy not in _strategy_memory[occasion]:
+        return
+    score = (reward * 0.45) + (truth * 0.35) + (shape * 0.20)
+    prev = _strategy_memory[occasion][strategy]
+    _strategy_memory[occasion][strategy] = max(0.0, min(1.0, (prev * 0.82) + (score * 0.18)))
+
+
+def _emit_strategy_feedback(
+    cycle: int,
+    focus: str,
+    occasion: str,
+    selected_strategy: str,
+    algo_profile: dict[str, float],
+    dynamic_specialty: str,
+    pulse_steps: int,
+    pulse_candidates: int,
+    sql_signal: float,
+    internet_signal: float,
+    llm_signal: float,
+    stability_bias: float,
+    reward: float,
+    truth: float,
+    shape: float,
+    chaos: tuple[float, float, float, float],
+) -> None:
+    leaderboard = sorted(_strategy_memory.get(occasion, {}).items(), key=lambda item: item[1], reverse=True)
+    requests.post(
+        f"{API_BASE}/ingest-signal",
+        json={
+            "source": "auto_trainer.strategy_learning",
+            "signal_score": max(0.0, min(1.0, (reward * 0.4) + (truth * 0.4) + (shape * 0.2))),
+            "payload": {
+                "cycle": cycle,
+                "focus": focus,
+                "occasion": occasion,
+                "selected_strategy": selected_strategy,
+                "strategy_algorithm": algo_profile,
+                "dynamic_specialty": dynamic_specialty,
+                "recommended_learning_pulse": {
+                    "steps": pulse_steps,
+                    "candidates": pulse_candidates,
+                    "sql_signal": sql_signal,
+                    "internet_signal": internet_signal,
+                    "llm_signal": llm_signal,
+                    "stability_bias": stability_bias,
+                },
+                "score_components": {"reward": reward, "truth": truth, "fleet_shape": shape},
+                "strategy_leaderboard": [{"strategy": s, "score": sc} for s, sc in leaderboard],
+                "evidence_top_combinations": _top_evidence(),
+                "chaos_3d_vector": {"x": chaos[0], "y": chaos[1], "z": chaos[2], "chaos_rate": chaos[3]},
+            },
+        },
+        headers=_headers(),
+        timeout=45,
+    ).raise_for_status()
+
+
+def _smart_actions(data: dict, cycle: int, active_specialty: str, skill_pack: list[str], agent_size: str, dynamic_micro_agents: int, chaos: tuple[float, float, float, float]) -> None:
     if not SMART_ACTIONS:
         return
     advisor_prompt = (
         "Generate one concrete optimization action, one communication mesh action, and one cross-LLM boost action "
-        "to improve Hermes fleet speed/quality. Keep actions short and executable."
+        "to improve Hermes fleet speed/quality with adaptive specialist switching. Keep actions short and executable."
     )
     advisor = _post(
         "/llm-chat",
@@ -128,6 +357,8 @@ def _smart_actions(data: dict, cycle: int, active_specialty: str, skill_pack: li
                 "permanent_intelligence": PERMANENT_INTELLIGENCE,
                 "specialist_modes": SPECIALIST_MODES,
                 "agent_work_styles": AGENT_WORK_STYLES,
+                "high_level_learning": HIGH_LEVEL_LEARNING,
+                "chaos_3d_vector": {"x": chaos[0], "y": chaos[1], "z": chaos[2], "chaos_rate": chaos[3]},
                 "advisor_text": advisor.get("response_text", "")[:1200],
             },
         },
@@ -150,7 +381,8 @@ def run_cycle() -> None:
     _cycle += 1
     active_specialty = _active_specialty(_cycle)
     skill_pack = _selected_skills(_cycle)
-    sim_steps = min(420, max(120, STEPS // 4 if MAX_MODE else STEPS))
+    perf_bias = 1.0 - HIGH_LEVEL_LEARNING
+    sim_steps = min(520, max(120, int((STEPS * (0.20 + (0.30 * perf_bias))) if MAX_MODE else STEPS)))
     data = _post(
         "/simulate",
         {
@@ -160,6 +392,13 @@ def run_cycle() -> None:
         timeout=120,
     )
     signal_score = max(0.0, min(1.0, (data.get("avg_truth_score", 0.5) * 0.6) + (data.get("avg_quality", 0.5) * 0.4)))
+    focus = _occasion_focus(data)
+    occasion = _occasion_type(focus)
+    x, y, z, chaos_rate = _chaos_vector(_cycle, data)
+    selected_strategy = _pick_strategy(occasion, chaos_rate, _cycle)
+    algo_profile = _algo_live.get(selected_strategy, STRATEGY_ALGOS["hybrid"])
+    factors = _chaotic_factor_pack(chaos_rate)
+    dynamic_specialty = f"{SPECIALTY}:{selected_strategy}:{focus}"
     requests.post(
         f"{API_BASE}/ingest-signal",
         json={
@@ -170,6 +409,13 @@ def run_cycle() -> None:
                 "avg_knaa_qnaa_score": data.get("avg_knaa_qnaa_score"),
                 "avg_fleet_shape_score": data.get("avg_fleet_shape_score"),
                 "avg_long_haul_meta_score": data.get("avg_long_haul_meta_score"),
+                "high_level_learning": HIGH_LEVEL_LEARNING,
+                "focus": focus,
+                "occasion": occasion,
+                "selected_strategy": selected_strategy,
+                "strategy_algorithm": algo_profile,
+                "chaotic_factor_pack": factors,
+                "chaos_3d_vector": {"x": x, "y": y, "z": z, "chaos_rate": chaos_rate},
             },
         },
         headers=_headers(),
@@ -177,23 +423,32 @@ def run_cycle() -> None:
     ).raise_for_status()
     agent_size, dynamic_micro_agents = _agent_size_profile(_cycle, data)
     sql_signal, internet_signal, llm_signal, stability_bias = _base_signals(data)
-    pulse_steps = min(520, max(140, STEPS // 3 if MAX_MODE else STEPS // 2))
+    sql_signal = max(0.55, min(0.99, (sql_signal + algo_profile["sql_boost"]) * factors["ratio_sql"]))
+    internet_signal = max(0.55, min(0.99, (internet_signal + algo_profile["internet_boost"]) * factors["ratio_internet"]))
+    llm_signal = max(0.60, min(0.99, (llm_signal + algo_profile["llm_boost"]) * factors["ratio_llm"]))
+    stability_bias = max(0.55, min(0.99, (stability_bias + algo_profile["stability_boost"]) * factors["ratio_stability"]))
+    pulse_steps = min(620, max(140, int((STEPS * (0.28 + (0.45 * HIGH_LEVEL_LEARNING))) if MAX_MODE else STEPS // 2)))
+    pulse_steps = min(680, max(120, int(pulse_steps * algo_profile["step_mult"] * factors["ratio_steps"])))
     pulse_candidates = (
         FLEET_CANDIDATES
         if not MAX_MODE
         else min(500, max(FLEET_CANDIDATES, 240) + int(dynamic_micro_agents * 0.2))
     )
+    pulse_candidates = min(520, max(48, int(pulse_candidates * algo_profile["candidate_mult"] * factors["ratio_candidates"])))
+    if _cycle % 3 == 0 or MAX_MODE:
+        _comparison_upgrade_pass(occasion, focus, _cycle, pulse_steps, pulse_candidates)
+    pulse_out = {}
     if _cycle % max(1, FLEET_OPTIMIZE_EVERY) == 0 or ALWAYS_DEEP_LEARNING:
-        _post(
+        pulse_out = _post(
             "/learning-pulse",
             {
-                "specialty": active_specialty,
+                "specialty": dynamic_specialty,
                 "steps": pulse_steps,
                 "candidates": pulse_candidates,
                 "sql_signal": sql_signal,
                 "internet_signal": internet_signal,
                 "llm_signal": llm_signal,
-                "stability_bias": stability_bias,
+                "stability_bias": max(0.55, min(0.99, stability_bias + chaos_rate * 0.07)),
             },
             timeout=120,
         )
@@ -208,10 +463,35 @@ def run_cycle() -> None:
             timeout=90,
         )
         _post("/dedupe-optimize", {"roots": ["imports", "core", "src", "runtime"], "max_file_mb": 8}, timeout=120)
-    _smart_actions(data, _cycle, active_specialty, skill_pack, agent_size, dynamic_micro_agents)
+    learned_reward = float(pulse_out.get("avg_reward", data.get("avg_reward_score", 0.5)))
+    learned_truth = float(data.get("avg_truth_score", 0.6))
+    learned_shape = float(data.get("avg_fleet_shape_score", 0.55))
+    _update_strategy_memory(occasion, selected_strategy, learned_reward, learned_truth, learned_shape)
+    _record_evidence(occasion, selected_strategy, agent_size, factors, learned_reward, learned_truth, learned_shape)
+    _emit_strategy_feedback(
+        cycle=_cycle,
+        focus=focus,
+        occasion=occasion,
+        selected_strategy=selected_strategy,
+        algo_profile=algo_profile,
+        dynamic_specialty=dynamic_specialty,
+        pulse_steps=pulse_steps,
+        pulse_candidates=pulse_candidates,
+        sql_signal=sql_signal,
+        internet_signal=internet_signal,
+        llm_signal=llm_signal,
+        stability_bias=stability_bias,
+        reward=learned_reward,
+        truth=learned_truth,
+        shape=learned_shape,
+        chaos=(x, y, z, chaos_rate),
+    )
+    _smart_actions(data, _cycle, dynamic_specialty, skill_pack, agent_size, dynamic_micro_agents, (x, y, z, chaos_rate))
     print(
-        f"[auto-trainer] cycle={_cycle} mode={'MAX' if MAX_MODE else 'BALANCED'} strategy={SWARM_STRATEGY} "
-        f"specialty={active_specialty} size={agent_size} micro_agents={dynamic_micro_agents} skills={','.join(skill_pack)} steps={data.get('steps')} "
+        f"[auto-trainer] cycle={_cycle} mode={'MAX' if MAX_MODE else 'BALANCED'} strategy={selected_strategy} "
+        f"specialty={dynamic_specialty} size={agent_size} micro_agents={dynamic_micro_agents} "
+        f"high_level_learning={HIGH_LEVEL_LEARNING:.2f} chaos={chaos_rate:.3f} "
+        f"skills={','.join(skill_pack)} steps={data.get('steps')} "
         f"avg_reward={data.get('avg_reward_score'):.4f} "
         f"avg_truth={data.get('avg_truth_score'):.4f} "
         f"avg_knaa_qnaa={data.get('avg_knaa_qnaa_score', 0.0):.4f} "

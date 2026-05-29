@@ -46,6 +46,9 @@ This runtime enables:
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
   - Deep Auto Learning Zone (`♾️`) with study-area targeting and multi-round comparison
   - Advanced intelligence controls: KNAA/QNAA, quantization, multi-parallel swarm, multipolar strategy, gaussian pressure, permanent memory mode
+  - Auto-trainer now includes `nano-swarm` (ultra micro-agent strategy above hybrid) with adaptive strategy switching by occasion
+  - Chaotic factor randomization (`sql/internet/llm/stability/steps/candidates` ratios) is applied per cycle for broader search
+  - Evidence matrix tracks strategy + ratio + agent-size combinations and feeds top-performing combinations back through `/ingest-signal`
   - Full auto cycle button (simulate + pulse + optimize + curate + dedupe)
   - Built-in API key field in GUI sidebar (uses `X-Hermes-Key`)
 - Resource targeting via env vars:
