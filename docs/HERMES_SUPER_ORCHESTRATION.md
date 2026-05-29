@@ -31,6 +31,7 @@ API endpoints:
 1. `GET /health`
 2. `GET /snapshot`
 3. `POST /train-step`
+4. `POST /simulate`
 
 Example training call:
 
@@ -38,24 +39,40 @@ Example training call:
 curl -X POST http://127.0.0.1:8787/train-step -H "Content-Type: application/json" -d "{\"specialty\":\"sql_learning\",\"complexity\":0.7}"
 ```
 
+Example simulation sweep:
+
+```bash
+curl -X POST http://127.0.0.1:8787/simulate -H "Content-Type: application/json" -d "{\"specialty\":\"llm_orchestration\",\"steps\":2000}"
+```
+
 ## Optimization Model
 
-Each train step computes:
+Each train step computes a 4D optimization envelope:
 
-- `success` (task completion outcome)
+- `quality` (result quality proxy)
 - `speed` (throughput proxy under current load)
-- `novelty` (exploration factor)
+- `cost_efficiency` (resource/cost efficiency)
+- `truth_score` (anti-false-promotion gate)
+- plus `novelty` (exploration factor)
 
 Reward update:
 
-1. weighted sum of success/speed/novelty
+1. weighted multi-objective score (quality/speed/cost/truth/novelty)
 2. gaussian adjustment of reward weights for exploration
-3. bounded reward score and success-rate updates
+3. hard truth-gate penalty if trust threshold is violated
+4. bounded reward score and success-rate updates
 
 Natural selection:
 
 1. retire persistently weak agents when fleet size is high
 2. periodically spawn evolved specialists from top performers
+
+Learning strategies in parallel:
+
+1. contextual bandit-style value updates
+2. q-learning table updates by workload complexity bins
+3. bayesian success priors per specialty
+4. simulation sweeps (`/simulate`) for batch tuning
 
 ## SQL + Compression
 

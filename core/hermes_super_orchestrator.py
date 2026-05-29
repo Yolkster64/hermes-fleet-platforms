@@ -26,6 +26,16 @@ class AgentProfile:
     active: bool = True
 
 
+@dataclass
+class InteractionOutcome:
+    quality: float
+    speed: float
+    cost_efficiency: float
+    truth_score: float
+    novelty: float
+    success: float
+
+
 class SqlTelemetryStore:
     def __init__(self, db_path: str = "runtime/auto/hermes_super_orchestrator.db") -> None:
         self.db_path = db_path
@@ -133,7 +143,13 @@ class HermesSuperOrchestrator:
         self.agents = agents
         self.store = store or SqlTelemetryStore()
         self.governor = ResourceGovernor(gpu_target_utilization=0.75)
-        self.reward_weights = {"success": 0.55, "speed": 0.25, "novelty": 0.20}
+        self.reward_weights = {"quality": 0.32, "speed": 0.20, "cost": 0.16, "truth": 0.22, "novelty": 0.10}
+        self.truth_threshold = 0.68
+        self.algorithm_state = {
+            "bandit_values": {},  # specialty -> value
+            "q_table": {},  # (specialty, bin) -> value
+            "beta_priors": {},  # specialty -> (alpha, beta)
+        }
         self.lock = threading.Lock()
 
     def _agent_score(self, agent: AgentProfile) -> float:
@@ -151,6 +167,49 @@ class HermesSuperOrchestrator:
         total = sum(max(0.01, v) for v in self.reward_weights.values())
         for k in self.reward_weights:
             self.reward_weights[k] = max(0.01, self.reward_weights[k]) / total
+
+    def _multi_objective_score(self, outcome: InteractionOutcome) -> float:
+        return (
+            outcome.quality * self.reward_weights["quality"]
+            + outcome.speed * self.reward_weights["speed"]
+            + outcome.cost_efficiency * self.reward_weights["cost"]
+            + outcome.truth_score * self.reward_weights["truth"]
+            + outcome.novelty * self.reward_weights["novelty"]
+        )
+
+    def _truth_gate_adjustment(self, score: float, truth_score: float) -> float:
+        if truth_score >= self.truth_threshold:
+            return score
+        # Strong penalty to prevent false promotions.
+        penalty = (self.truth_threshold - truth_score) * 1.5
+        return score - penalty
+
+    def _bandit_update(self, specialty: str, reward: float) -> None:
+        old = self.algorithm_state["bandit_values"].get(specialty, 0.0)
+        lr = 0.12
+        self.algorithm_state["bandit_values"][specialty] = old + lr * (reward - old)
+
+    def _q_learning_update(self, specialty: str, complexity: float, reward: float) -> None:
+        bin_key = f"c{int(max(0.0, min(0.99, complexity)) * 5)}"
+        state_key = (specialty, bin_key)
+        old_q = self.algorithm_state["q_table"].get(state_key, 0.0)
+        alpha = 0.2
+        gamma = 0.9
+        future = max([v for (s, _), v in self.algorithm_state["q_table"].items() if s == specialty] or [0.0])
+        self.algorithm_state["q_table"][state_key] = old_q + alpha * (reward + gamma * future - old_q)
+
+    def _bayesian_update(self, specialty: str, success: float) -> None:
+        alpha, beta = self.algorithm_state["beta_priors"].get(specialty, (1.0, 1.0))
+        if success >= 0.5:
+            alpha += 1.0
+        else:
+            beta += 1.0
+        self.algorithm_state["beta_priors"][specialty] = (alpha, beta)
+
+    def _run_algorithm_updates(self, specialty: str, complexity: float, reward: float, success: float) -> None:
+        self._bandit_update(specialty, reward)
+        self._q_learning_update(specialty, complexity, reward)
+        self._bayesian_update(specialty, success)
 
     def _natural_selection(self) -> None:
         inactive_candidates = [a for a in self.agents if a.success_rate < 0.2 and a.reward_score < 0.1]
@@ -178,19 +237,28 @@ class HermesSuperOrchestrator:
             scale = max(0.1, min(1.0, self.governor.capacity_scale()))
             effective_work = workload_complexity * scale
 
-            success = 1.0 if random.random() < (0.35 + agent.success_rate * 0.6) else 0.0
-            speed = max(0.0, 1.0 - effective_work * random.uniform(0.7, 1.3))
-            novelty = random.uniform(0.0, 1.0)
-            delta = (
-                success * self.reward_weights["success"]
-                + speed * self.reward_weights["speed"]
-                + novelty * self.reward_weights["novelty"]
+            success = 1.0 if random.random() < (0.32 + agent.success_rate * 0.62) else 0.0
+            quality = max(0.0, min(1.0, (agent.success_rate * 0.65) + random.uniform(0.0, 0.35)))
+            speed = max(0.0, 1.0 - effective_work * random.uniform(0.68, 1.25))
+            cost_efficiency = max(0.0, 1.0 - (effective_work * random.uniform(0.3, 0.9)))
+            truth_score = max(0.0, min(1.0, quality * 0.7 + success * 0.2 + random.uniform(0.0, 0.1)))
+            novelty = max(0.0, min(1.0, random.gauss(0.55, 0.2)))
+            outcome = InteractionOutcome(
+                quality=quality,
+                speed=speed,
+                cost_efficiency=cost_efficiency,
+                truth_score=truth_score,
+                novelty=novelty,
+                success=success,
             )
+            objective_score = self._multi_objective_score(outcome)
+            delta = self._truth_gate_adjustment(objective_score, truth_score)
 
-            agent.reward_score = max(0.0, min(10.0, agent.reward_score + (delta - 0.35)))
-            agent.success_rate = max(0.0, min(1.0, (agent.success_rate * 0.9) + (success * 0.1)))
+            agent.reward_score = max(0.0, min(10.0, agent.reward_score + (delta - 0.28)))
+            agent.success_rate = max(0.0, min(1.0, (agent.success_rate * 0.86) + (success * 0.14)))
             agent.load = max(0.0, min(1.0, effective_work))
 
+            self._run_algorithm_updates(agent.specialty, workload_complexity, delta, success)
             self._gaussian_tune_rewards()
             self._natural_selection()
 
@@ -199,14 +267,42 @@ class HermesSuperOrchestrator:
                 "agent": agent.name,
                 "specialty": agent.specialty,
                 "success": success,
+                "quality": quality,
                 "speed": speed,
+                "cost_efficiency": cost_efficiency,
+                "truth_score": truth_score,
                 "novelty": novelty,
+                "objective_score": objective_score,
                 "reward_score": agent.reward_score,
                 "success_rate": agent.success_rate,
                 "capacity_scale": scale,
             }
             self.store.write_event("train_step", event)
             return event
+
+    def run_simulations(self, steps: int = 250, specialty: str = "general") -> Dict:
+        steps = max(1, min(20000, int(steps)))
+        results = []
+        for _ in range(steps):
+            complexity = max(0.05, min(1.0, random.gauss(0.58, 0.22)))
+            results.append(self.train_step(specialty, complexity))
+
+        avg_reward = sum(r["reward_score"] for r in results) / len(results)
+        avg_truth = sum(r["truth_score"] for r in results) / len(results)
+        avg_quality = sum(r["quality"] for r in results) / len(results)
+        avg_speed = sum(r["speed"] for r in results) / len(results)
+        avg_cost = sum(r["cost_efficiency"] for r in results) / len(results)
+        truth_violations = len([r for r in results if r["truth_score"] < self.truth_threshold])
+        return {
+            "steps": steps,
+            "avg_reward_score": avg_reward,
+            "avg_truth_score": avg_truth,
+            "avg_quality": avg_quality,
+            "avg_speed": avg_speed,
+            "avg_cost_efficiency": avg_cost,
+            "truth_violations": truth_violations,
+            "reward_weights": self.reward_weights,
+        }
 
     def snapshot(self) -> Dict:
         p = self.governor.pressure()
@@ -246,16 +342,22 @@ class OrchestratorApi:
                 self._json({"error": "not_found"}, status=404)
 
             def do_POST(self):  # noqa: N802
-                if self.path != "/train-step":
+                if self.path not in ("/train-step", "/simulate"):
                     self._json({"error": "not_found"}, status=404)
                     return
                 length = int(self.headers.get("Content-Length", "0"))
                 body = self.rfile.read(length) if length else b"{}"
                 payload = json.loads(body.decode("utf-8"))
-                result = orchestrator.train_step(
-                    specialty_hint=str(payload.get("specialty", "general")),
-                    workload_complexity=float(payload.get("complexity", 0.5)),
-                )
+                if self.path == "/train-step":
+                    result = orchestrator.train_step(
+                        specialty_hint=str(payload.get("specialty", "general")),
+                        workload_complexity=float(payload.get("complexity", 0.5)),
+                    )
+                else:
+                    result = orchestrator.run_simulations(
+                        steps=int(payload.get("steps", 500)),
+                        specialty=str(payload.get("specialty", "general")),
+                    )
                 self._json(result)
 
         return Handler
