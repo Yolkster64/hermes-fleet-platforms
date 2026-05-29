@@ -1,4 +1,6 @@
 import json
+import hashlib
+import os
 import random
 import sqlite3
 import threading
@@ -113,6 +115,54 @@ class SqlTelemetryStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS temporal_memory_bands (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts REAL NOT NULL,
+                    band TEXT NOT NULL,
+                    ttl_class TEXT NOT NULL,
+                    retention_score REAL NOT NULL,
+                    payload_compressed BLOB NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS external_signals (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts REAL NOT NULL,
+                    source TEXT NOT NULL,
+                    signal_score REAL NOT NULL,
+                    payload_compressed BLOB NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS fleet_optimization_runs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts REAL NOT NULL,
+                    specialty TEXT NOT NULL,
+                    team_shape TEXT NOT NULL,
+                    active_agents INTEGER NOT NULL,
+                    score REAL NOT NULL,
+                    payload_compressed BLOB NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS dedupe_candidates (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts REAL NOT NULL,
+                    file_hash TEXT NOT NULL,
+                    file_count INTEGER NOT NULL,
+                    total_bytes INTEGER NOT NULL,
+                    sample_path TEXT NOT NULL
+                )
+                """
+            )
 
     def write_metric(self, agent: AgentProfile) -> None:
         with self._conn() as conn:
@@ -207,6 +257,64 @@ class SqlTelemetryStore:
                 ),
             )
 
+    def write_memory_band(self, band: str, ttl_class: str, retention_score: float, payload: Dict) -> None:
+        compressed = zlib.compress(json.dumps(payload).encode("utf-8"))
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO temporal_memory_bands(ts, band, ttl_class, retention_score, payload_compressed)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (time.time(), band, ttl_class, retention_score, compressed),
+            )
+
+    def write_external_signal(self, source: str, signal_score: float, payload: Dict) -> None:
+        compressed = zlib.compress(json.dumps(payload).encode("utf-8"))
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO external_signals(ts, source, signal_score, payload_compressed)
+                VALUES (?, ?, ?, ?)
+                """,
+                (time.time(), source, signal_score, compressed),
+            )
+
+    def recent_external_signal_score(self, lookback: int = 40) -> float:
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT signal_score
+                FROM external_signals
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (lookback,),
+            ).fetchall()
+        if not rows:
+            return 0.5
+        return sum(r[0] for r in rows) / len(rows)
+
+    def write_fleet_optimization_run(self, specialty: str, team_shape: str, active_agents: int, score: float, payload: Dict) -> None:
+        compressed = zlib.compress(json.dumps(payload).encode("utf-8"))
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO fleet_optimization_runs(ts, specialty, team_shape, active_agents, score, payload_compressed)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (time.time(), specialty, team_shape, active_agents, score, compressed),
+            )
+
+    def write_dedupe_candidate(self, file_hash: str, file_count: int, total_bytes: int, sample_path: str) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO dedupe_candidates(ts, file_hash, file_count, total_bytes, sample_path)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (time.time(), file_hash, file_count, total_bytes, sample_path),
+            )
+
 
 class ResourceGovernor:
     def __init__(self, gpu_target_utilization: float = 0.75, cpu_target_utilization: float = 0.8) -> None:
@@ -244,7 +352,9 @@ class HermesSuperOrchestrator:
     def __init__(self, agents: List[AgentProfile], store: Optional[SqlTelemetryStore] = None) -> None:
         self.agents = agents
         self.store = store or SqlTelemetryStore()
-        self.governor = ResourceGovernor(gpu_target_utilization=0.75)
+        gpu_target = float(os.getenv("HERMES_GPU_TARGET_UTILIZATION", "0.75"))
+        cpu_target = float(os.getenv("HERMES_CPU_TARGET_UTILIZATION", "0.80"))
+        self.governor = ResourceGovernor(gpu_target_utilization=gpu_target, cpu_target_utilization=cpu_target)
         self.reward_weights = {
             "quality": 0.22,
             "speed": 0.16,
@@ -268,6 +378,11 @@ class HermesSuperOrchestrator:
             "q_table": {},  # (specialty, bin) -> value
             "beta_priors": {},  # specialty -> (alpha, beta)
             "horizon_memory": {"short": [], "mid": [], "long": []},
+            "knaa_qnaa_memory": [],
+            "punishment_memory": [],
+            "fleet_shape_memory": [],
+            "long_haul_meta_memory": [],
+            "aihub_bonus_memory": [],
         }
         self.goal_shape_targets = {
             "quality": (0.90, 0.62, 0.52),
@@ -371,6 +486,130 @@ class HermesSuperOrchestrator:
             sigma=sigma,
         )
 
+    def _knaa_qnaa_score(
+        self,
+        short_variables: Dict[str, float],
+        mid_variables: Dict[str, float],
+        long_variables: Dict[str, float],
+        truth_score: float,
+        reward_score: float,
+    ) -> float:
+        short_values = [max(0.0, min(1.0, v)) for v in short_variables.values()]
+        mid_values = [max(0.0, min(1.0, v)) for v in mid_variables.values()]
+        long_values = [max(0.0, min(1.0, v)) for v in long_variables.values()]
+        exploration_rate = max(0.01, min(0.6, 1.0 - truth_score))
+        score = self.native_bridge.knaa_qnaa_score(
+            short_values=short_values,
+            mid_values=mid_values,
+            long_values=long_values,
+            truth_score=truth_score,
+            reward_score=reward_score,
+            exploration_rate=exploration_rate,
+        )
+        mem = self.algorithm_state["knaa_qnaa_memory"]
+        mem.append(score)
+        if len(mem) > 2000:
+            del mem[: len(mem) - 2000]
+        return score
+
+    def _fleet_shape_score(
+        self,
+        active_agents: int,
+        latency_ms: float,
+        throughput_rps: float,
+        error_rate: float,
+        diversity: float,
+        memory_retention: float,
+    ) -> float:
+        score = self.native_bridge.fleet_shape_score(
+            active_agents=float(active_agents),
+            latency_ms=latency_ms,
+            throughput_rps=throughput_rps,
+            error_rate=error_rate,
+            diversity=diversity,
+            memory_retention=memory_retention,
+        )
+        mem = self.algorithm_state["fleet_shape_memory"]
+        mem.append(score)
+        if len(mem) > 2000:
+            del mem[: len(mem) - 2000]
+        return score
+
+    def _punishment_correction(self, truth_score: float, quality: float, drift: float) -> float:
+        if truth_score >= self.truth_threshold and quality >= 0.6:
+            correction = min(0.18, (truth_score - self.truth_threshold) * 0.25 + quality * 0.05)
+        else:
+            truth_gap = max(0.0, self.truth_threshold - truth_score)
+            correction = -min(0.6, truth_gap * 1.35 + drift * 0.22)
+        pmem = self.algorithm_state["punishment_memory"]
+        pmem.append(correction)
+        if len(pmem) > 2000:
+            del pmem[: len(pmem) - 2000]
+        return correction
+
+    def _persist_temporal_memory_bands(self, event: Dict) -> None:
+        short_payload = {
+            "agent": event["agent"],
+            "specialty": event["specialty"],
+            "short_score": event["short_score"],
+            "knaa_qnaa_score": event["knaa_qnaa_score"],
+            "fleet_shape_score": event["fleet_shape_score"],
+        }
+        mid_payload = {
+            "objective_score": event["objective_score"],
+            "truth_score": event["truth_score"],
+            "compression_gain": event["compression_gain"],
+            "external_signal_score": event["external_signal_score"],
+        }
+        long_payload = {
+            "long_score": event["long_score"],
+            "retention_score": event["long_variables"]["retention_score"],
+            "correction": event["punishment_correction"],
+            "long_haul_meta_score": event["long_haul_meta_score"],
+            "reward_score": event["reward_score"],
+        }
+        self.store.write_memory_band("short", "short_ttl", short_payload["short_score"], short_payload)
+        self.store.write_memory_band("mid", "mid_ttl", event["mid_score"], mid_payload)
+        self.store.write_memory_band("long", "long_ttl", long_payload["retention_score"], long_payload)
+
+    def _compression_shape_score(
+        self,
+        short_variables: Dict[str, float],
+        mid_variables: Dict[str, float],
+        long_variables: Dict[str, float],
+    ) -> float:
+        values = [*short_variables.values(), *mid_variables.values(), *long_variables.values()]
+        safe_values = [max(0.0, min(1.0, v)) for v in values]
+        return self.native_bridge.quantized_compression_score(safe_values)
+
+    def _long_haul_meta_score(
+        self,
+        short_variables: Dict[str, float],
+        mid_variables: Dict[str, float],
+        long_variables: Dict[str, float],
+        external_signal_score: float,
+        correction_signal: float,
+        truth_score: float,
+        gaussian_alignment: float,
+    ) -> float:
+        short_values = [max(0.0, min(1.0, v)) for v in short_variables.values()]
+        mid_values = [max(0.0, min(1.0, v)) for v in mid_variables.values()]
+        long_values = [max(0.0, min(1.0, v)) for v in long_variables.values()]
+        score = self.native_bridge.long_haul_meta_score(
+            short_values=short_values,
+            mid_values=mid_values,
+            long_values=long_values,
+            external_signal_score=max(0.0, min(1.0, external_signal_score)),
+            correction_signal=max(-1.0, min(1.0, correction_signal)),
+            truth_score=max(0.0, min(1.0, truth_score)),
+            gaussian_alignment=max(0.0, min(1.0, gaussian_alignment)),
+        )
+        mem = self.algorithm_state["long_haul_meta_memory"]
+        mem.append(score)
+        if len(mem) > 2000:
+            del mem[: len(mem) - 2000]
+        return score
+
     def _natural_selection(self) -> None:
         inactive_candidates = [a for a in self.agents if a.success_rate < 0.2 and a.reward_score < 0.1]
         if inactive_candidates and len(self.agents) > 6:
@@ -422,6 +661,7 @@ class HermesSuperOrchestrator:
                 "generalization": max(0.0, min(1.0, random.gauss(0.65, 0.23))),
                 "compression_longevity": max(0.0, min(1.0, random.gauss(0.63, 0.21))),
             }
+            external_signal_score = max(0.0, min(1.0, self.store.recent_external_signal_score()))
             outcome = InteractionOutcome(
                 quality=quality,
                 speed=speed,
@@ -448,8 +688,51 @@ class HermesSuperOrchestrator:
                 + mid_variables["agent_alignment"] * 0.02
                 + long_variables["retention_score"] * 0.03
             )
+            knaa_qnaa_score = self._knaa_qnaa_score(
+                short_variables=short_variables,
+                mid_variables=mid_variables,
+                long_variables=long_variables,
+                truth_score=truth_score,
+                reward_score=agent.reward_score / 10.0,
+            )
+            quantized_compression_score = self._compression_shape_score(short_variables, mid_variables, long_variables)
+            fleet_shape_score = self._fleet_shape_score(
+                active_agents=len([a for a in self.agents if a.active]),
+                latency_ms=max(25.0, 400.0 * (1.0 - speed)),
+                throughput_rps=max(1.0, 40.0 + quality * 220.0),
+                error_rate=max(0.0, 1.0 - truth_score),
+                diversity=pattern_diversity,
+                memory_retention=long_variables["retention_score"],
+            )
+            punishment_correction = self._punishment_correction(
+                truth_score=truth_score,
+                quality=quality,
+                drift=mid_variables["stability_drift"],
+            )
+            gaussian_alignment = self._gaussian_3d_shape_score(
+                point=(truth_score, quality, speed),
+                target=self.goal_shape_targets["balanced"],
+                sigma=0.24,
+            )
+            long_haul_meta_score = self._long_haul_meta_score(
+                short_variables=short_variables,
+                mid_variables=mid_variables,
+                long_variables=long_variables,
+                external_signal_score=external_signal_score,
+                correction_signal=punishment_correction,
+                truth_score=truth_score,
+                gaussian_alignment=gaussian_alignment,
+            )
+            aihub_bonus = self.compute_aihub_bonus()
+            objective_score += knaa_qnaa_score * 0.12
+            objective_score += quantized_compression_score * 0.06
+            objective_score += fleet_shape_score * 0.08
+            objective_score += external_signal_score * 0.05
+            objective_score += long_haul_meta_score * 0.10
+            objective_score += aihub_bonus * 0.09
             objective_score = (objective_score * 0.55) + (self._multi_objective_score(outcome) * 0.45)
             delta = self._truth_gate_adjustment(objective_score, truth_score)
+            delta += punishment_correction
 
             agent.reward_score = max(0.0, min(10.0, agent.reward_score + (delta - 0.28)))
             agent.success_rate = max(0.0, min(1.0, (agent.success_rate * 0.86) + (success * 0.14)))
@@ -485,12 +768,21 @@ class HermesSuperOrchestrator:
                 "short_variables": short_variables,
                 "mid_variables": mid_variables,
                 "long_variables": long_variables,
+                "knaa_qnaa_score": knaa_qnaa_score,
+                "quantized_compression_score": quantized_compression_score,
+                "fleet_shape_score": fleet_shape_score,
+                "external_signal_score": external_signal_score,
+                "punishment_correction": punishment_correction,
+                "gaussian_alignment": gaussian_alignment,
+                "long_haul_meta_score": long_haul_meta_score,
+                "aihub_bonus": aihub_bonus,
                 "objective_score": objective_score,
                 "reward_score": agent.reward_score,
                 "success_rate": agent.success_rate,
                 "capacity_scale": scale,
             }
             self.store.write_event("train_step", event)
+            self._persist_temporal_memory_bands(event)
             return event
 
     def run_simulations(self, steps: int = 250, specialty: str = "general") -> Dict:
@@ -508,6 +800,11 @@ class HermesSuperOrchestrator:
         avg_short = sum(r["short_score"] for r in results) / len(results)
         avg_mid = sum(r["mid_score"] for r in results) / len(results)
         avg_long = sum(r["long_score"] for r in results) / len(results)
+        avg_knaa_qnaa = sum(r["knaa_qnaa_score"] for r in results) / len(results)
+        avg_quantized_compression = sum(r["quantized_compression_score"] for r in results) / len(results)
+        avg_fleet_shape = sum(r["fleet_shape_score"] for r in results) / len(results)
+        avg_long_haul_meta = sum(r["long_haul_meta_score"] for r in results) / len(results)
+        avg_aihub_bonus = sum(r["aihub_bonus"] for r in results) / len(results)
         truth_violations = len([r for r in results if r["truth_score"] < self.truth_threshold])
         return {
             "steps": steps,
@@ -519,9 +816,192 @@ class HermesSuperOrchestrator:
             "avg_short_score": avg_short,
             "avg_mid_score": avg_mid,
             "avg_long_score": avg_long,
+            "avg_knaa_qnaa_score": avg_knaa_qnaa,
+            "avg_quantized_compression_score": avg_quantized_compression,
+            "avg_fleet_shape_score": avg_fleet_shape,
+            "avg_long_haul_meta_score": avg_long_haul_meta,
+            "avg_aihub_bonus": avg_aihub_bonus,
             "truth_violations": truth_violations,
             "reward_weights": self.reward_weights,
         }
+
+    def optimize_fleet_topology(self, specialty: str = "fleet", candidates: int = 80) -> Dict:
+        candidates = max(8, min(500, int(candidates)))
+        shapes = ["triangle", "hex", "mesh", "swarm", "hybrid"]
+        best = None
+        for _ in range(candidates):
+            team_shape = random.choice(shapes)
+            active_agents = random.randint(4, 72)
+            latency_ms = max(18.0, random.gauss(180.0, 65.0))
+            throughput_rps = max(10.0, random.gauss(165.0, 70.0))
+            error_rate = max(0.0, min(1.0, random.gauss(0.12, 0.08)))
+            diversity = max(0.0, min(1.0, random.gauss(0.68, 0.18)))
+            memory_retention = max(0.0, min(1.0, random.gauss(0.72, 0.16)))
+            score = self._fleet_shape_score(
+                active_agents=active_agents,
+                latency_ms=latency_ms,
+                throughput_rps=throughput_rps,
+                error_rate=error_rate,
+                diversity=diversity,
+                memory_retention=memory_retention,
+            )
+            candidate = {
+                "specialty": specialty,
+                "team_shape": team_shape,
+                "active_agents": active_agents,
+                "latency_ms": latency_ms,
+                "throughput_rps": throughput_rps,
+                "error_rate": error_rate,
+                "diversity": diversity,
+                "memory_retention": memory_retention,
+                "score": score,
+            }
+            if best is None or candidate["score"] > best["score"]:
+                best = candidate
+
+        assert best is not None
+        self.store.write_fleet_optimization_run(
+            specialty=best["specialty"],
+            team_shape=best["team_shape"],
+            active_agents=best["active_agents"],
+            score=best["score"],
+            payload=best,
+        )
+        self.store.write_event("fleet_optimized", best)
+        return {"candidates": candidates, "best": best}
+
+    def curate_learning_plan(
+        self,
+        sql_signal: float = 0.7,
+        internet_signal: float = 0.5,
+        llm_signal: float = 0.6,
+        stability_bias: float = 0.65,
+    ) -> Dict:
+        sql = max(0.0, min(1.0, sql_signal))
+        internet = max(0.0, min(1.0, internet_signal))
+        llm = max(0.0, min(1.0, llm_signal))
+        stability = max(0.0, min(1.0, stability_bias))
+
+        source_weights = {
+            "sql": (sql * 0.55) + (stability * 0.20),
+            "internet": (internet * 0.45) + ((1.0 - stability) * 0.20),
+            "llm": (llm * 0.50) + (stability * 0.10),
+        }
+        total = sum(source_weights.values()) or 1.0
+        normalized = {k: v / total for k, v in source_weights.items()}
+        primary = max(normalized, key=normalized.get)
+
+        plan = {
+            "primary_source": primary,
+            "source_weights": normalized,
+            "stability_bias": stability,
+            "recommendation": "focus-truth-and-retention" if stability > 0.62 else "focus-exploration-and-diversity",
+        }
+        self.store.write_event("learning_curated", plan)
+        self.store.write_external_signal("curation", normalized[primary], plan)
+        return plan
+
+    def learning_pulse(
+        self,
+        specialty: str = "fleet",
+        steps: int = 120,
+        candidates: int = 60,
+        sql_signal: float = 0.7,
+        internet_signal: float = 0.55,
+        llm_signal: float = 0.65,
+        stability_bias: float = 0.68,
+    ) -> Dict:
+        sim = self.run_simulations(steps=steps, specialty=specialty)
+        fleet = self.optimize_fleet_topology(specialty=specialty, candidates=candidates)
+        curation = self.curate_learning_plan(
+            sql_signal=sql_signal,
+            internet_signal=internet_signal,
+            llm_signal=llm_signal,
+            stability_bias=stability_bias,
+        )
+        pulse = {
+            "specialty": specialty,
+            "simulation": sim,
+            "fleet": fleet,
+            "curation": curation,
+            "pulse_score": (
+                sim["avg_long_haul_meta_score"] * 0.38
+                + sim["avg_fleet_shape_score"] * 0.24
+                + sim["avg_quantized_compression_score"] * 0.18
+                + sim["avg_truth_score"] * 0.20
+            ),
+        }
+        self.store.write_event("learning_pulse", pulse)
+        return pulse
+
+    def run_dedupe_optimization(self, roots: Optional[List[str]] = None, max_file_mb: int = 8) -> Dict:
+        roots = roots or ["imports", "core", "src", "runtime"]
+        max_bytes = max(1, int(max_file_mb)) * 1024 * 1024
+        skip_dirs = {".git", "obj", "bin", "node_modules", "__pycache__"}
+        hash_map: Dict[str, List[Dict]] = {}
+
+        for root in roots:
+            if not os.path.exists(root):
+                continue
+            for base, dirs, files in os.walk(root):
+                dirs[:] = [d for d in dirs if d not in skip_dirs]
+                for name in files:
+                    path = os.path.join(base, name)
+                    try:
+                        size = os.path.getsize(path)
+                    except OSError:
+                        continue
+                    if size <= 0 or size > max_bytes:
+                        continue
+                    try:
+                        with open(path, "rb") as f:
+                            digest = hashlib.sha256(f.read()).hexdigest()
+                    except OSError:
+                        continue
+                    hash_map.setdefault(digest, []).append({"path": path, "size": size})
+
+        groups = []
+        potential_saved = 0
+        for digest, items in hash_map.items():
+            if len(items) < 2:
+                continue
+            total = sum(i["size"] for i in items)
+            potential_saved += total - min(i["size"] for i in items)
+            sample = items[0]["path"]
+            self.store.write_dedupe_candidate(digest, len(items), total, sample)
+            groups.append(
+                {
+                    "hash": digest,
+                    "count": len(items),
+                    "total_bytes": total,
+                    "sample_path": sample,
+                }
+            )
+
+        groups.sort(key=lambda g: g["total_bytes"], reverse=True)
+        result = {
+            "roots": roots,
+            "duplicate_groups": len(groups),
+            "potential_saved_bytes": potential_saved,
+            "top_groups": groups[:20],
+        }
+        self.store.write_event("dedupe_optimization", result)
+        return result
+
+    def compute_aihub_bonus(self) -> float:
+        signal = self.store.recent_external_signal_score()
+        knaa_tail = self.algorithm_state["knaa_qnaa_memory"][-80:]
+        fleet_tail = self.algorithm_state["fleet_shape_memory"][-80:]
+        meta_tail = self.algorithm_state["long_haul_meta_memory"][-80:]
+        knaa_avg = (sum(knaa_tail) / len(knaa_tail)) if knaa_tail else 0.5
+        fleet_avg = (sum(fleet_tail) / len(fleet_tail)) if fleet_tail else 0.5
+        meta_avg = (sum(meta_tail) / len(meta_tail)) if meta_tail else 0.5
+        bonus = max(0.0, min(1.0, (signal * 0.34) + (knaa_avg * 0.20) + (fleet_avg * 0.20) + (meta_avg * 0.26)))
+        mem = self.algorithm_state["aihub_bonus_memory"]
+        mem.append(bonus)
+        if len(mem) > 2000:
+            del mem[: len(mem) - 2000]
+        return bonus
 
     def rank_llm_output(
         self,
@@ -590,6 +1070,11 @@ class HermesSuperOrchestrator:
         return {
             "resource_pressure": p,
             "reward_weights": self.reward_weights,
+            "knaa_qnaa_memory_tail": self.algorithm_state["knaa_qnaa_memory"][-20:],
+            "fleet_shape_memory_tail": self.algorithm_state["fleet_shape_memory"][-20:],
+            "punishment_memory_tail": self.algorithm_state["punishment_memory"][-20:],
+            "long_haul_meta_memory_tail": self.algorithm_state["long_haul_meta_memory"][-20:],
+            "aihub_bonus_memory_tail": self.algorithm_state["aihub_bonus_memory"][-20:],
             "agents": [asdict(a) for a in self.agents],
             "recent_events": self.store.recent_events(limit=10),
         }
@@ -600,11 +1085,19 @@ class OrchestratorApi:
         self.orchestrator = orchestrator
         self.host = host
         self.port = port
+        self.api_key = os.getenv("HERMES_API_KEY", "")
 
     def _handler(self):
         orchestrator = self.orchestrator
+        api_key = self.api_key
 
         class Handler(BaseHTTPRequestHandler):
+            def _authorized(self) -> bool:
+                if not api_key:
+                    return True
+                incoming = self.headers.get("X-Hermes-Key", "")
+                return incoming == api_key
+
             def _json(self, payload: Dict, status: int = 200) -> None:
                 body = json.dumps(payload).encode("utf-8")
                 self.send_response(status)
@@ -617,13 +1110,22 @@ class OrchestratorApi:
                 if self.path == "/health":
                     self._json({"ok": True})
                     return
+                if not self._authorized():
+                    self._json({"error": "unauthorized"}, status=401)
+                    return
                 if self.path == "/snapshot":
                     self._json(orchestrator.snapshot())
+                    return
+                if self.path == "/aihub-bonus":
+                    self._json({"aihub_bonus": orchestrator.compute_aihub_bonus()})
                     return
                 self._json({"error": "not_found"}, status=404)
 
             def do_POST(self):  # noqa: N802
-                if self.path not in ("/train-step", "/simulate", "/horizon-tests", "/rank-output"):
+                if not self._authorized():
+                    self._json({"error": "unauthorized"}, status=401)
+                    return
+                if self.path not in ("/train-step", "/simulate", "/horizon-tests", "/rank-output", "/ingest-signal", "/optimize-fleet", "/curate-learning", "/learning-pulse", "/dedupe-optimize", "/aihub-bonus"):
                     self._json({"error": "not_found"}, status=404)
                     return
                 length = int(self.headers.get("Content-Length", "0"))
@@ -637,7 +1139,7 @@ class OrchestratorApi:
                 else:
                     if self.path == "/simulate":
                         result = orchestrator.run_simulations(
-                            steps=int(payload.get("steps", 500)),
+                            steps=int(payload.get("steps", payload.get("simulations", 500))),
                             specialty=str(payload.get("specialty", "general")),
                         )
                     elif self.path == "/horizon-tests":
@@ -647,6 +1149,46 @@ class OrchestratorApi:
                             mid_steps=int(payload.get("mid_steps", 300)),
                             long_steps=int(payload.get("long_steps", 1200)),
                         )
+                    elif self.path == "/ingest-signal":
+                        source = str(payload.get("source", "external"))
+                        signal_score = max(0.0, min(1.0, float(payload.get("signal_score", 0.5))))
+                        signal_payload = payload.get("payload", {})
+                        if not isinstance(signal_payload, dict):
+                            signal_payload = {"value": str(signal_payload)}
+                        orchestrator.store.write_external_signal(source, signal_score, signal_payload)
+                        result = {"ok": True, "source": source, "signal_score": signal_score}
+                    elif self.path == "/optimize-fleet":
+                        result = orchestrator.optimize_fleet_topology(
+                            specialty=str(payload.get("specialty", "fleet")),
+                            candidates=int(payload.get("candidates", 80)),
+                        )
+                    elif self.path == "/curate-learning":
+                        result = orchestrator.curate_learning_plan(
+                            sql_signal=float(payload.get("sql_signal", 0.7)),
+                            internet_signal=float(payload.get("internet_signal", 0.5)),
+                            llm_signal=float(payload.get("llm_signal", 0.6)),
+                            stability_bias=float(payload.get("stability_bias", 0.65)),
+                        )
+                    elif self.path == "/learning-pulse":
+                        result = orchestrator.learning_pulse(
+                            specialty=str(payload.get("specialty", "fleet")),
+                            steps=int(payload.get("steps", 120)),
+                            candidates=int(payload.get("candidates", 60)),
+                            sql_signal=float(payload.get("sql_signal", 0.7)),
+                            internet_signal=float(payload.get("internet_signal", 0.55)),
+                            llm_signal=float(payload.get("llm_signal", 0.65)),
+                            stability_bias=float(payload.get("stability_bias", 0.68)),
+                        )
+                    elif self.path == "/dedupe-optimize":
+                        roots = payload.get("roots", ["imports", "core", "src", "runtime"])
+                        if not isinstance(roots, list):
+                            roots = ["imports", "core", "src", "runtime"]
+                        result = orchestrator.run_dedupe_optimization(
+                            roots=[str(r) for r in roots],
+                            max_file_mb=int(payload.get("max_file_mb", 8)),
+                        )
+                    elif self.path == "/aihub-bonus":
+                        result = {"aihub_bonus": orchestrator.compute_aihub_bonus()}
                     else:
                         result = orchestrator.rank_llm_output(
                             output_text=str(payload.get("output", "")),
@@ -679,5 +1221,7 @@ def build_default_orchestrator() -> HermesSuperOrchestrator:
 
 
 if __name__ == "__main__":
-    api = OrchestratorApi(build_default_orchestrator())
+    api_host = os.getenv("HERMES_API_HOST", "0.0.0.0")
+    api_port = int(os.getenv("HERMES_API_PORT", "8787"))
+    api = OrchestratorApi(build_default_orchestrator(), host=api_host, port=api_port)
     api.serve()
