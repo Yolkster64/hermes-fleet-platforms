@@ -1,47 +1,36 @@
-# Hermes Fleet Platforms – Unified Architecture, AI, Security, and Developer Orchestration
+# Hermes Fleet Platforms + HELIOS Consolidation
 
-## Vision
-This project merges everything from Hermes, Monado Blade, Helios Platform, and more into a single, fully native, high-performance, secure, and developer/AI-centric platform. The goal: create the ultimate orchestration suite for Windows and hybrid environments, supporting dynamic user profiles, hyper-secure partitioning, advanced AI integration, and out-of-the-box cloud/devtools/automation.
+This repository consolidates Hermes Fleet, HELIOS Platform, and Monado Blade-aligned assets into one working platform for orchestration, security, and AI-driven operations.
 
-**Features include:**
-- Native C++, C#, Python cores (security, optimization, AI/ML, system management)
-- Cinematic, ultra-modern C#/Python/TS GUI/UX, dynamic logins and profiles
-- Vaults, DevDrives, Partitions, Quarantine—full profile, scene, and activity support
-- Automated/secure provisioning, USB builder, role-locked admin (local unlock, no remote hacks)
-- Easy integration: Azure/Intune, Power Apps, Copilot, Visual Studio, Synapse, Foundry, Chroma etc.
-- Local and cloud AI, AI/Dev/Automation Hubs, live troubleshooting, audit, and self-healing
+## What is included
 
-## How it's Organized
-Repository structure uses clear modular directories:
-- `core/` — C++/C# security and optimization libraries, drivers, kernel extensions
-- `ai/` — Hermes AI Hub, Builder, ML/LLM pipelines (Python/C++/C#)
-- `gui/` — All GUI/apps, including login, dashboards, and dynamic user/profile "scenes"
-- `installer/` — USB builder/setup, partitioning, device/driver management
-- `platform/` — Partition and user/profile/vault managers
-- `integrations/` — Connectors for Azure/Intune, Foundry, PowerApps, VS, ReaOper, more
-- `music/` — Low-latency audio, plugins, profiling
-- `scripts/` — Cross-language hybrid scripts for sysops, automation, and recovery
-- `tests/` — Suite for validation, performance, and integration
-- `docs/` — Deep documentation and step-by-step guides
+- Hermes multi-agent runtime and orchestration modules (`core/`, `ui/`)
+- SQL learning and model-tracking workflow (`SQL_LEARNING_GROUND.md`, `sql-learning/`)
+- HELIOS platform history imported from `M0nado/helios-platform`
+- Cross-platform integration docs for cloud/dev tooling and operations
 
-> See `/docs/README.md` for a full documentation index.
+## Current focus
 
----
+1. Unified branch history across Hermes + HELIOS sources.
+2. Organized docs for operational delivery and onboarding.
+3. GitHub CLI-driven workflow for branch/PR/release automation.
 
-## Quick Start (for Devs, AIs, and Reviewers)
-1. **Browse `/docs/` for guides, onboarding, and technical deep dives.**
-2. **Jump into any module (core, ai, gui, integrations, etc) for code, configs, and structure.**
-3. **Follow the inline docs and folder `README.md` files for guidance and architectural explanations.**
-4. **All submodules reference their origins/related legacy repos, so merging and extending is seamless.**
+## Key documentation
 
----
-## Merged Projects and Legacy Inspiration
-- Hermes Fleet (platforms, scripts, AI)
-- Monado Blade (C#/Python, deep optimization)
-- Helios Platform (workstation, security, automation)
-- CryptoBot, Control Center, Codespaces, and more
-- Demo/project examples from Heli0s-Dynamics and M0nado orgs
+- [`docs/README.md`](./docs/README.md)
+- [`docs/GETTING_STARTED.md`](./docs/GETTING_STARTED.md)
+- [`docs/HERMES_AGENTS_SQL_GHCLI.md`](./docs/HERMES_AGENTS_SQL_GHCLI.md)
+- [`SQL_LEARNING_GROUND.md`](./SQL_LEARNING_GROUND.md)
 
-All contributing inspiration is mapped to its module for traceability and future merging.
+## Quick workflow
 
-> Each core module README documents which legacy repo or idea influenced its design. As the repo evolves, add, cross-link, or update READMEs/docs to keep the project's story traceable and showable to collaborators, AI systems, and Microsoft/Azure/Power Platform tools.
+```bash
+git checkout integration/helios-website-consolidation
+git pull
+```
+
+To open a PR with GitHub CLI:
+
+```bash
+gh pr create --title "feat: consolidate helios and hermes platform history" --body "Merges latest HELIOS website/platform history and organizes agent/sql/github-cli docs." --base main --head integration/helios-website-consolidation
+```

@@ -6,19 +6,53 @@ __pycache__/
 .mypy_cache/
 .venv/
 venv/
+env/
+ENV/
+*.egg-info/
 
-# Build artifacts
+# .NET / build artifacts
 bin/
 obj/
 dist/
 build/
+out/
+
+# Node / frontend
+node_modules/
+.next/
+.nuxt/
+_nuxt/
+.cache/
+.cache-loader/
+
+# Coverage and logs
+.coverage
+htmlcov/
+coverage/
+.nyc_output/
+logs/
+*.log
+
+# Environment and secrets
+.env
+.env.*
+local.settings.json
+appsettings.development.json
+appsettings.production.json
+secrets/
+*.key
+*.pem
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
 
 # IDE and OS
 .vscode/
 .idea/
+*.swp
+*.swo
 .DS_Store
 Thumbs.db
-
-# Local environment/config
-.env
-.env.*
