@@ -1,1 +1,1 @@
-"auto $(date -u +%Y-%m-%dT%H:%M:%SZ)" 
+"updated 2026-05-29" 
