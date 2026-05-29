@@ -4,9 +4,9 @@ import time
 from typing import Any, Dict, List, Tuple
 
 import streamlit as st
-from gui_api_client import API_BASE, run_logged_post_action, safe_get, safe_post
+from gui_api_client import API_BASE, log_text, run_logged_post_action, safe_get, safe_post
 from gui_insights import fleet_score_history, latest_learned_profile, render_learning_diagram, render_xp_bar
-from gui_volume_tools import read_volume_file, resolve_volume_root, scan_volume_files
+from gui_volume_tools import initialize_volume_layout, read_volume_file, resolve_volume_root, scan_volume_files, volume_health_summary
 try:
     from core.hermes_variable_registry import VARIABLE_CATALOG, default_user_entry_profile
 except Exception:  # pragma: no cover
@@ -990,10 +990,20 @@ with vf1:
     st.caption(f"Volume root: {volume_root}")
 with vf2:
     file_limit = st.slider("Volume file rows", min_value=50, max_value=1200, value=300, step=50)
+vf3, vf4 = st.columns([1, 1])
+with vf3:
+    if st.button("Initialize/Repair Volume Layout", use_container_width=True):
+        root_out, manifest = initialize_volume_layout(volume_root)
+        st.success(f"Volume layout ready at: {root_out}")
+        log_text("volume-layout-init", manifest if isinstance(manifest, dict) else {"status": "ok"})
 volume_rows = scan_volume_files(volume_root, limit=file_limit)
 if not volume_rows:
     st.caption("No files found in volume root yet.")
 else:
+    summary = volume_health_summary(volume_rows)
+    with vf4:
+        st.metric("Volume Files", int(summary.get("file_count", 0.0)))
+        st.metric("Volume Size (MB)", f"{summary.get('total_mb', 0.0):.2f}")
     st.dataframe(
         [
             {

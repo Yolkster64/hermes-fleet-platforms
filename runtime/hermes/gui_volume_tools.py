@@ -2,18 +2,11 @@ import os
 from datetime import datetime
 from typing import Dict, List, Tuple
 
+from volume_setup import ensure_runtime_volume_setup, resolve_runtime_volume_root
+
 
 def resolve_volume_root() -> str:
-    candidates = [
-        os.getenv("HERMES_VOLUME_DATA_PATH", "").strip(),
-        "/workspace/runtime/hermes_persist",
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hermes_persist")),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "auto")),
-    ]
-    for path in candidates:
-        if path and os.path.exists(path):
-            return path
-    return "/workspace/runtime/hermes_persist"
+    return resolve_runtime_volume_root()
 
 
 def scan_volume_files(root: str, limit: int = 500) -> List[Dict[str, object]]:
@@ -56,3 +49,16 @@ def read_volume_file(root: str, rel_path: str, max_bytes: int = 2_000_000) -> Tu
     if len(data) > max_bytes:
         return data[:max_bytes], f"File truncated to {max_bytes} bytes for preview."
     return data, ""
+
+
+def volume_health_summary(rows: List[Dict[str, object]]) -> Dict[str, float]:
+    total_bytes = sum(int(row.get("bytes", 0)) for row in rows)
+    return {
+        "file_count": float(len(rows)),
+        "total_mb": float(total_bytes) / (1024.0 * 1024.0),
+        "avg_kb": (float(total_bytes) / 1024.0 / float(len(rows))) if rows else 0.0,
+    }
+
+
+def initialize_volume_layout(root: str | None = None) -> Tuple[str, Dict[str, object]]:
+    return ensure_runtime_volume_setup(root=root)

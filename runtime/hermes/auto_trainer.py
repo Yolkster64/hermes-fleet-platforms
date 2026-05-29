@@ -5,6 +5,7 @@ import random
 import json
 
 import requests
+from volume_setup import ensure_runtime_volume_setup
 try:
     from core.hermes_variable_registry import VARIABLE_CATALOG, clamp01, compute_efficiency_profile
 except Exception:  # pragma: no cover
@@ -883,6 +884,13 @@ def run_cycle() -> None:
 
 
 if __name__ == "__main__":
+    try:
+        volume_root, manifest = ensure_runtime_volume_setup()
+        print(
+            f"[auto-trainer] volume-ready root={volume_root} created={manifest.get('created_count', 0)}"
+        )
+    except Exception as volume_exc:
+        print(f"[auto-trainer] volume setup failed: {volume_exc}")
     _load_learning_state()
     while True:
         try:

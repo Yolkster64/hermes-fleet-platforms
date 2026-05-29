@@ -48,6 +48,7 @@ This runtime enables:
   - GUI API/action helper split: `runtime/hermes/gui_api_client.py`
   - GUI insights/render split: `runtime/hermes/gui_insights.py`
   - GUI volume explorer split: `runtime/hermes/gui_volume_tools.py`
+  - Runtime volume bootstrap: `runtime/hermes/volume_setup.py` (shared by trainer + GUI)
   - Trainer alias: `runtime/hermes/apps/fleet_trainer_service.py`
   - Startup helpers: `runtime/hermes/scripts/startup/helpers.ps1`
   - Legacy aliases remain (`gui_fleet_control_center.py`, `trainer_fleet_super.py`, `gui_dashboard.py`, `auto_trainer.py`, `start-local.ps1`, `start-agent-fleet.ps1`, `start-common.ps1`, `start-hermes-local-runtime.ps1`, `start-hermes-super-fleet.ps1`, `startup-helpers.ps1`) for compatibility
@@ -89,6 +90,7 @@ This runtime enables:
   - Training Compliance panel with always-on status, idle timer, and one-click forced pulse
   - Hermes Bundle export/download area for easy chat handoff and external analysis
   - Data Volume Explorer for `/workspace/runtime/hermes_persist` with file list, preview, and direct download
+  - Volume setup controls in GUI: initialize/repair standard runtime folders + manifest for training/knowledge/export/log/cache
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
   - Deep Auto Learning Zone (`♾️`) with study-area targeting and multi-round comparison
   - Advanced intelligence controls: KNAA/QNAA, quantization, multi-parallel swarm, multipolar strategy, gaussian pressure, permanent memory mode
