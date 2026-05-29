@@ -584,6 +584,23 @@ def _smart_actions(data: dict, cycle: int, active_specialty: str, skill_pack: li
         headers=_headers(),
         timeout=60,
     ).raise_for_status()
+    requests.post(
+        f"{API_BASE}/ingest-signal",
+        json={
+            "source": "auto_trainer.heartbeat",
+            "signal_score": max(0.0, min(1.0, signal_score)),
+            "payload": {
+                "cycle": _cycle,
+                "specialty": dynamic_specialty,
+                "mode": "continuous_training",
+                "fleet_model_label": FLEET_MODEL_LABEL,
+                "shared_model_id": SHARED_MODEL_ID,
+                "timestamp_unix": time.time(),
+            },
+        },
+        headers=_headers(),
+        timeout=30,
+    ).raise_for_status()
     if MAX_MODE or cycle % 2 == 0:
         _post(
             "/optimize-fleet",

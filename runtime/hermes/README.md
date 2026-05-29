@@ -27,6 +27,7 @@ This runtime enables:
   - `HERMES_ORCHESTRATOR_STATE_SAVE_SECONDS=10`
 - Learning-state APIs for local data flow:
   - `GET /learning-growth`
+  - `GET /training-status`
   - `GET /learning-state`
   - `POST /learning-state/import`
   - `GET /knowledge-mesh`
@@ -71,6 +72,9 @@ This runtime enables:
   - Visual learning flow diagram + multiple XP bars
   - Fleet Data section (`/snapshot`) for live runtime context (raw hidden by default)
   - Fleet Summary text and instant Fleet Health Report action
+  - Training Compliance panel with always-on status, idle timer, and one-click forced pulse
+  - Hermes Bundle export/download area for easy chat handoff and external analysis
+  - Data Volume Explorer for `/workspace/runtime/hermes_persist` with file list, preview, and direct download
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
   - Deep Auto Learning Zone (`♾️`) with study-area targeting and multi-round comparison
   - Advanced intelligence controls: KNAA/QNAA, quantization, multi-parallel swarm, multipolar strategy, gaussian pressure, permanent memory mode

@@ -139,6 +139,7 @@ app.MapGet("/", () =>
             "/health",
             "/snapshot",
             "/learning-growth",
+            "/training-status",
             "/learning-state",
             "/cpp-kernel-status",
             "/knowledge-mesh",
@@ -186,6 +187,11 @@ app.MapGet("/snapshot", async (IHttpClientFactory factory, HttpContext context) 
 app.MapGet("/learning-growth", async (IHttpClientFactory factory, HttpContext context) =>
 {
     return await ProxyGetJson(factory, context, "/learning-growth");
+});
+
+app.MapGet("/training-status", async (IHttpClientFactory factory, HttpContext context) =>
+{
+    return await ProxyGetJson(factory, context, "/training-status");
 });
 
 app.MapGet("/learning-state", async (IHttpClientFactory factory, HttpContext context) =>

@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
 import requests
@@ -342,6 +343,61 @@ def fleet_score_history(snapshot_data: Dict[str, Any]) -> List[float]:
     return scores
 
 
+def resolve_volume_root() -> str:
+    candidates = [
+        os.getenv("HERMES_VOLUME_DATA_PATH", "").strip(),
+        "/workspace/runtime/hermes_persist",
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "hermes_persist")),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "auto")),
+    ]
+    for path in candidates:
+        if path and os.path.exists(path):
+            return path
+    return "/workspace/runtime/hermes_persist"
+
+
+def scan_volume_files(root: str, limit: int = 500) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    if not os.path.exists(root):
+        return rows
+    for base, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in {".git", "__pycache__", "node_modules"}]
+        for name in files:
+            path = os.path.join(base, name)
+            try:
+                stat = os.stat(path)
+            except OSError:
+                continue
+            rel = os.path.relpath(path, root).replace("\\", "/")
+            rows.append(
+                {
+                    "relative_path": rel,
+                    "bytes": int(stat.st_size),
+                    "modified_unix": float(stat.st_mtime),
+                    "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+                }
+            )
+    rows.sort(key=lambda r: r["modified_unix"], reverse=True)
+    return rows[: max(50, min(2000, int(limit)))]
+
+
+def read_volume_file(root: str, rel_path: str, max_bytes: int = 2_000_000) -> Tuple[bytes, str]:
+    target = os.path.abspath(os.path.join(root, rel_path))
+    root_abs = os.path.abspath(root)
+    if not target.startswith(root_abs):
+        return b"", "Invalid path."
+    if not os.path.exists(target):
+        return b"", "File not found."
+    try:
+        with open(target, "rb") as fh:
+            data = fh.read(max_bytes + 1)
+    except OSError as exc:
+        return b"", str(exc)
+    if len(data) > max_bytes:
+        return data[:max_bytes], f"File truncated to {max_bytes} bytes for preview."
+    return data, ""
+
+
 st.set_page_config(page_title="Hermes Super Easy", page_icon="🧠", layout="wide")
 st.title("Hermes Fleet Command Center")
 st.caption("Super simple dashboard: what is happening now, how learning works, and one-click actions.")
@@ -381,6 +437,7 @@ unified, unified_err = safe_get("/unified-config", timeout=20)
 bonus_data, bonus_err = safe_get("/aihub-bonus", timeout=20)
 snapshot, snapshot_err = safe_get("/snapshot", timeout=20)
 growth_data, growth_err = safe_get("/learning-growth", timeout=20)
+training_status, training_status_err = safe_get("/training-status", timeout=20)
 cpp_kernel, cpp_kernel_err = safe_get("/cpp-kernel-status", timeout=20)
 knowledge_mesh, mesh_err = safe_get("/knowledge-mesh", timeout=20)
 aihub_bonus = float(bonus_data.get("aihub_bonus", 0.0))
@@ -402,6 +459,8 @@ if unified_err:
     st.error(f"Gateway not ready: {unified_err}")
 if bonus_err:
     st.warning(f"AIHub bonus pending: {bonus_err}")
+if training_status_err:
+    st.warning(f"Training status pending: {training_status_err}")
 
 st.write(
     f"**Unified AI/ML:** provider={unified.get('llm_api_provider', 'temp-api')} | "
@@ -413,6 +472,26 @@ if LOW_BANDWIDTH_MODE:
 if USER_ROUTED_INTERNET and not OFFLINE_ONLY_MODE:
     st.caption("Internet mode: routed through your controlled path only (capped low internet-signal).")
 render_learning_diagram()
+
+st.subheader("Training Compliance + Always-On Status")
+ts1, ts2, ts3, ts4 = st.columns(4)
+is_training_active = bool(training_status.get("training_active", False)) if not training_status_err else False
+idle_seconds = training_status.get("idle_seconds") if isinstance(training_status, dict) else None
+rule_score = str(training_status.get("rule_score", "n/a")) if isinstance(training_status, dict) else "n/a"
+recent_pulses = int(training_status.get("recent_learning_events", 0)) if isinstance(training_status, dict) else 0
+ts1.metric("Training", "Active" if is_training_active else "Needs Pulse")
+ts2.metric("Idle Seconds", "n/a" if idle_seconds is None else f"{float(idle_seconds):.1f}")
+ts3.metric("Rule Score", rule_score)
+ts4.metric("Recent Pulses", str(recent_pulses))
+if not is_training_active:
+    st.warning("Training appears idle. Use 'Force Training Pulse Now' to restart immediate learning.")
+if st.button("Force Training Pulse Now", use_container_width=True):
+    pulse_now, pulse_now_err = safe_post("/learning-pulse", {"specialty": "fleet", "steps": 220, "candidates": 140}, timeout=120)
+    if pulse_now_err:
+        st.error(f"Training pulse failed: {pulse_now_err}")
+    else:
+        log_text("force-training-pulse", pulse_now)
+        st.success("Training pulse triggered.")
 
 cpp1, cpp2, cpp3 = st.columns(3)
 cpp_available = bool(cpp_kernel.get("available", False)) if not cpp_kernel_err else False
@@ -818,6 +897,72 @@ with exp2:
 with exp3:
     st.caption("Use this to move full Hermes learning memory locally between runs/machines.")
 st.text_area("Learning State JSON", key="learning_state_blob", height=220)
+
+st.subheader("Share to Chat / Export Bundle")
+bundle_payload = {
+    "snapshot": snapshot if isinstance(snapshot, dict) else {},
+    "growth": growth_data if isinstance(growth_data, dict) else {},
+    "training_status": training_status if isinstance(training_status, dict) else {},
+    "knowledge_mesh_summary": knowledge_mesh.get("summary", {}) if isinstance(knowledge_mesh, dict) else {},
+    "unified_config": unified if isinstance(unified, dict) else {},
+}
+bundle_json = json.dumps(bundle_payload, indent=2)
+sb1, sb2 = st.columns([1.2, 2.0])
+with sb1:
+    st.download_button(
+        "Download Hermes Bundle JSON",
+        data=bundle_json.encode("utf-8"),
+        file_name="hermes_bundle.json",
+        mime="application/json",
+        use_container_width=True,
+    )
+with sb2:
+    st.caption("Use this bundle for easy sharing, analysis, and replay in other tools/conversations.")
+st.text_area("Hermes Bundle (copy/paste here)", value=bundle_json, height=220)
+
+st.subheader("Data Volume Explorer (easy pull + analysis)")
+volume_root = resolve_volume_root()
+vf1, vf2 = st.columns([2, 1])
+with vf1:
+    st.caption(f"Volume root: {volume_root}")
+with vf2:
+    file_limit = st.slider("Volume file rows", min_value=50, max_value=1200, value=300, step=50)
+volume_rows = scan_volume_files(volume_root, limit=file_limit)
+if not volume_rows:
+    st.caption("No files found in volume root yet.")
+else:
+    st.dataframe(
+        [
+            {
+                "Path": row["relative_path"],
+                "Size (KB)": round(row["bytes"] / 1024.0, 2),
+                "Modified": row["modified"],
+            }
+            for row in volume_rows
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    selected_volume_file = st.selectbox(
+        "Select volume file",
+        options=[row["relative_path"] for row in volume_rows],
+        index=0,
+    )
+    preview_bytes, preview_err = read_volume_file(volume_root, selected_volume_file)
+    if preview_err:
+        st.warning(preview_err)
+    if preview_bytes:
+        st.download_button(
+            "Download Selected File",
+            data=preview_bytes,
+            file_name=os.path.basename(selected_volume_file),
+            use_container_width=True,
+        )
+        try:
+            preview_text = preview_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            preview_text = f"[binary preview] {len(preview_bytes)} bytes"
+        st.text_area("Selected File Preview", value=preview_text[:120000], height=220)
 
 st.subheader("Hermes Fleet Units")
 if snapshot_err:

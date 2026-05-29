@@ -2003,6 +2003,53 @@ class HermesSuperOrchestrator:
             "external_signals_tail": self.store.recent_external_signals(limit=20),
         }
 
+    def training_status(self, max_idle_seconds: int = 120) -> Dict:
+        now = time.time()
+        max_idle = max(30, int(max_idle_seconds))
+        recent_events = self.store.recent_events(limit=80)
+        recent_signals = self.store.recent_external_signals(limit=80)
+
+        last_event_ts = 0.0
+        for item in recent_events:
+            if item.get("event_type") in ("learning_pulse", "train_step", "learning_curated", "fleet_optimized"):
+                ts = float(item.get("ts", 0.0))
+                if ts > last_event_ts:
+                    last_event_ts = ts
+
+        last_trainer_signal_ts = 0.0
+        for item in recent_signals:
+            src = str(item.get("source", "")).lower()
+            if "auto_trainer" in src or "trainer" in src:
+                ts = float(item.get("ts", 0.0))
+                if ts > last_trainer_signal_ts:
+                    last_trainer_signal_ts = ts
+
+        last_training_ts = max(last_event_ts, last_trainer_signal_ts)
+        idle_seconds = max(0.0, now - last_training_ts) if last_training_ts > 0 else float("inf")
+        training_active = idle_seconds <= float(max_idle)
+        cpp = self.cpp_kernel_status()
+        rules = {
+            "training_active": training_active,
+            "cpp_brain_available": bool(cpp.get("available", False)),
+            "aihub_unified_enabled": bool(self.unified_config.get("aihub_unified_enabled", True)),
+            "offline_only_mode": bool(self.offline_only_mode),
+            "user_routed_internet": bool(self.user_routed_internet),
+        }
+        passing_rules = len([v for v in rules.values() if bool(v)])
+        return {
+            "ok": True,
+            "training_active": training_active,
+            "max_idle_seconds": max_idle,
+            "idle_seconds": None if last_training_ts <= 0 else idle_seconds,
+            "last_training_unix": None if last_training_ts <= 0 else last_training_ts,
+            "recent_learning_events": len([e for e in recent_events if e.get("event_type") == "learning_pulse"]),
+            "recent_train_steps": len([e for e in recent_events if e.get("event_type") == "train_step"]),
+            "recent_trainer_signals": len([s for s in recent_signals if "trainer" in str(s.get("source", "")).lower()]),
+            "rules": rules,
+            "rule_score": f"{passing_rules}/{len(rules)}",
+            "recommended_action": "continue_training" if training_active else "trigger_learning_pulse_or_auto_trainer",
+        }
+
 
 class OrchestratorApi:
     def __init__(self, orchestrator: HermesSuperOrchestrator, host: str = "127.0.0.1", port: int = 8787) -> None:
@@ -2059,6 +2106,9 @@ class OrchestratorApi:
                     return
                 if self.path == "/knowledge-mesh":
                     self._json(orchestrator.knowledge_mesh_state())
+                    return
+                if self.path == "/training-status":
+                    self._json(orchestrator.training_status())
                     return
                 self._json({"error": "not_found"}, status=404)
 
