@@ -2114,6 +2114,10 @@ class HermesSuperOrchestrator:
         maturity_signal = max(0.0, min(1.0, float(training_variables.get("maturity_signal", 0.5))))
         position_score = max(0.0, min(1.0, float(training_variables.get("position_score", 0.5))))
         monitor_comparison = max(0.0, min(1.0, float(training_variables.get("monitor_comparison", 0.5))))
+        success_signal = max(0.0, min(1.0, float(training_variables.get("success_signal", 0.5))))
+        wrongness_signal = max(0.0, min(1.0, float(training_variables.get("wrongness_signal", 0.5))))
+        sql_pattern_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("sql_pattern", lookback=120))))
+        github_sync_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("github_knowledge_sync", lookback=120))))
         speed_priority = clamp01(speed_priority)
         energy_saver = clamp01(energy_saver)
 
@@ -2136,6 +2140,10 @@ class HermesSuperOrchestrator:
                 + (maturity_signal * power_score * 0.08)
                 + (position_score * speed_score * 0.05)
                 + (monitor_comparison * cost_score * 0.04)
+                + (success_signal * power_score * 0.06)
+                + ((1.0 - wrongness_signal) * cost_score * 0.04)
+                + (sql_pattern_signal * power_score * 0.07)
+                + (github_sync_signal * speed_score * 0.04)
                 + (speed_priority * speed_score * 0.06)
                 + (energy_saver * cost_score * 0.06)
             )
@@ -2158,6 +2166,10 @@ class HermesSuperOrchestrator:
                 "maturity_signal": maturity_signal,
                 "position_score": position_score,
                 "monitor_comparison": monitor_comparison,
+                "success_signal": success_signal,
+                "wrongness_signal": wrongness_signal,
+                "sql_pattern_signal": sql_pattern_signal,
+                "github_sync_signal": github_sync_signal,
             },
             "candidates": [
                 {

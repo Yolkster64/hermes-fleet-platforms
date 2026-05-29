@@ -49,6 +49,7 @@ This runtime enables:
   - GUI insights/render split: `runtime/hermes/gui_insights.py`
   - GUI volume explorer split: `runtime/hermes/gui_volume_tools.py`
   - Runtime volume bootstrap: `runtime/hermes/volume_setup.py` (shared by trainer + GUI)
+  - SQL training intelligence: `runtime/hermes/training_sql_intel.py` (deep variable-pattern tracking + GitHub context)
   - Trainer alias: `runtime/hermes/apps/fleet_trainer_service.py`
   - Startup helpers: `runtime/hermes/scripts/startup/helpers.ps1`
   - Legacy aliases remain (`gui_fleet_control_center.py`, `trainer_fleet_super.py`, `gui_dashboard.py`, `auto_trainer.py`, `start-local.ps1`, `start-agent-fleet.ps1`, `start-common.ps1`, `start-hermes-local-runtime.ps1`, `start-hermes-super-fleet.ps1`, `startup-helpers.ps1`) for compatibility
@@ -91,6 +92,7 @@ This runtime enables:
   - Hermes Bundle export/download area for easy chat handoff and external analysis
   - Data Volume Explorer for `/workspace/runtime/hermes_persist` with file list, preview, and direct download
   - Volume setup controls in GUI: initialize/repair standard runtime folders + manifest for training/knowledge/export/log/cache
+  - SQL-backed training intelligence now writes cycle data to volume (`training/hermes_training_intel.sqlite3`), computes deep variable-pattern summaries, and surfaces pattern/variable/GitHub context in GUI
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
   - Deep Auto Learning Zone (`♾️`) with study-area targeting and multi-round comparison
   - Advanced intelligence controls: KNAA/QNAA, quantization, multi-parallel swarm, multipolar strategy, gaussian pressure, permanent memory mode

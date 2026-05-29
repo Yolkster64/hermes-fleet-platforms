@@ -2,6 +2,7 @@ import os
 from datetime import datetime
 from typing import Dict, List, Tuple
 
+from training_sql_intel import compute_sql_pattern_intel, ensure_training_sql
 from volume_setup import ensure_runtime_volume_setup, resolve_runtime_volume_root
 
 
@@ -62,3 +63,11 @@ def volume_health_summary(rows: List[Dict[str, object]]) -> Dict[str, float]:
 
 def initialize_volume_layout(root: str | None = None) -> Tuple[str, Dict[str, object]]:
     return ensure_runtime_volume_setup(root=root)
+
+
+def read_sql_training_intelligence(root: str) -> Dict[str, object]:
+    try:
+        ensure_training_sql(root)
+        return compute_sql_pattern_intel(root, lookback=240)
+    except Exception as exc:
+        return {"rows": 0, "pattern_score": 0.0, "trend": 0.0, "error": str(exc), "variable_means": {}, "latest_github": {}}

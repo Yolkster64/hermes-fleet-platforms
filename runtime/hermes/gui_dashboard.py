@@ -6,7 +6,14 @@ from typing import Any, Dict, List, Tuple
 import streamlit as st
 from gui_api_client import API_BASE, log_text, run_logged_post_action, safe_get, safe_post
 from gui_insights import fleet_score_history, latest_learned_profile, render_learning_diagram, render_xp_bar
-from gui_volume_tools import initialize_volume_layout, read_volume_file, resolve_volume_root, scan_volume_files, volume_health_summary
+from gui_volume_tools import (
+    initialize_volume_layout,
+    read_sql_training_intelligence,
+    read_volume_file,
+    resolve_volume_root,
+    scan_volume_files,
+    volume_health_summary,
+)
 try:
     from core.hermes_variable_registry import VARIABLE_CATALOG, default_user_entry_profile
 except Exception:  # pragma: no cover
@@ -997,6 +1004,7 @@ with vf3:
         st.success(f"Volume layout ready at: {root_out}")
         log_text("volume-layout-init", manifest if isinstance(manifest, dict) else {"status": "ok"})
 volume_rows = scan_volume_files(volume_root, limit=file_limit)
+sql_intel = read_sql_training_intelligence(volume_root)
 if not volume_rows:
     st.caption("No files found in volume root yet.")
 else:
@@ -1004,6 +1012,7 @@ else:
     with vf4:
         st.metric("Volume Files", int(summary.get("file_count", 0.0)))
         st.metric("Volume Size (MB)", f"{summary.get('total_mb', 0.0):.2f}")
+        st.metric("SQL Pattern", f"{float(sql_intel.get('pattern_score', 0.0)) * 100:.1f}%")
     st.dataframe(
         [
             {
@@ -1036,6 +1045,28 @@ else:
         except UnicodeDecodeError:
             preview_text = f"[binary preview] {len(preview_bytes)} bytes"
         st.text_area("Selected File Preview", value=preview_text[:120000], height=220)
+
+st.caption(
+    f"SQL training rows: {int(sql_intel.get('rows', 0))} | "
+    f"trend: {float(sql_intel.get('trend', 0.0)):+.4f} | "
+    f"signal avg: {float(sql_intel.get('signal_avg', 0.0)):.4f}"
+)
+latest_github = sql_intel.get("latest_github", {}) if isinstance(sql_intel, dict) else {}
+if isinstance(latest_github, dict) and latest_github:
+    st.caption(
+        f"GitHub->Volume context: {latest_github.get('branch', 'unknown')} "
+        f"{latest_github.get('commit_sha', '')} "
+        f"({latest_github.get('changed_files', 0)} changed files)"
+    )
+variable_means = sql_intel.get("variable_means", {}) if isinstance(sql_intel, dict) else {}
+if isinstance(variable_means, dict) and variable_means:
+    top_vars = sorted(variable_means.items(), key=lambda item: abs(float(item[1]) - 0.5), reverse=True)[:10]
+    st.caption("Top SQL pattern variables")
+    st.dataframe(
+        [{"variable": k, "mean_value": float(v)} for k, v in top_vars],
+        use_container_width=True,
+        hide_index=True,
+    )
 
 st.subheader("Hermes Fleet Units")
 if snapshot_err:

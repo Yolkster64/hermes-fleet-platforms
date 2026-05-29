@@ -6,6 +6,7 @@ import json
 
 import requests
 from volume_setup import ensure_runtime_volume_setup
+from training_sql_intel import compute_sql_pattern_intel, ensure_training_sql, ingest_github_context, record_training_cycle
 try:
     from core.hermes_variable_registry import VARIABLE_CATALOG, clamp01, compute_efficiency_profile
 except Exception:  # pragma: no cover
@@ -88,6 +89,7 @@ AGENT_SKILLS_25 = [
     "reliability_engineering",
 ]
 _cycle = 0
+_volume_root = ""
 _strategy_memory: dict[str, dict[str, float]] = {
     "speed": {k: 0.0 for k in ("nano-swarm", "hybrid", "swarm", "mesh", "multipolar", "specialist-mix")},
     "quality": {k: 0.0 for k in ("nano-swarm", "hybrid", "swarm", "mesh", "multipolar", "specialist-mix")},
@@ -724,7 +726,7 @@ def _emit_knowledge_sync(
 
 
 def run_cycle() -> None:
-    global _cycle
+    global _cycle, _volume_root
     _cycle += 1
     active_specialty = _active_specialty(_cycle)
     skill_pack = _selected_skills(_cycle)
@@ -842,6 +844,35 @@ def run_cycle() -> None:
     learned_reward = float(pulse_out.get("avg_reward", data.get("avg_reward_score", 0.5)))
     learned_truth = float(data.get("avg_truth_score", 0.6))
     learned_shape = float(data.get("avg_fleet_shape_score", 0.55))
+    sql_intel = {"rows": 0, "pattern_score": 0.0, "trend": 0.0, "variable_means": {}, "latest_github": {}}
+    if _volume_root:
+        try:
+            record_training_cycle(
+                volume_root=_volume_root,
+                cycle=_cycle,
+                specialty=dynamic_specialty,
+                signal_score=signal_score,
+                reward=learned_reward,
+                truth_score=learned_truth,
+                shape_score=learned_shape,
+                training_variables=training_variables,
+            )
+            if _cycle % 4 == 0:
+                ingest_github_context(_volume_root, repo_root=os.getcwd())
+            sql_intel = compute_sql_pattern_intel(_volume_root, lookback=240)
+            _emit_signal(
+                "auto_trainer.sql_pattern",
+                float(sql_intel.get("pattern_score", signal_score)),
+                {
+                    "cycle": _cycle,
+                    "specialty": dynamic_specialty,
+                    "sql_intel": sql_intel,
+                    "training_variables": training_variables,
+                },
+                timeout=30,
+            )
+        except Exception as sql_exc:
+            print(f"[auto-trainer] sql intel failed: {sql_exc}")
     weighted_reward = max(0.0, min(1.0, (learned_reward * 0.75) + (brain_value["value"] * 0.25)))
     _update_strategy_memory(occasion, selected_strategy, weighted_reward, learned_truth, learned_shape)
     _record_evidence(occasion, selected_strategy, agent_size, factors, learned_reward, learned_truth, learned_shape)
@@ -873,6 +904,7 @@ def run_cycle() -> None:
         f"[auto-trainer] cycle={_cycle} mode={'MAX' if MAX_MODE else 'BALANCED'} strategy={selected_strategy} "
         f"specialty={dynamic_specialty} size={agent_size} micro_agents={dynamic_micro_agents} "
         f"high_level_learning={HIGH_LEVEL_LEARNING:.2f} chaos={chaos_rate:.3f} "
+        f"sql_pattern={float(sql_intel.get('pattern_score', 0.0)):.4f} "
         f"cpp_native={str(cpp_available).lower()} "
         f"skills={','.join(skill_pack)} steps={data.get('steps')} "
         f"avg_reward={data.get('avg_reward_score'):.4f} "
@@ -886,6 +918,8 @@ def run_cycle() -> None:
 if __name__ == "__main__":
     try:
         volume_root, manifest = ensure_runtime_volume_setup()
+        _volume_root = volume_root
+        ensure_training_sql(_volume_root)
         print(
             f"[auto-trainer] volume-ready root={volume_root} created={manifest.get('created_count', 0)}"
         )
