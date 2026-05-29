@@ -3,10 +3,10 @@ WORKDIR /src
 COPY runtime/hermes/gateway/HermesGateway.csproj runtime/hermes/gateway/
 RUN dotnet restore runtime/hermes/gateway/HermesGateway.csproj
 COPY runtime/hermes/gateway/ runtime/hermes/gateway/
-RUN dotnet publish runtime/hermes/gateway/HermesGateway.csproj -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish runtime/hermes/gateway/HermesGateway.csproj -c Release -o /app/publish /p:UseAppHost=true
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0
 WORKDIR /app
 COPY --from=build /app/publish .
 ENV ASPNETCORE_URLS=http://0.0.0.0:8788
-ENTRYPOINT ["dotnet", "HermesGateway.dll"]
+ENTRYPOINT ["/app/HermesGateway"]
