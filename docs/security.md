@@ -1,24 +1,12 @@
-# Security Best Practices
+# Security Baseline Checklist
 
-This document outlines security best practices for development and deployment.
+For platform-level controls and architecture decisions, use [`SECURITY.md`](./SECURITY.md).
 
-## General Guidelines
-- Never commit secrets or credentials to the repository.
-- Use environment variables for sensitive data.
-- Regularly update dependencies to patch vulnerabilities.
-- Enable 2FA on all accounts with access to the codebase.
+This checklist is for quick operational verification:
 
-## Application Security
-- Validate all user input to prevent injection attacks.
-- Use HTTPS for all network communication.
-- Store passwords securely using strong hashing algorithms (e.g., bcrypt).
-- Implement proper authentication and authorization checks.
-
-## Infrastructure Security
-- Restrict access to production systems using firewalls and VPNs.
-- Use least privilege principles for all services and users.
-- Regularly audit access logs and permissions.
-
-## Incident Response
-- Have a process for reporting and responding to security incidents.
-- Rotate credentials immediately if a breach is suspected.
+1. Secrets are stored outside source control.
+2. CI/CD identities use least privilege.
+3. API endpoints enforce authorization and input validation.
+4. TLS is enabled for all external traffic.
+5. Audit logs are retained and queryable.
+6. Incident response contacts and rotation runbooks are current.

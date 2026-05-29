@@ -1,20 +1,21 @@
 # LLM Usage Guide
 
-This guide explains how to use Large Language Models (LLMs) within the project.
+This guide explains how to use Large Language Models (LLMs) within Hermes Fleet Platforms.
 
 ## Integration
-- LLMs are accessed via API endpoints defined in the `/api/llm/` directory.
-- Supported providers: OpenAI, Azure, and local models (e.g., llama.cpp).
-- Configure provider credentials in the `.env` file.
+- Use provider adapters in `/llm-orchestration`.
+- Supported providers: OpenAI, Azure OpenAI, and local model runtimes.
+- Keep provider credentials in environment variables (`.env`), never in source files.
 
 ## Usage
-- Use the provided SDK or HTTP endpoints to send prompts and receive completions.
-- Handle rate limits and errors gracefully in your application code.
+- Use orchestration helpers to route prompts to the right provider/model.
+- Add retry/backoff for transient API failures.
+- Capture request/response metadata for observability and cost tracking.
 
 ## Best Practices
-- Always sanitize user input before sending to the LLM.
-- Log usage for monitoring and debugging.
-- Respect provider terms of service and usage limits.
+- Sanitize user input before prompt composition.
+- Keep prompts versioned so behavior changes are traceable.
+- Enforce policy checks before returning model output to end users.
 
 ## Example
 ```js

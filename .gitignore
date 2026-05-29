@@ -1,17 +1,24 @@
-.cache/
-AppData/
-Application\
-Data/
-Local\
-Settings/
-My\
-Documents/
-Documents/
-Cookies/
-NetHood/
-PrintHood/
-Recent/
-SendTo/
-Start\
-Menu/
-Templates/
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Build artifacts
+bin/
+obj/
+dist/
+build/
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Local environment/config
+.env
+.env.*

@@ -1,3 +1,23 @@
-# docs
+# Documentation Index
 
-This folder contains deep guides, architecture docs, best practices, and setup instructions for Hermes Fleet.
+This folder contains architecture notes, setup guides, and operations playbooks for Hermes Fleet Platforms.
+
+## Core Guides
+
+- [`GETTING_STARTED.md`](./GETTING_STARTED.md) - onboarding flow for local/dev deployment.
+- [`AI.md`](./AI.md) - AI integration model (local + cloud orchestration).
+- [`SECURITY.md`](./SECURITY.md) - security architecture and operational controls.
+- [`integration.md`](./integration.md) - integration patterns and best practices.
+- [`setup.md`](./setup.md) - setup checklist and baseline tooling.
+
+## Hermes Agents + SQL + GitHub CLI
+
+- [`HERMES_AGENTS_SQL_GHCLI.md`](./HERMES_AGENTS_SQL_GHCLI.md) - detailed end-to-end runbook for:
+  - multi-agent orchestration
+  - SQL-backed training and telemetry
+  - GitHub CLI-driven delivery flow (branch, PR, status, release)
+
+## Supporting References
+
+- [`llm-usage.md`](./llm-usage.md) - provider usage and prompt/runtime practices.
+- [`security.md`](./security.md) - generic security baseline checklist.
