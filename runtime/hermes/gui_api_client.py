@@ -3,6 +3,7 @@ import time
 from typing import Any, Dict, Tuple
 
 import requests
+from requests.adapters import HTTPAdapter
 import streamlit as st
 
 API_BASE = os.getenv("HERMES_API_BASE_URL", "http://localhost:8788")
@@ -13,14 +14,23 @@ def headers() -> Dict[str, str]:
     return {"X-Hermes-Key": key} if key else {}
 
 
+def _session() -> requests.Session:
+    if "_api_http_session" not in st.session_state:
+        sess = requests.Session()
+        sess.mount("http://", HTTPAdapter(pool_connections=16, pool_maxsize=16, max_retries=0))
+        sess.mount("https://", HTTPAdapter(pool_connections=8, pool_maxsize=8, max_retries=0))
+        st.session_state["_api_http_session"] = sess
+    return st.session_state["_api_http_session"]
+
+
 def api_get(path: str, timeout: int = 30) -> Dict[str, Any]:
-    r = requests.get(f"{API_BASE}{path}", headers=headers(), timeout=timeout)
+    r = _session().get(f"{API_BASE}{path}", headers=headers(), timeout=timeout)
     r.raise_for_status()
     return r.json()
 
 
 def api_post(path: str, payload: Dict[str, Any], timeout: int = 120) -> Dict[str, Any]:
-    r = requests.post(f"{API_BASE}{path}", json=payload, headers=headers(), timeout=timeout)
+    r = _session().post(f"{API_BASE}{path}", json=payload, headers=headers(), timeout=timeout)
     r.raise_for_status()
     return r.json()
 
@@ -28,7 +38,7 @@ def api_post(path: str, payload: Dict[str, Any], timeout: int = 120) -> Dict[str
 def safe_get(path: str, timeout: int = 30) -> Tuple[Dict[str, Any], str]:
     try:
         return api_get(path, timeout=timeout), ""
-    except Exception as exc:  # pragma: no cover
+    except requests.RequestException as exc:  # pragma: no cover
         return {}, str(exc)
 
 
@@ -37,7 +47,7 @@ def safe_post(path: str, payload: Dict[str, Any], timeout: int = 120) -> Tuple[D
     for attempt in range(3):
         try:
             return api_post(path, payload=payload, timeout=timeout), ""
-        except Exception as exc:  # pragma: no cover
+        except requests.RequestException as exc:  # pragma: no cover
             last_error = str(exc)
             if attempt < 2:
                 time.sleep(0.7)
