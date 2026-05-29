@@ -93,31 +93,49 @@ def prune_training_sql(
         conn.execute(
             """
             DELETE FROM training_cycles
-            WHERE id NOT IN (
-                SELECT id FROM training_cycles ORDER BY id DESC LIMIT ?
+            WHERE id < COALESCE(
+                (
+                    SELECT id
+                    FROM training_cycles
+                    ORDER BY id DESC
+                    LIMIT 1 OFFSET ?
+                ),
+                -1
             )
             """,
-            (int(max_cycles),),
+            (max(0, int(max_cycles) - 1),),
         )
         pruned["training_cycles"] = int(conn.total_changes)
         conn.execute(
             """
             DELETE FROM hermes_agent_variables
-            WHERE id NOT IN (
-                SELECT id FROM hermes_agent_variables ORDER BY id DESC LIMIT ?
+            WHERE id < COALESCE(
+                (
+                    SELECT id
+                    FROM hermes_agent_variables
+                    ORDER BY id DESC
+                    LIMIT 1 OFFSET ?
+                ),
+                -1
             )
             """,
-            (int(max_agent_rows),),
+            (max(0, int(max_agent_rows) - 1),),
         )
         pruned["hermes_agent_variables"] = int(conn.total_changes) - pruned["training_cycles"]
         conn.execute(
             """
             DELETE FROM github_context
-            WHERE id NOT IN (
-                SELECT id FROM github_context ORDER BY id DESC LIMIT ?
+            WHERE id < COALESCE(
+                (
+                    SELECT id
+                    FROM github_context
+                    ORDER BY id DESC
+                    LIMIT 1 OFFSET ?
+                ),
+                -1
             )
             """,
-            (int(max_github_rows),),
+            (max(0, int(max_github_rows) - 1),),
         )
         pruned["github_context"] = int(conn.total_changes) - pruned["training_cycles"] - pruned["hermes_agent_variables"]
         conn.commit()
@@ -158,6 +176,39 @@ def record_training_cycle(
 
 def _clamp01(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
+
+
+def _read_git_context(repo_root: str) -> tuple[str, str, str, int]:
+    branch = "unknown"
+    commit_sha = "unknown"
+    commit_subject = ""
+    changed_files = 0
+    try:
+        status_out = subprocess.check_output(
+            ["git", "--no-pager", "status", "--short", "--branch"],
+            cwd=repo_root,
+            text=True,
+            timeout=6,
+        )
+        status_lines = [line for line in status_out.splitlines() if line.strip()]
+        if status_lines:
+            head = status_lines[0].strip()
+            if head.startswith("## "):
+                branch = head[3:].split("...", 1)[0].strip() or "unknown"
+            changed_files = sum(1 for line in status_lines[1:] if line and not line.startswith("## "))
+        log_out = subprocess.check_output(
+            ["git", "--no-pager", "log", "-1", "--pretty=%h|%s"],
+            cwd=repo_root,
+            text=True,
+            timeout=6,
+        ).strip()
+        if "|" in log_out:
+            sha, subject = log_out.split("|", 1)
+            commit_sha = sha.strip() or "unknown"
+            commit_subject = subject.strip()
+    except (subprocess.CalledProcessError, OSError, subprocess.TimeoutExpired):
+        return "unknown", "unknown", "", 0
+    return branch, commit_sha, commit_subject, int(changed_files)
 
 
 def _art_pattern_metrics(variable_means: Dict[str, float]) -> Dict[str, float]:
@@ -346,21 +397,7 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
 
 def ingest_github_context(volume_root: str, repo_root: str) -> Dict[str, object]:
     db = ensure_training_sql(volume_root)
-    branch = "unknown"
-    commit_sha = "unknown"
-    commit_subject = ""
-    changed_files = 0
-    try:
-        branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_root, text=True).strip()
-        commit_sha = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=repo_root, text=True).strip()
-        commit_subject = subprocess.check_output(["git", "log", "-1", "--pretty=%s"], cwd=repo_root, text=True).strip()
-        status = subprocess.check_output(["git", "--no-pager", "status", "--short"], cwd=repo_root, text=True)
-        changed_files = len([line for line in status.splitlines() if line.strip()])
-    except (subprocess.CalledProcessError, OSError):
-        branch = "unknown"
-        commit_sha = "unknown"
-        commit_subject = ""
-        changed_files = 0
+    branch, commit_sha, commit_subject, changed_files = _read_git_context(repo_root)
     payload = {
         "branch": branch,
         "commit_sha": commit_sha,
