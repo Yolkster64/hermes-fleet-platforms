@@ -2,16 +2,9 @@ Set-Location $PSScriptRoot
 docker compose up -d --build
 docker compose ps
 
-$api = "http://localhost:8787"
-$gateway = "http://localhost:8788"
-for ($i = 0; $i -lt 20; $i++) {
-    try {
-        Invoke-RestMethod -Uri "$api/health" -Method Get | Out-Null
-        break
-    } catch {
-        Start-Sleep -Seconds 2
-    }
-}
+$gatewayPort = if ($env:MCP_DOCKER_PORT) { $env:MCP_DOCKER_PORT } else { "8788" }
+$guiPort = if ($env:HERMES_GUI_PORT) { $env:HERMES_GUI_PORT } else { "8501" }
+$gateway = "http://localhost:$gatewayPort"
 
 for ($i = 0; $i -lt 20; $i++) {
     try {
@@ -21,14 +14,14 @@ for ($i = 0; $i -lt 20; $i++) {
         Start-Sleep -Seconds 2
     }
 
-    try {
-        Invoke-RestMethod -Uri "$gateway/learning-pulse" -Method Post -ContentType "application/json" -Body '{"specialty":"fleet","steps":60,"candidates":40}' | Out-Null
-    } catch {
-        Write-Host "Warm-start pulse skipped (gateway not ready yet)."
-    }
 }
 
-Write-Host "Hermes API: http://localhost:8787"
-Write-Host "Hermes Gateway (C# front): http://localhost:8788"
-Write-Host "Hermes GUI: http://localhost:8501"
-Write-Host "Unified config: http://localhost:8788/unified-config"
+try {
+    Invoke-RestMethod -Uri "$gateway/learning-pulse" -Method Post -ContentType "application/json" -Body '{"specialty":"fleet","steps":60,"candidates":40}' | Out-Null
+} catch {
+    Write-Host "Warm-start pulse skipped."
+}
+
+Write-Host "Hermes MCP Gateway: $gateway"
+Write-Host "Hermes GUI: http://localhost:$guiPort"
+Write-Host "Unified config: $gateway/unified-config"

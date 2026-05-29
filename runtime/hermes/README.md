@@ -2,12 +2,10 @@
 
 1. Start stack:
    - `pwsh ./runtime/hermes/start-local.ps1`
-2. API:
-   - `http://localhost:8787`
-2b. C# gateway front:
-   - `http://localhost:8788`
+2. MCP Docker gateway (primary entry):
+   - `http://localhost:${MCP_DOCKER_PORT:-8788}`
 3. GUI:
-   - `http://localhost:8501`
+   - `http://localhost:${HERMES_GUI_PORT:-8501}`
 
 This runtime enables:
 - QNAA/KNAA training simulations through `/simulate` and `/horizon-tests`
@@ -24,6 +22,11 @@ This runtime enables:
 - API security between gateway and backend via `HERMES_API_KEY`
 - Single EXE entrypoint through C# gateway publish (`runtime/hermes/build-single-exe.ps1`)
   - Output: `runtime/hermes/dist/HermesUnified.exe`
+- LLM API bridge for Hermes via `/llm-chat` (through gateway), configured by:
+  - `AIHUB_LLM_API_URL`
+  - `AIHUB_LLM_API_KEY`
+  - `AIHUB_LLM_API_MODEL`
+- GUI text training ground for direct prompt/response workflow against the shared AIHub model
 - Resource targeting via env vars:
   - `HERMES_GPU_TARGET_UTILIZATION` (default `0.75`)
   - `HERMES_CPU_TARGET_UTILIZATION` (default `0.80`)
@@ -31,4 +34,4 @@ This runtime enables:
   - `AIHUB_UNIFIED_ENABLED` (default `true`)
   - `AIHUB_SHARED_MODEL_ID` (default `aihub-unified-v1`)
   - `AIHUB_SHARED_ML_PROFILE` (default `global-learning`)
-  - Inspect with `GET /unified-config` on gateway (`:8788`) or backend (`:8787`)
+  - Inspect with `GET /unified-config` on gateway (`:${MCP_DOCKER_PORT:-8788}`)

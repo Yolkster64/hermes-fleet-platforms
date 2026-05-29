@@ -15,8 +15,9 @@ services:
       AIHUB_UNIFIED_ENABLED: "true"
       AIHUB_SHARED_MODEL_ID: "aihub-unified-v1"
       AIHUB_SHARED_ML_PROFILE: "global-learning"
-    ports:
-      - "8787:8787"
+      AIHUB_LLM_API_URL: "${AIHUB_LLM_API_URL:-}"
+      AIHUB_LLM_API_KEY: "${AIHUB_LLM_API_KEY:-}"
+      AIHUB_LLM_API_MODEL: "${AIHUB_LLM_API_MODEL:-aihub-unified-v1}"
     volumes:
       - ../../:/workspace
       - ../auto:/workspace/runtime/auto
@@ -42,7 +43,7 @@ services:
     depends_on:
       - hermes-gateway
     ports:
-      - "8501:8501"
+      - "${HERMES_GUI_PORT:-8501}:8501"
     volumes:
       - ../../:/workspace
       - ../auto:/workspace/runtime/auto
@@ -78,7 +79,10 @@ services:
       AIHUB_UNIFIED_ENABLED: "true"
       AIHUB_SHARED_MODEL_ID: "aihub-unified-v1"
       AIHUB_SHARED_ML_PROFILE: "global-learning"
+      AIHUB_LLM_API_URL: "${AIHUB_LLM_API_URL:-}"
+      AIHUB_LLM_API_KEY: "${AIHUB_LLM_API_KEY:-}"
+      AIHUB_LLM_API_MODEL: "${AIHUB_LLM_API_MODEL:-aihub-unified-v1}"
     depends_on:
       - hermes-api
     ports:
-      - "8788:8788"
+      - "${MCP_DOCKER_PORT:-8788}:8788"

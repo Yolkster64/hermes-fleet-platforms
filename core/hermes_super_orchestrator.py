@@ -5,6 +5,8 @@ import random
 import sqlite3
 import threading
 import time
+import urllib.error
+import urllib.request
 import zlib
 from dataclasses import dataclass, asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -360,6 +362,8 @@ class HermesSuperOrchestrator:
             "aihub_unified_enabled": os.getenv("AIHUB_UNIFIED_ENABLED", "true").lower() in ("1", "true", "yes", "on"),
             "aihub_shared_model_id": os.getenv("AIHUB_SHARED_MODEL_ID", "aihub-unified-v1"),
             "aihub_shared_ml_profile": os.getenv("AIHUB_SHARED_ML_PROFILE", "global-learning"),
+            "llm_api_url": os.getenv("AIHUB_LLM_API_URL", ""),
+            "llm_api_model": os.getenv("AIHUB_LLM_API_MODEL", os.getenv("AIHUB_SHARED_MODEL_ID", "aihub-unified-v1")),
         }
         self.reward_weights = {
             "quality": 0.22,
@@ -994,6 +998,73 @@ class HermesSuperOrchestrator:
         self.store.write_event("dedupe_optimization", result)
         return result
 
+    def llm_chat(
+        self,
+        prompt: str,
+        system_prompt: str = "You are Hermes AIHub assistant.",
+        model: Optional[str] = None,
+        temperature: float = 0.3,
+        max_tokens: int = 512,
+    ) -> Dict:
+        llm_api_url = os.getenv("AIHUB_LLM_API_URL", "").strip()
+        llm_api_key = os.getenv("AIHUB_LLM_API_KEY", "").strip()
+        llm_model = (model or os.getenv("AIHUB_LLM_API_MODEL", self.unified_config["aihub_shared_model_id"])).strip()
+        if not llm_api_url:
+            return {"ok": False, "error": "llm_api_not_configured"}
+        if not prompt.strip():
+            return {"ok": False, "error": "prompt_required"}
+
+        payload = {
+            "model": llm_model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": max(0.0, min(1.5, float(temperature))),
+            "max_tokens": max(32, min(4096, int(max_tokens))),
+        }
+        headers = {"Content-Type": "application/json"}
+        if llm_api_key:
+            headers["Authorization"] = f"Bearer {llm_api_key}"
+
+        body = json.dumps(payload).encode("utf-8")
+        request = urllib.request.Request(llm_api_url, data=body, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(request, timeout=45) as response:
+                raw = response.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            raw_err = exc.read().decode("utf-8", errors="replace")
+            return {"ok": False, "error": "llm_api_http_error", "status": exc.code, "details": raw_err}
+        except urllib.error.URLError as exc:
+            return {"ok": False, "error": "llm_api_connection_error", "details": str(exc.reason)}
+
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = {"raw": raw}
+
+        text = ""
+        if isinstance(parsed, dict):
+            choices = parsed.get("choices", [])
+            if choices and isinstance(choices[0], dict):
+                msg = choices[0].get("message", {})
+                if isinstance(msg, dict):
+                    text = str(msg.get("content", ""))
+            if not text:
+                text = str(parsed.get("output_text", parsed.get("text", "")))
+
+        result = {
+            "ok": True,
+            "model": llm_model,
+            "response_text": text,
+            "provider_response": parsed,
+        }
+        self.store.write_event(
+            "llm_chat",
+            {"model": llm_model, "prompt_chars": len(prompt), "response_chars": len(text)},
+        )
+        return result
+
     def compute_aihub_bonus(self) -> float:
         signal = self.store.recent_external_signal_score()
         knaa_tail = self.algorithm_state["knaa_qnaa_memory"][-80:]
@@ -1135,7 +1206,7 @@ class OrchestratorApi:
                 if not self._authorized():
                     self._json({"error": "unauthorized"}, status=401)
                     return
-                if self.path not in ("/train-step", "/simulate", "/horizon-tests", "/rank-output", "/ingest-signal", "/optimize-fleet", "/curate-learning", "/learning-pulse", "/dedupe-optimize", "/aihub-bonus"):
+                if self.path not in ("/train-step", "/simulate", "/horizon-tests", "/rank-output", "/ingest-signal", "/optimize-fleet", "/curate-learning", "/learning-pulse", "/dedupe-optimize", "/aihub-bonus", "/llm-chat"):
                     self._json({"error": "not_found"}, status=404)
                     return
                 length = int(self.headers.get("Content-Length", "0"))
@@ -1199,6 +1270,14 @@ class OrchestratorApi:
                         )
                     elif self.path == "/aihub-bonus":
                         result = {"aihub_bonus": orchestrator.compute_aihub_bonus()}
+                    elif self.path == "/llm-chat":
+                        result = orchestrator.llm_chat(
+                            prompt=str(payload.get("prompt", "")),
+                            system_prompt=str(payload.get("system_prompt", "You are Hermes AIHub assistant.")),
+                            model=(str(payload.get("model", "")).strip() or None),
+                            temperature=float(payload.get("temperature", 0.3)),
+                            max_tokens=int(payload.get("max_tokens", 512)),
+                        )
                     else:
                         result = orchestrator.rank_llm_output(
                             output_text=str(payload.get("output", "")),

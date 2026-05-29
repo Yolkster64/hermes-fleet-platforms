@@ -146,6 +146,26 @@ app.MapPost("/dedupe-optimize", async (IHttpClientFactory factory, DedupeRequest
     return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
 });
 
+app.MapPost("/llm-chat", async (IHttpClientFactory factory, LlmChatRequest request, HttpContext context) =>
+{
+    if (!Authorized(context))
+        return Results.Unauthorized();
+    using var client = factory.CreateClient("hermes");
+    AttachBackendKey(client);
+    using var response = await client.PostAsJsonAsync(
+        $"{backendUrl}/llm-chat",
+        new
+        {
+            prompt = request.Prompt,
+            system_prompt = request.SystemPrompt,
+            model = request.Model,
+            temperature = request.Temperature,
+            max_tokens = request.MaxTokens,
+        });
+    var body = await response.Content.ReadAsStringAsync();
+    return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
+});
+
 app.MapGet("/aihub-bonus", async (IHttpClientFactory factory, HttpContext context) =>
 {
     if (!Authorized(context))
@@ -171,3 +191,9 @@ public sealed record LearningPulseRequest(
     double LlmSignal = 0.7,
     double StabilityBias = 0.72);
 public sealed record DedupeRequest(string[] Roots, int MaxFileMb = 8);
+public sealed record LlmChatRequest(
+    string Prompt,
+    string SystemPrompt = "You are Hermes AIHub assistant.",
+    string? Model = null,
+    double Temperature = 0.3,
+    int MaxTokens = 512);

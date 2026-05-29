@@ -46,6 +46,22 @@ def fetch_aihub_bonus():
     return response.json().get("aihub_bonus", 0.0)
 
 
+def run_llm_chat(prompt: str, system_prompt: str, model: str, temperature: float, max_tokens: int):
+    response = requests.post(
+        f"{API_BASE}/llm-chat",
+        json={
+            "prompt": prompt,
+            "system_prompt": system_prompt,
+            "model": model or None,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        },
+        timeout=60,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
 st.set_page_config(page_title="Hermes Runtime", page_icon="⚙️", layout="wide")
 st.title("Hermes Local Runtime")
 st.caption("QNAA/KNAA training control, SQL telemetry, and quick API controls")
@@ -126,6 +142,24 @@ with col2:
             st.json(response.json())
         except Exception as exc:
             st.error(f"Dedupe optimization failed: {exc}")
+
+st.subheader("Training Ground (Text)")
+prompt = st.text_area("Prompt", value="Give me a concise fleet optimization plan for Hermes.")
+system_prompt = st.text_input("System prompt", value="You are Hermes AIHub assistant focused on safe, efficient optimization.")
+model_name = st.text_input("Model override (optional)", value="")
+temperature = st.slider("Temperature", min_value=0.0, max_value=1.5, value=0.3, step=0.05)
+max_tokens = st.slider("Max tokens", min_value=64, max_value=2048, value=512, step=64)
+if st.button("Send text to AIHub LLM"):
+    try:
+        llm_payload = run_llm_chat(prompt, system_prompt, model_name, temperature, max_tokens)
+        if llm_payload.get("ok"):
+            st.success("LLM response received.")
+            st.text_area("Response", value=llm_payload.get("response_text", ""), height=220)
+        else:
+            st.error(f"LLM call failed: {llm_payload.get('error', 'unknown_error')}")
+        st.json(llm_payload)
+    except Exception as exc:
+        st.error(f"LLM chat failed: {exc}")
 
 st.subheader("Recent SQL horizon metrics")
 rows = read_latest_scores()
