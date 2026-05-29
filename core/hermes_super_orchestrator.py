@@ -15,6 +15,10 @@ try:
     from .hermes_cpp_native_bridge import HermesCppNativeBridge
 except ImportError:
     from hermes_cpp_native_bridge import HermesCppNativeBridge
+try:
+    from .hermes_variable_registry import VARIABLE_CATALOG, clamp01, compute_efficiency_profile, default_user_entry_profile
+except ImportError:
+    from hermes_variable_registry import VARIABLE_CATALOG, clamp01, compute_efficiency_profile, default_user_entry_profile
 
 try:
     import psutil
@@ -840,35 +844,7 @@ class HermesSuperOrchestrator:
         }
 
     def _horizon_variable_catalog(self) -> Dict[str, Dict[str, str]]:
-        return {
-            "short_horizon": {
-                "latency_pressure": "Immediate response pressure under active workload.",
-                "cache_hit_proxy": "Short-cycle memory/cache reuse efficiency.",
-                "io_efficiency": "Near-term IO throughput quality.",
-                "response_consistency": "Stability of immediate output across retries.",
-                "micro_recovery": "Ability to recover quickly from micro-errors.",
-            },
-            "mid_horizon": {
-                "stability_drift": "Deviation trend over medium windows.",
-                "schema_health": "Data/contract reliability over active sessions.",
-                "agent_alignment": "Alignment among agents toward shared goals.",
-                "coordination_cohesion": "Team-level coordination quality.",
-                "reward_adaptation": "How quickly reward signals are incorporated.",
-            },
-            "long_horizon": {
-                "retention_score": "Long-term memory preservation strength.",
-                "generalization": "Transfer quality across new domains/tasks.",
-                "compression_longevity": "Durability of compressed knowledge.",
-                "knowledge_transfer": "Cross-agent/domain transfer effectiveness.",
-                "maturity_stability": "Long-run stability of learned behavior.",
-            },
-            "integrated_growth": {
-                "growth_index": "Overall learning growth from core memory bands.",
-                "maturity_index": "Long-run readiness blending long horizon + AIHub + growth.",
-                "learning_velocity": "Current learning speed across short/mid horizons.",
-                "softening_factor": "How softly decisions should be blended vs sharply pivoted.",
-            },
-        }
+        return dict(VARIABLE_CATALOG)
 
     def _goal_target_for_specialty(self, specialty: str) -> str:
         key = str(specialty).lower()
@@ -881,14 +857,7 @@ class HermesSuperOrchestrator:
         return "balanced"
 
     def _latest_user_activity_profile(self) -> Dict[str, float]:
-        defaults = {
-            "goal_profile": "balanced",
-            "success_priority": 0.72,
-            "wrongness_tolerance": 0.22,
-            "group_preference": 0.58,
-            "solo_preference": 0.42,
-            "dynamic_response": 0.62,
-        }
+        defaults = dict(default_user_entry_profile())
         signals = self.store.recent_external_signals(limit=20)
         for item in signals:
             if str(item.get("source", "")).lower() != "gui_activity_profile":
@@ -897,9 +866,9 @@ class HermesSuperOrchestrator:
             if not isinstance(payload, dict):
                 continue
             defaults["goal_profile"] = str(payload.get("goal_profile", defaults["goal_profile"]))
-            for k in ("success_priority", "wrongness_tolerance", "group_preference", "solo_preference", "dynamic_response"):
+            for k in ("success_priority", "wrongness_tolerance", "group_preference", "solo_preference", "dynamic_response", "speed_priority", "energy_saver"):
                 if k in payload:
-                    defaults[k] = max(0.0, min(1.0, float(payload[k])))
+                    defaults[k] = clamp01(payload[k])
             return defaults
         return defaults
 
@@ -1585,6 +1554,7 @@ class HermesSuperOrchestrator:
                 goal_target=goal_target,
             )
             training_variables = self._training_variable_vector(agent, activity_model, horizon_profile)
+            efficiency_profile = compute_efficiency_profile(training_variables)
             adaptive_variables = [
                 quality,
                 speed,
@@ -1617,6 +1587,9 @@ class HermesSuperOrchestrator:
                 training_variables["success_signal"],
                 training_variables["wrongness_signal"],
                 training_variables["monitor_comparison"],
+                efficiency_profile["energy_efficiency"],
+                efficiency_profile["speed_efficiency"],
+                efficiency_profile["yield_efficiency"],
             ]
             adaptive_weights = [
                 self.reward_weights["quality"],
@@ -1650,6 +1623,9 @@ class HermesSuperOrchestrator:
                 0.09,
                 0.09,
                 0.07,
+                0.07,
+                0.08,
+                0.10,
             ]
             adaptive_decision = self._adaptive_brain_decision(
                 variables=adaptive_variables,
@@ -1702,6 +1678,8 @@ class HermesSuperOrchestrator:
             objective_score += training_variables["position_score"] * 0.03
             objective_score += training_variables["monitor_comparison"] * 0.025
             objective_score += training_variables["size_factor"] * 0.02
+            objective_score += efficiency_profile["yield_efficiency"] * 0.045
+            objective_score += efficiency_profile["energy_efficiency"] * (0.02 + (float(user_profile.get("energy_saver", 0.55)) * 0.03))
             objective_score = (objective_score * 0.55) + (self._multi_objective_score(outcome) * 0.45)
             objective_score = self._soft_blend(objective_score, horizon_profile["growth_index"], alpha=(0.10 + (horizon_profile["softening_factor"] * 0.18)))
             delta = self._truth_gate_adjustment(objective_score, truth_score)
@@ -1762,6 +1740,7 @@ class HermesSuperOrchestrator:
                 "horizon_profile": horizon_profile,
                 "activity_variables": activity_model,
                 "training_variables": training_variables,
+                "efficiency_profile": efficiency_profile,
                 "user_activity_profile": user_profile,
                 "goal_target": goal_target,
                 "aihub_bonus": aihub_bonus,
@@ -1772,6 +1751,7 @@ class HermesSuperOrchestrator:
             }
             self.algorithm_state["last_activity_model"] = activity_model
             self.algorithm_state["last_training_variables"] = training_variables
+            self.algorithm_state["last_efficiency_profile"] = efficiency_profile
             if isinstance(big_decision_plan, dict):
                 self.store.write_event("big_decision_replan", big_decision_plan)
             self.store.write_event("train_step", event)
@@ -2059,6 +2039,8 @@ class HermesSuperOrchestrator:
             aihub_bonus=aihub_bonus,
             goal_profile=str(user_profile.get("goal_profile", "balanced")),
             training_variables=training_vars if isinstance(training_vars, dict) else {},
+            speed_priority=float(user_profile.get("speed_priority", 0.65)),
+            energy_saver=float(user_profile.get("energy_saver", 0.55)),
         )
         text = (
             f"[TEMP API::{multi_llm['selected_model']}] {system_prompt}\n"
@@ -2108,6 +2090,8 @@ class HermesSuperOrchestrator:
         aihub_bonus: float,
         goal_profile: str = "balanced",
         training_variables: Optional[Dict] = None,
+        speed_priority: float = 0.65,
+        energy_saver: float = 0.55,
     ) -> Dict:
         # Simulated multi-LLM routing profiles for low-cost/high-power blended selection.
         profiles = [
@@ -2130,6 +2114,8 @@ class HermesSuperOrchestrator:
         maturity_signal = max(0.0, min(1.0, float(training_variables.get("maturity_signal", 0.5))))
         position_score = max(0.0, min(1.0, float(training_variables.get("position_score", 0.5))))
         monitor_comparison = max(0.0, min(1.0, float(training_variables.get("monitor_comparison", 0.5))))
+        speed_priority = clamp01(speed_priority)
+        energy_saver = clamp01(energy_saver)
 
         scored = []
         for p in profiles:
@@ -2150,6 +2136,8 @@ class HermesSuperOrchestrator:
                 + (maturity_signal * power_score * 0.08)
                 + (position_score * speed_score * 0.05)
                 + (monitor_comparison * cost_score * 0.04)
+                + (speed_priority * speed_score * 0.06)
+                + (energy_saver * cost_score * 0.06)
             )
             scored.append((blend, p, speed_score, cost_score, power_score))
 
@@ -2293,9 +2281,11 @@ class HermesSuperOrchestrator:
             "unified_config": self.unified_config,
             "growth": growth,
             "brain_horizon_catalog": self._horizon_variable_catalog(),
+            "shared_variable_catalog": VARIABLE_CATALOG,
             "brain_horizon_profile": horizon_profile,
             "activity_variable_model": self.algorithm_state.get("last_activity_model", {}),
             "training_variables": self.algorithm_state.get("last_training_variables", {}),
+            "efficiency_profile": self.algorithm_state.get("last_efficiency_profile", {}),
             "cpp_kernel": self.cpp_kernel_status(),
             "knowledge_mesh": self.knowledge_mesh_state(),
             "aihub_bonus_live": aihub_live,
@@ -2364,9 +2354,11 @@ class HermesSuperOrchestrator:
             "recent_train_steps": len([e for e in recent_events if e.get("event_type") == "train_step"]),
             "recent_trainer_signals": len([s for s in recent_signals if "trainer" in str(s.get("source", "")).lower()]),
             "brain_horizon_catalog": self._horizon_variable_catalog(),
+            "shared_variable_catalog": VARIABLE_CATALOG,
             "growth": self.growth_metrics(),
             "activity_variable_model": activity_model,
             "training_variables": self.algorithm_state.get("last_training_variables", {}),
+            "efficiency_profile": self.algorithm_state.get("last_efficiency_profile", {}),
             "monitor_weights": monitor_weights,
             "super_orchestration_counts": {
                 "total_agents": len(self.agents),
