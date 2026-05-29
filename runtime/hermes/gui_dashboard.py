@@ -34,9 +34,25 @@ def trigger_simulations(simulations: int):
     return response.json()
 
 
+def fetch_snapshot():
+    response = requests.get(f"{API_BASE}/snapshot", timeout=20)
+    response.raise_for_status()
+    return response.json()
+
+
 st.set_page_config(page_title="Hermes Runtime", page_icon="⚙️", layout="wide")
 st.title("Hermes Local Runtime")
 st.caption("QNAA/KNAA training control, SQL telemetry, and quick API controls")
+
+try:
+    snap = fetch_snapshot()
+    pressure = snap.get("resource_pressure", {})
+    m1, m2, m3 = st.columns(3)
+    m1.metric("CPU Pressure", f"{pressure.get('cpu', 0.0)*100:.1f}%")
+    m2.metric("Memory Pressure", f"{pressure.get('memory', 0.0)*100:.1f}%")
+    m3.metric("GPU Pressure", f"{pressure.get('gpu', 0.0)*100:.1f}%")
+except Exception:
+    st.info("Live snapshot unavailable yet.")
 
 col1, col2 = st.columns(2)
 with col1:
