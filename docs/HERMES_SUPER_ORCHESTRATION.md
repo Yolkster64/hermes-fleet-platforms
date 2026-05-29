@@ -33,6 +33,7 @@ API endpoints:
 3. `POST /train-step`
 4. `POST /simulate`
 5. `POST /horizon-tests`
+6. `POST /rank-output`
 
 Example training call:
 
@@ -50,6 +51,12 @@ Example short/mid/long horizon test suite:
 
 ```bash
 curl -X POST http://127.0.0.1:8787/horizon-tests -H "Content-Type: application/json" -d "{\"specialty\":\"sql_learning\",\"short_steps\":100,\"mid_steps\":400,\"long_steps\":1500}"
+```
+
+Rank an LLM output with 3D gaussian objective shaping:
+
+```bash
+curl -X POST http://127.0.0.1:8787/rank-output -H "Content-Type: application/json" -d "{\"output\":\"candidate text\",\"goal\":\"quality\",\"quality\":0.84,\"speed\":0.71,\"cost_efficiency\":0.69,\"truth_score\":0.92}"
 ```
 
 Build native kernel DLL on Windows (MSVC Developer Prompt):
@@ -108,8 +115,11 @@ Tables:
 
 1. `agent_metrics`
 2. `orchestrator_events`
+3. `horizon_test_scores`
+4. `llm_output_rankings`
 
 `orchestrator_events.payload_compressed` stores zlib-compressed JSON for compact retention.
+`llm_output_rankings` stores per-output rankings with 3D shape vectors and goal-aware gaussian scores.
 
 ## C++ and ML Integration Guidance
 
@@ -121,6 +131,12 @@ Implemented paths:
 1. C++ kernel: `core/native/hermes_learning_kernel.cpp`
 2. Python bridge: `core/hermes_cpp_native_bridge.py`
 3. C# bridge: `src/MonadoBlade.Core/Services/NativeHermesLearningBridge.cs`
+
+Native C++ also computes:
+
+1. reward update scoring
+2. float quantization
+3. 3D gaussian shape score (`hermes_gaussian_3d_score`)
 
 Recommended split:
 

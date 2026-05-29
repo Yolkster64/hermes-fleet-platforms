@@ -95,6 +95,24 @@ class SqlTelemetryStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS llm_output_rankings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts REAL NOT NULL,
+                    goal TEXT NOT NULL,
+                    output_hash TEXT NOT NULL,
+                    rank_score REAL NOT NULL,
+                    quality REAL NOT NULL,
+                    speed REAL NOT NULL,
+                    cost_efficiency REAL NOT NULL,
+                    truth_score REAL NOT NULL,
+                    shape3d_x REAL NOT NULL,
+                    shape3d_y REAL NOT NULL,
+                    shape3d_z REAL NOT NULL
+                )
+                """
+            )
 
     def write_metric(self, agent: AgentProfile) -> None:
         with self._conn() as conn:
@@ -153,6 +171,39 @@ class SqlTelemetryStore:
                     outcome.speed,
                     outcome.cost_efficiency,
                     outcome.truth_score,
+                ),
+            )
+
+    def write_llm_ranking(
+        self,
+        goal: str,
+        output_hash: str,
+        rank_score: float,
+        quality: float,
+        speed: float,
+        cost_efficiency: float,
+        truth_score: float,
+        shape3d: tuple[float, float, float],
+    ) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO llm_output_rankings(
+                    ts, goal, output_hash, rank_score, quality, speed, cost_efficiency, truth_score, shape3d_x, shape3d_y, shape3d_z
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    time.time(),
+                    goal,
+                    output_hash,
+                    rank_score,
+                    quality,
+                    speed,
+                    cost_efficiency,
+                    truth_score,
+                    shape3d[0],
+                    shape3d[1],
+                    shape3d[2],
                 ),
             )
 
@@ -217,6 +268,12 @@ class HermesSuperOrchestrator:
             "q_table": {},  # (specialty, bin) -> value
             "beta_priors": {},  # specialty -> (alpha, beta)
             "horizon_memory": {"short": [], "mid": [], "long": []},
+        }
+        self.goal_shape_targets = {
+            "quality": (0.90, 0.62, 0.52),
+            "speed": (0.74, 0.92, 0.60),
+            "cost": (0.68, 0.70, 0.93),
+            "balanced": (0.82, 0.82, 0.82),
         }
         self.lock = threading.Lock()
 
@@ -303,6 +360,17 @@ class HermesSuperOrchestrator:
         if len(mem) > 1500:
             del mem[: len(mem) - 1500]
 
+    def _gaussian_3d_shape_score(self, point: tuple[float, float, float], target: tuple[float, float, float], sigma: float = 0.20) -> float:
+        return self.native_bridge.gaussian_3d_score(
+            x=point[0],
+            y=point[1],
+            z=point[2],
+            target_x=target[0],
+            target_y=target[1],
+            target_z=target[2],
+            sigma=sigma,
+        )
+
     def _natural_selection(self) -> None:
         inactive_candidates = [a for a in self.agents if a.success_rate < 0.2 and a.reward_score < 0.1]
         if inactive_candidates and len(self.agents) > 6:
@@ -339,6 +407,21 @@ class HermesSuperOrchestrator:
             data_freshness = max(0.0, min(1.0, random.gauss(0.62, 0.20)))
             pattern_diversity = max(0.0, min(1.0, random.gauss(0.5, 0.22)))
             risk_adjusted = max(0.0, min(1.0, truth_score * 0.65 + quality * 0.2 + speed * 0.15))
+            short_variables = {
+                "latency_pressure": max(0.0, min(1.0, random.gauss(0.62, 0.18))),
+                "cache_hit_proxy": max(0.0, min(1.0, random.gauss(0.66, 0.20))),
+                "io_efficiency": max(0.0, min(1.0, random.gauss(0.6, 0.21))),
+            }
+            mid_variables = {
+                "stability_drift": max(0.0, min(1.0, random.gauss(0.52, 0.22))),
+                "schema_health": max(0.0, min(1.0, random.gauss(0.7, 0.18))),
+                "agent_alignment": max(0.0, min(1.0, random.gauss(0.68, 0.17))),
+            }
+            long_variables = {
+                "retention_score": max(0.0, min(1.0, random.gauss(0.71, 0.19))),
+                "generalization": max(0.0, min(1.0, random.gauss(0.65, 0.23))),
+                "compression_longevity": max(0.0, min(1.0, random.gauss(0.63, 0.21))),
+            }
             outcome = InteractionOutcome(
                 quality=quality,
                 speed=speed,
@@ -359,6 +442,11 @@ class HermesSuperOrchestrator:
                 outcome.data_freshness * self.reward_weights["freshness"]
                 + outcome.pattern_diversity * self.reward_weights["diversity"]
                 + outcome.risk_adjusted * self.reward_weights["risk"]
+            )
+            objective_score += (
+                short_variables["latency_pressure"] * 0.025
+                + mid_variables["agent_alignment"] * 0.02
+                + long_variables["retention_score"] * 0.03
             )
             objective_score = (objective_score * 0.55) + (self._multi_objective_score(outcome) * 0.45)
             delta = self._truth_gate_adjustment(objective_score, truth_score)
@@ -394,6 +482,9 @@ class HermesSuperOrchestrator:
                 "short_score": short_score,
                 "mid_score": mid_score,
                 "long_score": long_score,
+                "short_variables": short_variables,
+                "mid_variables": mid_variables,
+                "long_variables": long_variables,
                 "objective_score": objective_score,
                 "reward_score": agent.reward_score,
                 "success_rate": agent.success_rate,
@@ -431,6 +522,51 @@ class HermesSuperOrchestrator:
             "truth_violations": truth_violations,
             "reward_weights": self.reward_weights,
         }
+
+    def rank_llm_output(
+        self,
+        output_text: str,
+        goal: str = "balanced",
+        quality: float = 0.7,
+        speed: float = 0.7,
+        cost_efficiency: float = 0.7,
+        truth_score: float = 0.7,
+    ) -> Dict:
+        goal_key = goal if goal in self.goal_shape_targets else "balanced"
+        point = (
+            max(0.0, min(1.0, quality)),
+            max(0.0, min(1.0, speed)),
+            max(0.0, min(1.0, cost_efficiency)),
+        )
+        target = self.goal_shape_targets[goal_key]
+        shape_score = self._gaussian_3d_shape_score(point, target, sigma=0.22)
+        rank_score = (
+            shape_score * 0.48
+            + max(0.0, min(1.0, truth_score)) * 0.32
+            + max(0.0, min(1.0, quality)) * 0.12
+            + max(0.0, min(1.0, speed)) * 0.08
+        )
+        out_hash = str(abs(hash(output_text)) % 10_000_000_000)
+        self.store.write_llm_ranking(
+            goal=goal_key,
+            output_hash=out_hash,
+            rank_score=rank_score,
+            quality=quality,
+            speed=speed,
+            cost_efficiency=cost_efficiency,
+            truth_score=truth_score,
+            shape3d=point,
+        )
+        event = {
+            "goal": goal_key,
+            "output_hash": out_hash,
+            "rank_score": rank_score,
+            "shape3d_score": shape_score,
+            "shape3d_point": point,
+            "shape3d_target": target,
+        }
+        self.store.write_event("llm_output_ranked", event)
+        return event
 
     def run_horizon_test_suite(self, specialty: str = "general", short_steps: int = 80, mid_steps: int = 300, long_steps: int = 1200) -> Dict:
         short = self.run_simulations(steps=short_steps, specialty=specialty)
@@ -487,7 +623,7 @@ class OrchestratorApi:
                 self._json({"error": "not_found"}, status=404)
 
             def do_POST(self):  # noqa: N802
-                if self.path not in ("/train-step", "/simulate", "/horizon-tests"):
+                if self.path not in ("/train-step", "/simulate", "/horizon-tests", "/rank-output"):
                     self._json({"error": "not_found"}, status=404)
                     return
                 length = int(self.headers.get("Content-Length", "0"))
@@ -504,12 +640,21 @@ class OrchestratorApi:
                             steps=int(payload.get("steps", 500)),
                             specialty=str(payload.get("specialty", "general")),
                         )
-                    else:
+                    elif self.path == "/horizon-tests":
                         result = orchestrator.run_horizon_test_suite(
                             specialty=str(payload.get("specialty", "general")),
                             short_steps=int(payload.get("short_steps", 80)),
                             mid_steps=int(payload.get("mid_steps", 300)),
                             long_steps=int(payload.get("long_steps", 1200)),
+                        )
+                    else:
+                        result = orchestrator.rank_llm_output(
+                            output_text=str(payload.get("output", "")),
+                            goal=str(payload.get("goal", "balanced")),
+                            quality=float(payload.get("quality", 0.7)),
+                            speed=float(payload.get("speed", 0.7)),
+                            cost_efficiency=float(payload.get("cost_efficiency", 0.7)),
+                            truth_score=float(payload.get("truth_score", 0.7)),
                         )
                 self._json(result)
 

@@ -55,4 +55,20 @@ __declspec(dllexport) void hermes_quantize_float32(
     }
 }
 
+__declspec(dllexport) double hermes_gaussian_3d_score(
+    double x,
+    double y,
+    double z,
+    double target_x,
+    double target_y,
+    double target_z,
+    double sigma) {
+    const double safe_sigma = std::max(0.000001, sigma);
+    const double dx = x - target_x;
+    const double dy = y - target_y;
+    const double dz = z - target_z;
+    const double dist2 = dx * dx + dy * dy + dz * dz;
+    return std::exp(-(dist2 / (2.0 * safe_sigma * safe_sigma)));
+}
+
 }

@@ -20,6 +20,16 @@ public sealed class NativeHermesLearningBridge
         double[] weights,
         nuint weightLen);
 
+    [DllImport(NativeDll, EntryPoint = "hermes_gaussian_3d_score", CallingConvention = CallingConvention.Cdecl)]
+    private static extern double HermesGaussian3DScoreNative(
+        double x,
+        double y,
+        double z,
+        double targetX,
+        double targetY,
+        double targetZ,
+        double sigma);
+
     /// <summary>
     /// Computes reward using native C++ kernels when available.
     /// </summary>
@@ -74,5 +84,45 @@ public sealed class NativeHermesLearningBridge
             score -= (0.68d - truthScore) * 1.5d;
 
         return score;
+    }
+
+    public double ComputeGaussian3DScore(
+        double x,
+        double y,
+        double z,
+        double targetX,
+        double targetY,
+        double targetZ,
+        double sigma = 0.2d)
+    {
+        try
+        {
+            return HermesGaussian3DScoreNative(x, y, z, targetX, targetY, targetZ, sigma);
+        }
+        catch (DllNotFoundException)
+        {
+            return ComputeGaussianManagedFallback(x, y, z, targetX, targetY, targetZ, sigma);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return ComputeGaussianManagedFallback(x, y, z, targetX, targetY, targetZ, sigma);
+        }
+    }
+
+    private static double ComputeGaussianManagedFallback(
+        double x,
+        double y,
+        double z,
+        double targetX,
+        double targetY,
+        double targetZ,
+        double sigma)
+    {
+        var safeSigma = Math.Max(0.000001d, sigma);
+        var dx = x - targetX;
+        var dy = y - targetY;
+        var dz = z - targetZ;
+        var dist2 = (dx * dx) + (dy * dy) + (dz * dz);
+        return Math.Exp(-(dist2 / (2.0d * safeSigma * safeSigma)));
     }
 }

@@ -25,6 +25,16 @@ class HermesCppNativeBridge:
             c_size_t,
         ]
         self._dll.hermes_reward_update.restype = c_double
+        self._dll.hermes_gaussian_3d_score.argtypes = [
+            c_double,
+            c_double,
+            c_double,
+            c_double,
+            c_double,
+            c_double,
+            c_double,
+        ]
+        self._dll.hermes_gaussian_3d_score.restype = c_double
 
     @property
     def available(self) -> bool:
@@ -61,5 +71,35 @@ class HermesCppNativeBridge:
                 c_double(novelty),
                 arr,
                 c_size_t(len(weights)),
+            )
+        )
+
+    def gaussian_3d_score(
+        self,
+        x: float,
+        y: float,
+        z: float,
+        target_x: float,
+        target_y: float,
+        target_z: float,
+        sigma: float = 0.2,
+    ) -> float:
+        if not self._dll:
+            dx = x - target_x
+            dy = y - target_y
+            dz = z - target_z
+            dist2 = dx * dx + dy * dy + dz * dz
+            safe_sigma = max(0.000001, sigma)
+            return pow(2.718281828, -(dist2 / (2 * safe_sigma * safe_sigma)))
+
+        return float(
+            self._dll.hermes_gaussian_3d_score(
+                c_double(x),
+                c_double(y),
+                c_double(z),
+                c_double(target_x),
+                c_double(target_y),
+                c_double(target_z),
+                c_double(sigma),
             )
         )
