@@ -26,9 +26,16 @@ This runtime enables:
 - GUI text training ground for direct prompt/response workflow against the shared AIHub model
 - Expanded text-first GUI control center with:
   - One-screen super-easy flow
+  - Total Hermes + active Hermes counters
+  - Fleet Score indicator (`0-100`) for at-a-glance quality
+  - Deploy-all control (`🚀 Deploy All Hermes`)
+  - Special Fleet Training action (`🛰️`) for deeper specialty runs
+  - Per-Hermes symbol/bonus/progress/zone table
   - Learning Space text panel (prompt -> Hermes response)
-  - Fleet Data section (`/snapshot`) for live runtime context
+  - Fleet Data section (`/snapshot`) for live runtime context (raw hidden by default)
   - Fleet Summary text and instant Fleet Health Report action
+  - Deep Auto Learning Zone (`♾️`) with study-area targeting and multi-round comparison
+  - Advanced intelligence controls: KNAA/QNAA, quantization, multi-parallel swarm, multipolar strategy, gaussian pressure, permanent memory mode
   - Full auto cycle button (simulate + pulse + optimize + curate + dedupe)
   - Built-in API key field in GUI sidebar (uses `X-Hermes-Key`)
 - Resource targeting via env vars:
