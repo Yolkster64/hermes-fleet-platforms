@@ -167,7 +167,7 @@ def record_training_cycle(
                 float(reward),
                 float(truth_score),
                 float(shape_score),
-                json.dumps(training_variables, sort_keys=True),
+                json.dumps(training_variables),
                 time.time(),
             ),
         )
@@ -474,7 +474,7 @@ def record_hermes_agent_variables(
                 str(specialty),
                 float(signal_score),
                 float(art_pattern_score),
-                json.dumps(agent_vars, sort_keys=True),
+                json.dumps(agent_vars),
                 now,
             )
         )
