@@ -23,6 +23,7 @@ This runtime enables:
 - C# performance front-end (`hermes-gateway`) for smoother API routing and integration
 - API security between gateway and backend via `HERMES_API_KEY`
 - Single EXE entrypoint through C# gateway publish (`runtime/hermes/build-single-exe.ps1`)
+  - Output: `runtime/hermes/dist/HermesUnified.exe`
 - Resource targeting via env vars:
   - `HERMES_GPU_TARGET_UTILIZATION` (default `0.75`)
   - `HERMES_CPU_TARGET_UTILIZATION` (default `0.80`)
