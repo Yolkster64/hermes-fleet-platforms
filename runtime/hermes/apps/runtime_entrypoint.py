@@ -1,6 +1,7 @@
 import argparse
 import os
 import runpy
+import sys
 
 
 def _runtime_root() -> str:
@@ -28,7 +29,23 @@ def _target_for_app(app: str) -> str:
     return mapping[_normalize_app(app)]
 
 
+def _bootstrap_runtime_intelligence() -> None:
+    runtime_root = _runtime_root()
+    if runtime_root not in sys.path:
+        sys.path.insert(0, runtime_root)
+    try:
+        from volume_setup import ensure_runtime_volume_setup
+        from training_sql_intel import ensure_training_sql
+
+        volume_root, _manifest = ensure_runtime_volume_setup()
+        ensure_training_sql(volume_root)
+        print(f"[runtime-entrypoint] volume+sql ready at {volume_root}")
+    except Exception as exc:  # pragma: no cover
+        print(f"[runtime-entrypoint] bootstrap warning: {exc}")
+
+
 def run_app(app: str) -> None:
+    _bootstrap_runtime_intelligence()
     runpy.run_path(_target_for_app(app), run_name="__main__")
 
 
