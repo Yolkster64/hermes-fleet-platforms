@@ -1,3 +1,4 @@
+import heapq
 import os
 import sqlite3
 from datetime import datetime
@@ -15,9 +16,10 @@ def resolve_volume_root() -> str:
 
 @st.cache_data(ttl=4, show_spinner=False)
 def scan_volume_files(root: str, limit: int = 500) -> List[Dict[str, object]]:
-    rows: List[Dict[str, object]] = []
+    max_rows = max(50, min(2000, int(limit)))
+    newest_heap: List[Tuple[float, Dict[str, object]]] = []
     if not os.path.exists(root):
-        return rows
+        return []
     for base, dirs, files in os.walk(root):
         dirs[:] = [d for d in dirs if d not in {".git", "__pycache__", "node_modules"}]
         for name in files:
@@ -27,16 +29,19 @@ def scan_volume_files(root: str, limit: int = 500) -> List[Dict[str, object]]:
             except OSError:
                 continue
             rel = os.path.relpath(path, root).replace("\\", "/")
-            rows.append(
-                {
-                    "relative_path": rel,
-                    "bytes": int(stat.st_size),
-                    "modified_unix": float(stat.st_mtime),
-                    "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
-                }
-            )
-    rows.sort(key=lambda r: float(r["modified_unix"]), reverse=True)
-    return rows[: max(50, min(2000, int(limit)))]
+            row = {
+                "relative_path": rel,
+                "bytes": int(stat.st_size),
+                "modified_unix": float(stat.st_mtime),
+                "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            stamp = float(stat.st_mtime)
+            if len(newest_heap) < max_rows:
+                heapq.heappush(newest_heap, (stamp, row))
+            elif stamp > newest_heap[0][0]:
+                heapq.heapreplace(newest_heap, (stamp, row))
+    newest_heap.sort(key=lambda item: item[0], reverse=True)
+    return [row for _, row in newest_heap]
 
 
 def read_volume_file(root: str, rel_path: str, max_bytes: int = 2_000_000) -> Tuple[bytes, str]:
