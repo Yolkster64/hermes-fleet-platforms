@@ -1,0 +1,40 @@
+services:
+  hermes-api:
+    build:
+      context: ../..
+      dockerfile: runtime/hermes/Dockerfile
+    container_name: hermes-api
+    command: python core/hermes_super_orchestrator.py
+    environment:
+      HERMES_API_HOST: 0.0.0.0
+      HERMES_API_PORT: "8787"
+      HERMES_GPU_TARGET_UTILIZATION: "0.75"
+      HERMES_CPU_TARGET_UTILIZATION: "0.80"
+    ports:
+      - "8787:8787"
+    volumes:
+      - ../../:/workspace
+      - ../auto:/workspace/runtime/auto
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  hermes-gui:
+    build:
+      context: ../..
+      dockerfile: runtime/hermes/Dockerfile
+    container_name: hermes-gui
+    command: streamlit run runtime/hermes/gui_dashboard.py --server.port 8501 --server.address 0.0.0.0
+    environment:
+      HERMES_API_BASE_URL: http://hermes-api:8787
+    depends_on:
+      - hermes-api
+    ports:
+      - "8501:8501"
+    volumes:
+      - ../../:/workspace
+      - ../auto:/workspace/runtime/auto

@@ -1,4 +1,5 @@
 import json
+import os
 import random
 import sqlite3
 import threading
@@ -244,7 +245,9 @@ class HermesSuperOrchestrator:
     def __init__(self, agents: List[AgentProfile], store: Optional[SqlTelemetryStore] = None) -> None:
         self.agents = agents
         self.store = store or SqlTelemetryStore()
-        self.governor = ResourceGovernor(gpu_target_utilization=0.75)
+        gpu_target = float(os.getenv("HERMES_GPU_TARGET_UTILIZATION", "0.75"))
+        cpu_target = float(os.getenv("HERMES_CPU_TARGET_UTILIZATION", "0.80"))
+        self.governor = ResourceGovernor(gpu_target_utilization=gpu_target, cpu_target_utilization=cpu_target)
         self.reward_weights = {
             "quality": 0.22,
             "speed": 0.16,
@@ -679,5 +682,7 @@ def build_default_orchestrator() -> HermesSuperOrchestrator:
 
 
 if __name__ == "__main__":
-    api = OrchestratorApi(build_default_orchestrator())
+    api_host = os.getenv("HERMES_API_HOST", "0.0.0.0")
+    api_port = int(os.getenv("HERMES_API_PORT", "8787"))
+    api = OrchestratorApi(build_default_orchestrator(), host=api_host, port=api_port)
     api.serve()

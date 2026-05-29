@@ -1,0 +1,109 @@
+{
+  "name": "HELIOS Platform Codespace",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:1-8.0-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/azure-cli:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/powershell:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "moby": true
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.csdevkit",
+        "ms-vscode.powershell",
+        "ms-azuretools.vscode-docker",
+        "ms-azuretools.vscode-azurefunctions",
+        "ms-azuretools.vscode-azureappservice",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "GitHub.copilot",
+        "GitHub.vscode-pull-request-github",
+        "eamodio.gitlens",
+        "redhat.vscode-yaml",
+        "DavidAnson.vscode-markdownlint"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "pwsh",
+        "terminal.integrated.profiles.linux": {
+          "pwsh": {
+            "path": "/usr/bin/pwsh"
+          },
+          "bash": {
+            "path": "/bin/bash"
+          }
+        },
+        "dotnet.completion.showCompletionItemsFromUnimportedNamespaces": true,
+        "editor.formatOnSave": true,
+        "files.autoSave": "onFocusChange",
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "[powershell]": {
+          "editor.defaultFormatter": "ms-vscode.powershell"
+        },
+        "[csharp]": {
+          "editor.defaultFormatter": "ms-dotnettools.csharp"
+        },
+        "[json]": {
+          "editor.defaultFormatter": "vscode.json-language-features"
+        },
+        "[yaml]": {
+          "editor.insertSpaces": true,
+          "editor.tabSize": 2
+        }
+      }
+    }
+  },
+  "remoteEnv": {
+    "HELIOS_ENV": "development",
+    "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+    "DOTNET_NOLOGO": "1"
+  },
+  "forwardPorts": [
+    3000,
+    5000,
+    5173,
+    8080,
+    8443
+  ],
+  "portsAttributes": {
+    "3000": {
+      "label": "Web UI",
+      "onAutoForward": "notify"
+    },
+    "5000": {
+      "label": "API Server",
+      "onAutoForward": "notify"
+    },
+    "5173": {
+      "label": "Vite Dev Server",
+      "onAutoForward": "notify"
+    },
+    "8080": {
+      "label": "HELIOS Dashboard",
+      "onAutoForward": "notify"
+    },
+    "8443": {
+      "label": "Secure API",
+      "onAutoForward": "notify"
+    }
+  },
+  "postCreateCommand": "pwsh -NoLogo -NoProfile -Command \"Write-Host 'HELIOS Codespace ready: restoring primary .NET projects...' -ForegroundColor Cyan; if (Test-Path 'src/core/HELIOS.Platform/HELIOS.Platform.csproj') { dotnet restore 'src/core/HELIOS.Platform/HELIOS.Platform.csproj' }; if (Test-Path 'tests/HELIOS.Platform.Tests/HELIOS.Platform.Tests.csproj') { dotnet restore 'tests/HELIOS.Platform.Tests/HELIOS.Platform.Tests.csproj' }; Write-Host 'Next: run ./scripts/build/build.ps1 or dotnet build src/core/HELIOS.Platform/HELIOS.Platform.csproj' -ForegroundColor Green\"",
+  "postStartCommand": "pwsh -NoLogo -NoProfile -Command \"Write-Host 'Welcome back to HELIOS Platform Codespace' -ForegroundColor Green; gh --version | Select-Object -First 1; dotnet --version\""
+}
