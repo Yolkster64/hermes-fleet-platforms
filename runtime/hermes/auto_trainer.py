@@ -188,6 +188,30 @@ def _get(path: str, timeout: int = 30) -> dict:
     return response.json()
 
 
+def _emit_signal(source: str, signal_score: float, payload: dict, timeout: int = 45) -> dict:
+    return _post(
+        "/ingest-signal",
+        {
+            "source": source,
+            "signal_score": max(0.0, min(1.0, float(signal_score))),
+            "payload": payload,
+        },
+        timeout=timeout,
+    )
+
+
+def _effective_internet_signal(raw_signal: float, low_cap: bool = False) -> float:
+    if OFFLINE_ONLY_MODE:
+        return 0.0
+    if USER_ROUTED_INTERNET:
+        cap = 0.14 if low_cap else 0.22
+        return min(cap, max(0.06, raw_signal))
+    if LOW_BANDWIDTH_MODE:
+        cap = 0.30 if low_cap else 0.60
+        return min(cap, raw_signal)
+    return raw_signal
+
+
 def _active_specialty(cycle: int) -> str:
     mode = SPECIALIST_MODES[(cycle - 1) % max(1, len(SPECIALIST_MODES))]
     style = AGENT_WORK_STYLES[(cycle - 1) % max(1, len(AGENT_WORK_STYLES))]
@@ -470,11 +494,7 @@ def _comparison_upgrade_pass(occasion: str, focus: str, cycle: int, base_steps: 
                     "steps": max(80, min(260, int(base_steps * 0.65 * algo["step_mult"]))),
                     "candidates": max(48, min(220, int(base_candidates * 0.70 * algo["candidate_mult"]))),
                     "sql_signal": max(0.55, min(0.99, 0.82 + algo["sql_boost"])),
-                    "internet_signal": (
-                        0.0
-                        if OFFLINE_ONLY_MODE
-                        else (min(0.14, max(0.06, 0.12 + algo["internet_boost"] * 0.15)) if USER_ROUTED_INTERNET else max(0.55, min(0.99, 0.82 + algo["internet_boost"])))
-                    ),
+                    "internet_signal": _effective_internet_signal(max(0.55, min(0.99, 0.82 + algo["internet_boost"])), low_cap=True),
                     "llm_signal": max(0.60, min(0.99, 0.86 + algo["llm_boost"])),
                     "stability_bias": max(0.55, min(0.99, 0.84 + algo["stability_boost"])),
                 },
@@ -540,24 +560,20 @@ def _comparison_upgrade_pass(occasion: str, focus: str, cycle: int, base_steps: 
     if loser in _algo_live:
         _algo_live[loser]["stability_boost"] = max(-0.03, min(0.12, _algo_live[loser]["stability_boost"] + (tune * 0.4)))
         _algo_live[loser]["candidate_mult"] = max(0.75, min(1.50, _algo_live[loser]["candidate_mult"] * 0.995))
-    requests.post(
-        f"{API_BASE}/ingest-signal",
-        json={
-            "source": "auto_trainer.comparison_upgrade",
-            "signal_score": 0.88,
-            "payload": {
-                "cycle": cycle,
-                "occasion": occasion,
-                "focus": focus,
-                "comparison_results": [{"strategy": s, "score": sc} for s, sc in winners],
-                "winner": winner,
-                "loser": loser,
-                "algo_live_winner": _algo_live.get(winner, {}),
-            },
+    _emit_signal(
+        "auto_trainer.comparison_upgrade",
+        0.88,
+        {
+            "cycle": cycle,
+            "occasion": occasion,
+            "focus": focus,
+            "comparison_results": [{"strategy": s, "score": sc} for s, sc in winners],
+            "winner": winner,
+            "loser": loser,
+            "algo_live_winner": _algo_live.get(winner, {}),
         },
-        headers=_headers(),
         timeout=45,
-    ).raise_for_status()
+    )
 
 
 def _update_strategy_memory(occasion: str, strategy: str, reward: float, truth: float, shape: float) -> None:
@@ -590,42 +606,38 @@ def _emit_strategy_feedback(
     chaos: tuple[float, float, float, float],
 ) -> None:
     leaderboard = sorted(_strategy_memory.get(occasion, {}).items(), key=lambda item: item[1], reverse=True)
-    requests.post(
-        f"{API_BASE}/ingest-signal",
-        json={
-            "source": "auto_trainer.strategy_learning",
-            "signal_score": max(0.0, min(1.0, (reward * 0.4) + (truth * 0.4) + (shape * 0.2))),
-            "payload": {
-                "cycle": cycle,
-                "focus": focus,
-                "occasion": occasion,
-                "fleet_model_label": FLEET_MODEL_LABEL,
-                "shared_model_id": SHARED_MODEL_ID,
-                "selected_strategy": selected_strategy,
-                "strategy_algorithm": algo_profile,
-                "dynamic_specialty": dynamic_specialty,
-                "recommended_learning_pulse": {
-                    "steps": pulse_steps,
-                    "candidates": pulse_candidates,
-                    "sql_signal": sql_signal,
-                    "internet_signal": internet_signal,
-                    "llm_signal": llm_signal,
-                    "stability_bias": stability_bias,
-                },
-                "score_components": {"reward": reward, "truth": truth, "fleet_shape": shape},
-                "value_brain": brain_value,
-                "horizon_profile": horizon_profile,
-                "training_variables": training_variables,
-                "value_brain_history_tail": _value_brain_history[-40:],
-                "strategy_leaderboard": [{"strategy": s, "score": sc} for s, sc in leaderboard],
-                "evidence_top_combinations": _top_evidence(),
-                "spatial_overlap_map": _spatial_overlap_map(occasion),
-                "chaos_3d_vector": {"x": chaos[0], "y": chaos[1], "z": chaos[2], "chaos_rate": chaos[3]},
+    _emit_signal(
+        "auto_trainer.strategy_learning",
+        (reward * 0.4) + (truth * 0.4) + (shape * 0.2),
+        {
+            "cycle": cycle,
+            "focus": focus,
+            "occasion": occasion,
+            "fleet_model_label": FLEET_MODEL_LABEL,
+            "shared_model_id": SHARED_MODEL_ID,
+            "selected_strategy": selected_strategy,
+            "strategy_algorithm": algo_profile,
+            "dynamic_specialty": dynamic_specialty,
+            "recommended_learning_pulse": {
+                "steps": pulse_steps,
+                "candidates": pulse_candidates,
+                "sql_signal": sql_signal,
+                "internet_signal": internet_signal,
+                "llm_signal": llm_signal,
+                "stability_bias": stability_bias,
             },
+            "score_components": {"reward": reward, "truth": truth, "fleet_shape": shape},
+            "value_brain": brain_value,
+            "horizon_profile": horizon_profile,
+            "training_variables": training_variables,
+            "value_brain_history_tail": _value_brain_history[-40:],
+            "strategy_leaderboard": [{"strategy": s, "score": sc} for s, sc in leaderboard],
+            "evidence_top_combinations": _top_evidence(),
+            "spatial_overlap_map": _spatial_overlap_map(occasion),
+            "chaos_3d_vector": {"x": chaos[0], "y": chaos[1], "z": chaos[2], "chaos_rate": chaos[3]},
         },
-        headers=_headers(),
         timeout=45,
-    ).raise_for_status()
+    )
 
 
 def _smart_actions(data: dict, cycle: int, active_specialty: str, skill_pack: list[str], agent_size: str, dynamic_micro_agents: int, chaos: tuple[float, float, float, float]) -> None:
@@ -640,47 +652,39 @@ def _smart_actions(data: dict, cycle: int, active_specialty: str, skill_pack: li
         {"prompt": advisor_prompt, "system_prompt": "You are Hermes fleet optimizer.", "temperature": 0.15, "max_tokens": 300},
         timeout=90,
     )
-    requests.post(
-        f"{API_BASE}/ingest-signal",
-        json={
-            "source": "auto_trainer.smart_actions",
-            "signal_score": max(0.0, min(1.0, data.get("avg_truth_score", 0.7))),
-            "payload": {
-                "strategy": SWARM_STRATEGY,
-                "active_specialty": active_specialty,
-                "micro_agents": dynamic_micro_agents,
-                "agent_size": agent_size,
-                "skill_pack": skill_pack,
-                "permanent_intelligence": PERMANENT_INTELLIGENCE,
-                "fleet_model_label": FLEET_MODEL_LABEL,
-                "shared_model_id": SHARED_MODEL_ID,
-                "specialist_modes": SPECIALIST_MODES,
-                "agent_work_styles": AGENT_WORK_STYLES,
-                "high_level_learning": HIGH_LEVEL_LEARNING,
-                "chaos_3d_vector": {"x": chaos[0], "y": chaos[1], "z": chaos[2], "chaos_rate": chaos[3]},
-                "advisor_text": advisor.get("response_text", "")[:1200],
-            },
+    _emit_signal(
+        "auto_trainer.smart_actions",
+        data.get("avg_truth_score", 0.7),
+        {
+            "strategy": SWARM_STRATEGY,
+            "active_specialty": active_specialty,
+            "micro_agents": dynamic_micro_agents,
+            "agent_size": agent_size,
+            "skill_pack": skill_pack,
+            "permanent_intelligence": PERMANENT_INTELLIGENCE,
+            "fleet_model_label": FLEET_MODEL_LABEL,
+            "shared_model_id": SHARED_MODEL_ID,
+            "specialist_modes": SPECIALIST_MODES,
+            "agent_work_styles": AGENT_WORK_STYLES,
+            "high_level_learning": HIGH_LEVEL_LEARNING,
+            "chaos_3d_vector": {"x": chaos[0], "y": chaos[1], "z": chaos[2], "chaos_rate": chaos[3]},
+            "advisor_text": advisor.get("response_text", "")[:1200],
         },
-        headers=_headers(),
         timeout=60,
-    ).raise_for_status()
-    requests.post(
-        f"{API_BASE}/ingest-signal",
-        json={
-            "source": "auto_trainer.heartbeat",
-            "signal_score": max(0.0, min(1.0, signal_score)),
-            "payload": {
-                "cycle": _cycle,
-                "specialty": dynamic_specialty,
-                "mode": "continuous_training",
-                "fleet_model_label": FLEET_MODEL_LABEL,
-                "shared_model_id": SHARED_MODEL_ID,
-                "timestamp_unix": time.time(),
-            },
+    )
+    _emit_signal(
+        "auto_trainer.heartbeat",
+        data.get("avg_truth_score", 0.7),
+        {
+            "cycle": cycle,
+            "specialty": active_specialty,
+            "mode": "continuous_training",
+            "fleet_model_label": FLEET_MODEL_LABEL,
+            "shared_model_id": SHARED_MODEL_ID,
+            "timestamp_unix": time.time(),
         },
-        headers=_headers(),
         timeout=30,
-    ).raise_for_status()
+    )
     if MAX_MODE or cycle % 2 == 0:
         _post(
             "/optimize-fleet",
@@ -702,24 +706,20 @@ def _emit_knowledge_sync(
     if not ENABLE_GITHUB_KNOWLEDGE_SYNC:
         return
     x, y, z, chaos_rate = chaos
-    requests.post(
-        f"{API_BASE}/ingest-signal",
-        json={
-            "source": "auto_trainer.github_knowledge_sync",
-            "signal_score": max(0.0, min(1.0, signal_score)),
-            "payload": {
-                "cycle": cycle,
-                "specialty": dynamic_specialty,
-                "github_training_enabled": True,
-                "field_adaptation_weight": FIELD_ADAPTATION_WEIGHT,
-                "knowledge_loop": "github_to_field_and_back",
-                "training_variables": training_variables,
-                "chaos_3d_vector": {"x": x, "y": y, "z": z, "chaos_rate": chaos_rate},
-            },
+    _emit_signal(
+        "auto_trainer.github_knowledge_sync",
+        signal_score,
+        {
+            "cycle": cycle,
+            "specialty": dynamic_specialty,
+            "github_training_enabled": True,
+            "field_adaptation_weight": FIELD_ADAPTATION_WEIGHT,
+            "knowledge_loop": "github_to_field_and_back",
+            "training_variables": training_variables,
+            "chaos_3d_vector": {"x": x, "y": y, "z": z, "chaos_rate": chaos_rate},
         },
-        headers=_headers(),
         timeout=30,
-    ).raise_for_status()
+    )
 
 
 def run_cycle() -> None:
@@ -767,33 +767,29 @@ def run_cycle() -> None:
                 ordered[key] = value
         training_variables = ordered
     dynamic_specialty = f"{SPECIALTY}:{selected_strategy}:{focus}:m{horizon_profile['maturity_index']:.2f}"
-    requests.post(
-        f"{API_BASE}/ingest-signal",
-        json={
-            "source": "auto_trainer",
-            "signal_score": signal_score,
-            "payload": {
-                "avg_reward_score": data.get("avg_reward_score"),
-                "avg_knaa_qnaa_score": data.get("avg_knaa_qnaa_score"),
-                "avg_fleet_shape_score": data.get("avg_fleet_shape_score"),
-                "avg_long_haul_meta_score": data.get("avg_long_haul_meta_score"),
-                "fleet_model_label": FLEET_MODEL_LABEL,
-                "shared_model_id": SHARED_MODEL_ID,
-                "high_level_learning": HIGH_LEVEL_LEARNING,
-                "focus": focus,
-                "occasion": occasion,
-                "selected_strategy": selected_strategy,
-                "strategy_algorithm": algo_profile,
-                "chaotic_factor_pack": factors,
-                "value_brain": brain_value,
-                "horizon_profile": horizon_profile,
-                "chaos_3d_vector": {"x": x, "y": y, "z": z, "chaos_rate": chaos_rate},
-                "cpp_kernel": cpp_kernel,
-            },
+    _emit_signal(
+        "auto_trainer",
+        signal_score,
+        {
+            "avg_reward_score": data.get("avg_reward_score"),
+            "avg_knaa_qnaa_score": data.get("avg_knaa_qnaa_score"),
+            "avg_fleet_shape_score": data.get("avg_fleet_shape_score"),
+            "avg_long_haul_meta_score": data.get("avg_long_haul_meta_score"),
+            "fleet_model_label": FLEET_MODEL_LABEL,
+            "shared_model_id": SHARED_MODEL_ID,
+            "high_level_learning": HIGH_LEVEL_LEARNING,
+            "focus": focus,
+            "occasion": occasion,
+            "selected_strategy": selected_strategy,
+            "strategy_algorithm": algo_profile,
+            "chaotic_factor_pack": factors,
+            "value_brain": brain_value,
+            "horizon_profile": horizon_profile,
+            "chaos_3d_vector": {"x": x, "y": y, "z": z, "chaos_rate": chaos_rate},
+            "cpp_kernel": cpp_kernel,
         },
-        headers=_headers(),
         timeout=30,
-    ).raise_for_status()
+    )
     agent_size, dynamic_micro_agents = _agent_size_profile(_cycle, data)
     sql_signal, internet_signal, llm_signal, stability_bias = _base_signals(data)
     if cpp_available:
@@ -802,10 +798,7 @@ def run_cycle() -> None:
         stability_bias = min(0.99, stability_bias + 0.02)
     sql_signal = max(0.55, min(0.99, (sql_signal + algo_profile["sql_boost"]) * factors["ratio_sql"]))
     internet_signal = max(0.55, min(0.99, (internet_signal + algo_profile["internet_boost"]) * factors["ratio_internet"]))
-    if OFFLINE_ONLY_MODE:
-        internet_signal = 0.0
-    elif USER_ROUTED_INTERNET:
-        internet_signal = min(0.14, max(0.06, internet_signal))
+    internet_signal = _effective_internet_signal(internet_signal, low_cap=True)
     llm_signal = max(0.60, min(0.99, (llm_signal + algo_profile["llm_boost"]) * factors["ratio_llm"]))
     stability_bias = max(0.55, min(0.99, (stability_bias + algo_profile["stability_boost"]) * factors["ratio_stability"]))
     stability_bias = max(0.55, min(0.99, (stability_bias * (0.82 + (horizon_profile["softening_factor"] * 0.18)))))

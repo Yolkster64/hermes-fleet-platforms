@@ -104,6 +104,7 @@ This runtime enables:
   - Growth + maturity + softening factors are now baked into adaptive scoring and surfaced in snapshot/training UX
   - Training variables now include professional monitors: `size_factor`, `position_score`, `success_signal`, `wrongness_signal`, and monitor comparison scores
   - Shared variable registry now powers super-orchestrator + trainer + GUI defaults for consistent entry profiles and variable semantics
+  - Trainer signal emission and internet-routing logic are now centralized for cleaner retries and consistent ingest behavior
   - AIHub model routing now blends goal profile + training variables for smarter cost/speed/safety selection
   - Composite `value_brain` scoring blends ease/correctness/opposite-pressure/reward/truth/shape/special-reaction into one dynamic weighted score
   - Spatial overlap map compares strategy groups/setups in multi-analysis form (overlap + distance) for stronger setting selection
