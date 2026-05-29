@@ -346,7 +346,7 @@ if "ctl_techniques" not in st.session_state:
 if "ctl_swarm_strategy" not in st.session_state:
     st.session_state["ctl_swarm_strategy"] = "hybrid"
 if "ctl_micro_agents" not in st.session_state:
-    st.session_state["ctl_micro_agents"] = 128
+    st.session_state["ctl_micro_agents"] = 200
 if "ctl_gaussian_pressure" not in st.session_state:
     st.session_state["ctl_gaussian_pressure"] = 0.88
 if "ctl_permanent_intelligence" not in st.session_state:

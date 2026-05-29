@@ -55,8 +55,8 @@ This runtime enables:
   - Full auto cycle button (simulate + pulse + optimize + curate + dedupe)
   - Built-in API key field in GUI sidebar (uses `X-Hermes-Key`)
 - Resource targeting via env vars:
-  - `HERMES_GPU_TARGET_UTILIZATION` (default `0.75`)
-  - `HERMES_CPU_TARGET_UTILIZATION` (default `0.80`)
+  - `HERMES_GPU_TARGET_UTILIZATION` (default `0.92`)
+  - `HERMES_CPU_TARGET_UTILIZATION` (default `0.95`)
 - Unified AI/ML contract across AIHub + Hermes + security/optimization services:
   - `AIHUB_UNIFIED_ENABLED` (default `true`)
   - `AIHUB_SHARED_MODEL_ID` (default `aihub-unified-v1`)
@@ -66,7 +66,8 @@ This runtime enables:
   - `HERMES_TRAIN_STEPS=2000`
   - `HERMES_TRAIN_INTERVAL_SECONDS=6`
   - `HERMES_FLEET_OPTIMIZE_EVERY=1`
-  - `HERMES_FLEET_CANDIDATES=480`
+  - `HERMES_FLEET_CANDIDATES=500`
+  - `HERMES_MICRO_AGENT_COUNT=200`
   - `HERMES_MAX_MODE=true`
   - `HERMES_SMART_ACTIONS=true`
   - `HERMES_ALWAYS_DEEP_LEARNING=true`
