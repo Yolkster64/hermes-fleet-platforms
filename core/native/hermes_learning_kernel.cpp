@@ -18,6 +18,20 @@ double clamp01(double v) {
     return std::clamp(v, 0.0, 1.0);
 }
 
+double sanitize01(double v) {
+    if (!std::isfinite(v)) {
+        return 0.0;
+    }
+    return clamp01(v);
+}
+
+double safe_weight(double v) {
+    if (!std::isfinite(v)) {
+        return 0.000001;
+    }
+    return std::max(0.000001, v);
+}
+
 double mean_or_zero(const double* values, std::size_t len) {
     if (values == nullptr || len == 0) {
         return 0.0;
@@ -232,16 +246,27 @@ HERMES_EXPORT double hermes_linear_regression_predict(
     const double alpha = std::max(0.0, l2_alpha);
     double sum_x = 0.0;
     double sum_y = 0.0;
+    std::size_t valid = 0;
     for (std::size_t i = 0; i < len; ++i) {
+        if (!std::isfinite(xs[i]) || !std::isfinite(ys[i])) {
+            continue;
+        }
         sum_x += xs[i];
         sum_y += ys[i];
+        ++valid;
     }
-    const double mean_x = sum_x / static_cast<double>(len);
-    const double mean_y = sum_y / static_cast<double>(len);
+    if (valid < 2) {
+        return 0.0;
+    }
+    const double mean_x = sum_x / static_cast<double>(valid);
+    const double mean_y = sum_y / static_cast<double>(valid);
 
     double num = 0.0;
     double den = 0.0;
     for (std::size_t i = 0; i < len; ++i) {
+        if (!std::isfinite(xs[i]) || !std::isfinite(ys[i])) {
+            continue;
+        }
         const double dx = xs[i] - mean_x;
         num += dx * (ys[i] - mean_y);
         den += dx * dx;
@@ -278,8 +303,8 @@ HERMES_EXPORT void hermes_adaptive_brain_decision(
     double weighted_sum = 0.0;
     double weight_sum = 0.0;
     for (std::size_t i = 0; i < n; ++i) {
-        const double w = std::max(0.000001, variable_weights[i]);
-        const double v = clamp01(variables[i]);
+        const double w = safe_weight(variable_weights[i]);
+        const double v = sanitize01(variables[i]);
         weighted_sum += v * w;
         weight_sum += w;
     }
@@ -287,8 +312,8 @@ HERMES_EXPORT void hermes_adaptive_brain_decision(
 
     double weighted_var = 0.0;
     for (std::size_t i = 0; i < n; ++i) {
-        const double w = std::max(0.000001, variable_weights[i]);
-        const double d = clamp01(variables[i]) - weighted_mean;
+        const double w = safe_weight(variable_weights[i]);
+        const double d = sanitize01(variables[i]) - weighted_mean;
         weighted_var += w * d * d;
     }
     weighted_var /= std::max(0.000001, weight_sum);

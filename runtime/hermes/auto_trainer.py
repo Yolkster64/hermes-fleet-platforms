@@ -28,6 +28,8 @@ GAUSSIAN_PRESSURE = float(os.getenv("HERMES_GAUSSIAN_PRESSURE", "0.88"))
 PERMANENT_INTELLIGENCE = os.getenv("HERMES_PERMANENT_INTELLIGENCE", "true").lower() in ("1", "true", "yes", "on")
 HIGH_LEVEL_LEARNING = max(0.0, min(1.0, float(os.getenv("HERMES_HIGH_LEVEL_LEARNING", "0.70"))))
 ENABLE_MOVIE_AIHUB = os.getenv("HERMES_ENABLE_MOVIE_AIHUB", "true").lower() in ("1", "true", "yes", "on")
+ENABLE_GITHUB_KNOWLEDGE_SYNC = os.getenv("HERMES_ENABLE_GITHUB_KNOWLEDGE_SYNC", "true").lower() in ("1", "true", "yes", "on")
+FIELD_ADAPTATION_WEIGHT = max(0.0, min(1.0, float(os.getenv("HERMES_FIELD_ADAPTATION_WEIGHT", "0.35"))))
 SPECIALIST_MODES = [m.strip() for m in os.getenv("HERMES_SPECIALIST_MODES", "swarm,mesh,multipolar,specialist-mix").split(",") if m.strip()]
 AGENT_WORK_STYLES = [s.strip() for s in os.getenv("HERMES_AGENT_WORK_STYLES", "fast_micro,deep_specialist,balanced_hybrid").split(",") if s.strip()]
 AGENT_SKILLS_25 = [
@@ -612,6 +614,29 @@ def _smart_actions(data: dict, cycle: int, active_specialty: str, skill_pack: li
         )
 
 
+def _emit_knowledge_sync(cycle: int, dynamic_specialty: str, signal_score: float, chaos: tuple[float, float, float, float]) -> None:
+    if not ENABLE_GITHUB_KNOWLEDGE_SYNC:
+        return
+    x, y, z, chaos_rate = chaos
+    requests.post(
+        f"{API_BASE}/ingest-signal",
+        json={
+            "source": "auto_trainer.github_knowledge_sync",
+            "signal_score": max(0.0, min(1.0, signal_score)),
+            "payload": {
+                "cycle": cycle,
+                "specialty": dynamic_specialty,
+                "github_training_enabled": True,
+                "field_adaptation_weight": FIELD_ADAPTATION_WEIGHT,
+                "knowledge_loop": "github_to_field_and_back",
+                "chaos_3d_vector": {"x": x, "y": y, "z": z, "chaos_rate": chaos_rate},
+            },
+        },
+        headers=_headers(),
+        timeout=30,
+    ).raise_for_status()
+
+
 def run_cycle() -> None:
     global _cycle
     _cycle += 1
@@ -744,6 +769,7 @@ def run_cycle() -> None:
         brain_value=brain_value,
         chaos=(x, y, z, chaos_rate),
     )
+    _emit_knowledge_sync(_cycle, dynamic_specialty, signal_score, (x, y, z, chaos_rate))
     _smart_actions(data, _cycle, dynamic_specialty, skill_pack, agent_size, dynamic_micro_agents, (x, y, z, chaos_rate))
     _save_learning_state()
     print(

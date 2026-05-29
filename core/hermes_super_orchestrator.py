@@ -2017,16 +2017,22 @@ class HermesSuperOrchestrator:
                     last_event_ts = ts
 
         last_trainer_signal_ts = 0.0
+        last_github_sync_ts = 0.0
         for item in recent_signals:
             src = str(item.get("source", "")).lower()
             if "auto_trainer" in src or "trainer" in src:
                 ts = float(item.get("ts", 0.0))
                 if ts > last_trainer_signal_ts:
                     last_trainer_signal_ts = ts
+            if "github_knowledge_sync" in src:
+                ts = float(item.get("ts", 0.0))
+                if ts > last_github_sync_ts:
+                    last_github_sync_ts = ts
 
         last_training_ts = max(last_event_ts, last_trainer_signal_ts)
         idle_seconds = max(0.0, now - last_training_ts) if last_training_ts > 0 else float("inf")
         training_active = idle_seconds <= float(max_idle)
+        github_sync_active = (now - last_github_sync_ts) <= float(max_idle * 2) if last_github_sync_ts > 0 else False
         cpp = self.cpp_kernel_status()
         rules = {
             "training_active": training_active,
@@ -2034,6 +2040,7 @@ class HermesSuperOrchestrator:
             "aihub_unified_enabled": bool(self.unified_config.get("aihub_unified_enabled", True)),
             "offline_only_mode": bool(self.offline_only_mode),
             "user_routed_internet": bool(self.user_routed_internet),
+            "github_knowledge_sync": github_sync_active,
         }
         passing_rules = len([v for v in rules.values() if bool(v)])
         return {
@@ -2042,6 +2049,7 @@ class HermesSuperOrchestrator:
             "max_idle_seconds": max_idle,
             "idle_seconds": None if last_training_ts <= 0 else idle_seconds,
             "last_training_unix": None if last_training_ts <= 0 else last_training_ts,
+            "last_github_sync_unix": None if last_github_sync_ts <= 0 else last_github_sync_ts,
             "recent_learning_events": len([e for e in recent_events if e.get("event_type") == "learning_pulse"]),
             "recent_train_steps": len([e for e in recent_events if e.get("event_type") == "train_step"]),
             "recent_trainer_signals": len([s for s in recent_signals if "trainer" in str(s.get("source", "")).lower()]),

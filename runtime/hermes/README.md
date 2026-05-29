@@ -51,7 +51,8 @@ This runtime enables:
 - C# performance front-end (`hermes-gateway`) for smoother API routing and integration
 - C# orchestration control-plane endpoints:
   - `POST /auth/login` (session token for gateway auth)
-  - `POST /runtime-orchestrate/deploy` (C#-dispatched learning pulse + optimize deploy flow)
+  - `POST /runtime-orchestrate/deploy` (C#-dispatched learning pulse + optimize deploy flow, supports batch deploy sizing)
+  - `POST /runtime-orchestrate/return` (return Hermes units signal path for controlled pullback)
   - `POST /runtime-orchestrate/restore` (restore/swap orchestration signal path)
   - `POST /runtime-bridge/transfer` (C# runtime bridge for C++/Python/Java transfer metadata and dispatch)
 - API security between gateway and backend via `HERMES_API_KEY`
@@ -62,11 +63,14 @@ This runtime enables:
 - GUI text training ground for direct prompt/response workflow against the shared AIHub model
 - Expanded text-first GUI control center with:
   - One-screen super-easy flow
+  - Simple/Advanced action view to reduce button clutter
   - Total Hermes + active Hermes counters
   - Fleet Score indicator (`0-100`) for at-a-glance quality
   - Deploy-all control (`🚀 Deploy All Hermes`)
+  - Batch deploy and return controls (`🚚 Deploy 10 Hermes`, `↩️ Return Hermes`)
+  - Mini vs full model lineup table with short descriptions in Learning Space
   - Special Fleet Training action (`🛰️`) for deeper specialty runs
-  - Per-Hermes symbol/bonus/progress/zone table
+  - Per-Hermes symbol/bonus/progress/zone table with size-mode descriptions
   - 25-skill agent system with 3 active skills per Hermes unit
   - Learning Space text panel (prompt -> Hermes response)
   - Automatic Learning Zone with timed smart cycles
@@ -84,9 +88,11 @@ This runtime enables:
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
   - Deep Auto Learning Zone (`♾️`) with study-area targeting and multi-round comparison
   - Advanced intelligence controls: KNAA/QNAA, quantization, multi-parallel swarm, multipolar strategy, gaussian pressure, permanent memory mode
+  - Detailed variable guide for sliders/signals (micro agents, gaussian pressure, high-level learning, source weighting)
   - Auto-trainer now includes `nano-swarm` (ultra micro-agent strategy above hybrid) with adaptive strategy switching by occasion
   - Chaotic factor randomization (`sql/internet/llm/stability/steps/candidates` ratios) is applied per cycle for broader search
   - Evidence matrix tracks strategy + ratio + agent-size combinations and feeds top-performing combinations back through `/ingest-signal`
+  - Auto trainer can emit GitHub↔field knowledge sync signals (`auto_trainer.github_knowledge_sync`) for continuous memory exchange
   - Composite `value_brain` scoring blends ease/correctness/opposite-pressure/reward/truth/shape/special-reaction into one dynamic weighted score
   - Spatial overlap map compares strategy groups/setups in multi-analysis form (overlap + distance) for stronger setting selection
   - Strategy memory now updates with value-brain-assisted reward weighting for longer-term, smarter adaptation

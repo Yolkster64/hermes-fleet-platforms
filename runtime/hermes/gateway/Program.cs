@@ -145,6 +145,7 @@ app.MapGet("/", () =>
             "/knowledge-mesh",
             "/unified-config",
             "/runtime-orchestrate/deploy",
+            "/runtime-orchestrate/return",
             "/runtime-orchestrate/restore",
             "/runtime-bridge/transfer"
         },
@@ -270,7 +271,13 @@ app.MapPost("/runtime-orchestrate/deploy", async (IHttpClientFactory factory, Ru
     if (!Authorized(context))
         return Results.Unauthorized();
     var specialty = string.IsNullOrWhiteSpace(request.Specialty) ? "fleet" : request.Specialty;
-    var candidates = request.Scope.Equals("all", StringComparison.OrdinalIgnoreCase) ? Math.Max(120, request.Candidates) : request.Candidates;
+    var normalizedBatch = Math.Max(1, Math.Min(256, request.BatchSize));
+    var isBatchScope = request.Scope.Equals("batch", StringComparison.OrdinalIgnoreCase);
+    var candidates = isBatchScope
+        ? Math.Max(40, Math.Min(request.Candidates, normalizedBatch * 6))
+        : request.Scope.Equals("all", StringComparison.OrdinalIgnoreCase)
+            ? Math.Max(120, request.Candidates)
+            : request.Candidates;
     using var client = factory.CreateClient("hermes");
     AttachBackendKey(client);
     using var pulseResponse = await client.PostAsJsonAsync(
@@ -305,10 +312,30 @@ app.MapPost("/runtime-orchestrate/deploy", async (IHttpClientFactory factory, Ru
         ok = true,
         mode = request.Mode,
         scope = request.Scope,
+        batch_size = normalizedBatch,
         dispatch = "csharp-gateway-control-plane",
         learning_pulse = pulseJson.RootElement.Clone(),
         optimized = optimizeJson.RootElement.Clone()
     });
+});
+
+app.MapPost("/runtime-orchestrate/return", async (IHttpClientFactory factory, RuntimeReturnRequest request, HttpContext context) =>
+{
+    var specialty = string.IsNullOrWhiteSpace(request.Specialty) ? "fleet" : request.Specialty;
+    var payload = new
+    {
+        source = "csharp-gateway-return",
+        score = Math.Max(0.0, Math.Min(1.0, request.Confidence)),
+        payload = new
+        {
+            action = "return_hermes",
+            specialty,
+            units = request.Units,
+            mode = request.Mode,
+            reason = request.Reason
+        }
+    };
+    return await ProxyPostJson(factory, context, "/ingest-signal", payload);
 });
 
 app.MapPost("/runtime-orchestrate/restore", async (IHttpClientFactory factory, RuntimeRestoreRequest request, HttpContext context) =>
@@ -432,12 +459,19 @@ public sealed record RuntimeDeployRequest(
     string Mode = "deploy",
     string Scope = "all",
     string Specialty = "fleet",
+    int BatchSize = 10,
     int Steps = 220,
     int Candidates = 140,
     double SqlSignal = 0.8,
     double InternetSignal = 0.58,
     double LlmSignal = 0.78,
     double StabilityBias = 0.74);
+public sealed record RuntimeReturnRequest(
+    string Mode = "return",
+    string Specialty = "fleet",
+    int Units = 10,
+    string Reason = "gui-return-action",
+    double Confidence = 0.8);
 public sealed record RuntimeRestoreRequest(
     string Mode = "restore",
     string Specialty = "fleet",

@@ -39,6 +39,11 @@ AGENT_SKILLS_25 = [
     "documentation",
     "reliability_engineering",
 ]
+SIZE_MODE_DETAILS = {
+    "small-fast": "Mini Hermes: quick cycles, low cost, rapid scouting.",
+    "medium-balanced": "Balanced Hermes: steady quality/speed for daily training.",
+    "large-deep": "Full Hermes: deeper reasoning and long-horizon adaptation.",
+}
 
 
 def headers() -> Dict[str, str]:
@@ -131,6 +136,16 @@ def build_technique_profile(
         "llm_signal": min(0.99, 0.82 + (0.07 if has_knaa else 0.0) + (0.04 if has_gnaa else 0.0) + (0.05 if has_quant else 0.0) + (learning_bias * 0.05)),
         "stability_bias": min(0.96, 0.72 + (0.10 if permanent_intelligence else 0.0) + (0.04 if has_chaos else 0.0) + (0.06 if has_quant else 0.0) + ((1.0 - learning_bias) * 0.08)),
     }
+
+
+def render_variable_guide() -> None:
+    st.caption("Variable guide")
+    st.markdown(
+        "- **Micro Hermes agents**: number of active mini workers. Higher = broader exploration, more compute.\n"
+        "- **Gaussian learning pressure**: how strongly learning is pulled toward stable evidence (high = stricter).\n"
+        "- **High-level learning focus**: shifts from raw speed to long-term memory quality.\n"
+        "- **SQL/Internet/LLM signals**: source weighting used for curation and orchestration decisions."
+    )
 
 
 def run_auto_cycle(max_mode: bool, technique: Dict[str, Any]) -> Dict[str, Any]:
@@ -246,6 +261,7 @@ def normalize_agents(snapshot_data: Dict[str, Any], global_bonus: float) -> List
                 "progress": progress,
                 "active": bool(agent.get("active", True)),
                 "size_mode": size_mode,
+                "size_description": SIZE_MODE_DETAILS.get(size_mode, "Hermes operational profile."),
                 "interaction": interaction,
                 "skills": skill_pack,
             }
@@ -474,15 +490,17 @@ if USER_ROUTED_INTERNET and not OFFLINE_ONLY_MODE:
 render_learning_diagram()
 
 st.subheader("Training Compliance + Always-On Status")
-ts1, ts2, ts3, ts4 = st.columns(4)
+ts1, ts2, ts3, ts4, ts5 = st.columns(5)
 is_training_active = bool(training_status.get("training_active", False)) if not training_status_err else False
 idle_seconds = training_status.get("idle_seconds") if isinstance(training_status, dict) else None
 rule_score = str(training_status.get("rule_score", "n/a")) if isinstance(training_status, dict) else "n/a"
 recent_pulses = int(training_status.get("recent_learning_events", 0)) if isinstance(training_status, dict) else 0
+github_sync = bool(training_status.get("rules", {}).get("github_knowledge_sync", False)) if isinstance(training_status, dict) else False
 ts1.metric("Training", "Active" if is_training_active else "Needs Pulse")
 ts2.metric("Idle Seconds", "n/a" if idle_seconds is None else f"{float(idle_seconds):.1f}")
 ts3.metric("Rule Score", rule_score)
 ts4.metric("Recent Pulses", str(recent_pulses))
+ts5.metric("GitHub Knowledge Sync", "Active" if github_sync else "Pending")
 if not is_training_active:
     st.warning("Training appears idle. Use 'Force Training Pulse Now' to restart immediate learning.")
 if st.button("Force Training Pulse Now", use_container_width=True):
@@ -533,6 +551,7 @@ else:
 
 mode = st.radio("Training Level", ["Easy", "Near Max Hermes"], horizontal=True, index=1)
 max_mode = mode == "Near Max Hermes"
+st.caption("Hermes sizes: mini units focus speed; full-size units focus deep reasoning and retention.")
 
 study_areas = st.multiselect(
     "Study Areas",
@@ -573,6 +592,7 @@ with st.expander("Advanced Intelligence Techniques"):
         key="ctl_high_level_learning",
     )
     st.caption("High-level learning ideal range: 0.65-0.88 for best blend of performance + long-term adaptation.")
+    render_variable_guide()
 
 technique_profile = build_technique_profile(
     techniques=techniques,
@@ -703,7 +723,10 @@ with summary_left:
     )
 with summary_right:
     st.subheader("Quick Actions")
-    st.caption("These buttons run full actions immediately.")
+    action_mode = st.radio("Action view", ["Simple", "Advanced"], horizontal=True, index=0)
+    deploy_batch = st.slider("Deploy batch size", min_value=1, max_value=50, value=10, step=1)
+    st.caption("Simple view keeps the most-used controls only. Advanced view exposes all orchestration actions.")
+    st.caption("These actions run immediately.")
     if st.button("Generate Fleet Health Report", use_container_width=True):
         report_prompt = (
             "Create a short fleet health report from current Hermes data with "
@@ -725,6 +748,7 @@ with summary_right:
             {
                 "mode": "deploy",
                 "scope": "all",
+                "batch_size": deploy_batch,
                 "specialty": "fleet",
                 "steps": 240,
                 "candidates": 160,
@@ -740,6 +764,39 @@ with summary_right:
             deploy = {"error": deploy_err}
         log_text("deploy-all-hermes", deploy)
         st.success("All Hermes units deployed and synced.")
+    if st.button("🚚 Deploy 10 Hermes", use_container_width=True):
+        deploy_ten, deploy_ten_err = safe_post(
+            "/runtime-orchestrate/deploy",
+            {
+                "mode": "deploy",
+                "scope": "batch",
+                "batch_size": deploy_batch,
+                "specialty": "fleet",
+                "steps": 180,
+                "candidates": max(80, deploy_batch * 6),
+                "sql_signal": min(0.99, technique_profile["sql_signal"] + 0.03),
+                "internet_signal": 0.0 if OFFLINE_ONLY_MODE else technique_profile["internet_signal"],
+                "llm_signal": min(0.99, technique_profile["llm_signal"] + 0.03),
+                "stability_bias": min(0.99, technique_profile["stability_bias"] + 0.02),
+            },
+            timeout=120,
+        )
+        if deploy_ten_err:
+            st.error(f"Batch deploy failed: {deploy_ten_err}")
+            deploy_ten = {"error": deploy_ten_err}
+        log_text("deploy-batch-hermes", deploy_ten)
+        st.success(f"Batch deploy completed for {deploy_batch} Hermes units.")
+    if st.button("↩️ Return Hermes", use_container_width=True):
+        returned, returned_err = safe_post(
+            "/runtime-orchestrate/return",
+            {"mode": "return", "specialty": "fleet", "units": deploy_batch, "reason": "gui-return-request", "confidence": 0.88},
+            timeout=90,
+        )
+        if returned_err:
+            st.error(f"Return action failed: {returned_err}")
+            returned = {"error": returned_err}
+        log_text("return-hermes", returned)
+        st.success(f"Return signal sent for {deploy_batch} Hermes units.")
     if st.button("⚡ Permanent Bonus Boost", use_container_width=True):
         boost1, e1 = safe_post(
             "/curate-learning",
@@ -755,46 +812,48 @@ with summary_right:
         log_text("permanent-bonus-boost", {"curate_learning": boost1, "dedupe": boost2, "errors": [e1, e2]})
         st.success("Permanent bonus boost tools applied.")
 
-act1, act2, act3, act4, act5 = st.columns([1.1, 1, 1, 1.1, 1.3])
-with act1:
-    if st.button("⚡ One Fusion Run (4-in-1)", use_container_width=True):
-        result = run_auto_cycle(max_mode=max_mode, technique=technique_profile)
-        log_text("full-auto-cycle", result)
-        st.success("Fusion run finished (simulate + pulse + optimize + curate/dedupe).")
-        st.text_area("Auto Cycle Result", value=json.dumps(result, indent=2), height=260)
-with act2:
-    if st.button("Refresh Fleet Data", use_container_width=True):
-        snapshot, snapshot_err = safe_get("/snapshot", timeout=20)
-        if snapshot_err:
-            st.error(f"Fleet data refresh failed: {snapshot_err}")
-        else:
-            agent_rows = normalize_agents(snapshot, aihub_bonus)
-            log_text("fleet-refresh", snapshot)
-            st.success("Fleet data refreshed.")
-with act3:
-    if st.button("Quick Optimize Now", use_container_width=True):
-        optimize, opt_err = safe_post(
-            "/optimize-fleet",
-            {"specialty": f"fleet:{technique_profile['swarm_strategy']}", "candidates": min(500, (480 if max_mode else 160) + int(technique_profile["micro_agents"] * 0.2))},
-            timeout=120,
-        )
-        if opt_err:
-            st.error(f"Optimize failed: {opt_err}")
-        else:
-            log_text("quick-optimize", optimize)
-            st.success("Fleet optimization complete.")
-with act4:
-    if st.button("♾️ Deep Auto Learning Zone", use_container_width=True):
-        deep = deep_auto_learning_zone(max_mode=max_mode, study_areas=study_areas, rounds=3 if max_mode else 2, technique=technique_profile)
-        log_text("deep-auto-learning-zone", deep)
-        st.success("Deep auto-learning completed.")
-        st.text_area("Deep Learning Summary", value=json.dumps(deep, indent=2), height=260)
-with act5:
-    if st.button("🛰️ Special Fleet Training", use_container_width=True):
-        special = run_special_fleet_training(max_mode=max_mode, study_areas=study_areas, technique=technique_profile)
-        log_text("special-fleet-training", special)
-        st.success("Special fleet training completed.")
-        st.text_area("Special Training Result", value=json.dumps(special, indent=2), height=260)
+if action_mode == "Simple":
+    simple1, simple2, simple3 = st.columns(3)
+    with simple1:
+        if st.button("⚡ One Fusion Run", use_container_width=True):
+            result = run_auto_cycle(max_mode=max_mode, technique=technique_profile)
+            log_text("full-auto-cycle", result)
+            st.success("Fusion run finished.")
+    with simple2:
+        if st.button("Refresh Fleet Data", use_container_width=True):
+            snapshot, snapshot_err = safe_get("/snapshot", timeout=20)
+            if snapshot_err:
+                st.error(f"Fleet data refresh failed: {snapshot_err}")
+            else:
+                agent_rows = normalize_agents(snapshot, aihub_bonus)
+                log_text("fleet-refresh", snapshot)
+                st.success("Fleet data refreshed.")
+    with simple3:
+        if st.button("Quick Optimize", use_container_width=True):
+            optimize, opt_err = safe_post(
+                "/optimize-fleet",
+                {"specialty": f"fleet:{technique_profile['swarm_strategy']}", "candidates": min(500, (480 if max_mode else 160) + int(technique_profile["micro_agents"] * 0.2))},
+                timeout=120,
+            )
+            if opt_err:
+                st.error(f"Optimize failed: {opt_err}")
+            else:
+                log_text("quick-optimize", optimize)
+                st.success("Fleet optimization complete.")
+else:
+    act1, act2 = st.columns(2)
+    with act1:
+        if st.button("♾️ Deep Auto Learning Zone", use_container_width=True):
+            deep = deep_auto_learning_zone(max_mode=max_mode, study_areas=study_areas, rounds=3 if max_mode else 2, technique=technique_profile)
+            log_text("deep-auto-learning-zone", deep)
+            st.success("Deep auto-learning completed.")
+            st.text_area("Deep Learning Summary", value=json.dumps(deep, indent=2), height=260)
+    with act2:
+        if st.button("🛰️ Special Fleet Training", use_container_width=True):
+            special = run_special_fleet_training(max_mode=max_mode, study_areas=study_areas, technique=technique_profile)
+            log_text("special-fleet-training", special)
+            st.success("Special fleet training completed.")
+            st.text_area("Special Training Result", value=json.dumps(special, indent=2), height=260)
 
 st.subheader("Automatic Learning Zone")
 auto_enabled = st.checkbox("Always run automatic smart learning", value=True)
@@ -865,6 +924,28 @@ if st.session_state.get("last_chat", ""):
             f"speed={float(opt.get('estimated_tokens_per_sec', 0.0)):.1f} tok/s | "
             f"eff={float(opt.get('token_efficiency', 0.0)):.3f}"
         )
+        model_rows = []
+        for item in opt.get("candidates", []):
+            name = str(item.get("model", "unknown"))
+            tier = "mini" if "mini" in name else ("full" if "reasoning" in name or "max" in name else "balanced")
+            description = (
+                "fast lower-cost explorer"
+                if tier == "mini"
+                else ("deep high-power reasoner" if tier == "full" else "balanced general model")
+            )
+            model_rows.append(
+                {
+                    "Model": name,
+                    "Tier": tier,
+                    "Description": description,
+                    "Blend": round(float(item.get("blend_score", 0.0)), 4),
+                    "Speed tok/s": round(float(item.get("speed_tokens_per_sec", 0.0)), 1),
+                    "Cost/1k": round(float(item.get("cost_per_1k_tokens", 0.0)), 4),
+                }
+            )
+        if model_rows:
+            st.caption("AIHub model lineup (mini vs full size):")
+            st.dataframe(model_rows, use_container_width=True, hide_index=True)
 st.caption("Prompt path: Prompt -> Hermes fleet agents -> learning pulse -> optimization -> bonus + XP")
 
 st.subheader("Local Learning Data (easy)")
@@ -982,6 +1063,7 @@ else:
                 "Bonus": round(a["bonus"], 4),
                 "Progress": f"{a['progress'] * 100:.1f}%",
                 "Size": a["size_mode"],
+                "Size Detail": a["size_description"],
                 "Interaction": a["interaction"],
                 "Zone": a["zone"],
                 "Specialty": a["specialty"],
