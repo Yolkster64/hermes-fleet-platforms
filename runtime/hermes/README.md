@@ -1,8 +1,8 @@
 # Hermes Local Runtime
 
 1. Start stack:
-   - `pwsh ./runtime/hermes/start-hermes-local-runtime.ps1`
-   - or one-command advanced fleet startup: `pwsh ./runtime/hermes/start-hermes-super-fleet.ps1`
+   - `pwsh ./runtime/hermes/scripts/startup/start_local_runtime.ps1`
+   - or one-command advanced fleet startup: `pwsh ./runtime/hermes/scripts/startup/start_super_fleet.ps1`
    - startup scripts auto-enable `docker-compose.intel.yml` when `/dev/dri` is detected for Intel Arc/NPU acceleration
 2. MCP Docker gateway (primary entry):
    - `http://localhost:${MCP_DOCKER_PORT:-8788}`
@@ -43,10 +43,10 @@ This runtime enables:
   - `hermes-data` persists compressed mesh links, 3D evidence shapes, and cross-agent transfer signals in SQLite (`knowledge_mesh_links`)
 - Continuous fleet auto-training via `hermes-trainer` service
 - Canonical runtime script names:
-  - GUI entry: `runtime/hermes/gui_fleet_control_center.py`
-  - Trainer entry: `runtime/hermes/trainer_fleet_super.py`
-  - Startup helpers: `runtime/hermes/startup-helpers.ps1`
-  - Legacy aliases remain (`gui_dashboard.py`, `auto_trainer.py`, `start-local.ps1`, `start-agent-fleet.ps1`, `start-common.ps1`) for compatibility
+  - GUI entry: `runtime/hermes/apps/gui_control_center.py`
+  - Trainer entry: `runtime/hermes/apps/fleet_trainer_service.py`
+  - Startup helpers: `runtime/hermes/scripts/startup/helpers.ps1`
+  - Legacy aliases remain (`gui_fleet_control_center.py`, `trainer_fleet_super.py`, `gui_dashboard.py`, `auto_trainer.py`, `start-local.ps1`, `start-agent-fleet.ps1`, `start-common.ps1`, `start-hermes-local-runtime.ps1`, `start-hermes-super-fleet.ps1`, `startup-helpers.ps1`) for compatibility
 - C# performance front-end (`hermes-gateway`) for smoother API routing and integration
 - C# orchestration control-plane endpoints:
   - `POST /auth/login` (session token for gateway auth)
@@ -136,4 +136,4 @@ This runtime enables:
   - GUI and trainer are pre-wired to use the same key
   - Runtime now fails closed when API keys are missing unless `HERMES_ALLOW_INSECURE_NO_KEY=true`
 - Startup script auto-opens both GUI and unified-config pages:
-  - `pwsh ./runtime/hermes/start-hermes-local-runtime.ps1`
+  - `pwsh ./runtime/hermes/scripts/startup/start_local_runtime.ps1`
