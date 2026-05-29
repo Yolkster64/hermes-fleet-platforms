@@ -58,6 +58,19 @@ public sealed class NativeHermesLearningBridge
         double[] values,
         nuint valueLen);
 
+    [DllImport(NativeDll, EntryPoint = "hermes_long_haul_meta_score", CallingConvention = CallingConvention.Cdecl)]
+    private static extern double HermesLongHaulMetaScoreNative(
+        double[] shortValues,
+        nuint shortLen,
+        double[] midValues,
+        nuint midLen,
+        double[] longValues,
+        nuint longLen,
+        double externalSignalScore,
+        double correctionSignal,
+        double truthScore,
+        double gaussianAlignment);
+
     /// <summary>
     /// Computes reward using native C++ kernels when available.
     /// </summary>
@@ -227,6 +240,42 @@ public sealed class NativeHermesLearningBridge
         }
     }
 
+    public double ComputeLongHaulMetaScore(
+        double[] shortValues,
+        double[] midValues,
+        double[] longValues,
+        double externalSignalScore,
+        double correctionSignal,
+        double truthScore,
+        double gaussianAlignment)
+    {
+        var safeShort = shortValues ?? Array.Empty<double>();
+        var safeMid = midValues ?? Array.Empty<double>();
+        var safeLong = longValues ?? Array.Empty<double>();
+        try
+        {
+            return HermesLongHaulMetaScoreNative(
+                safeShort,
+                (nuint)safeShort.Length,
+                safeMid,
+                (nuint)safeMid.Length,
+                safeLong,
+                (nuint)safeLong.Length,
+                externalSignalScore,
+                correctionSignal,
+                truthScore,
+                gaussianAlignment);
+        }
+        catch (DllNotFoundException)
+        {
+            return ComputeLongHaulMetaManagedFallback(safeShort, safeMid, safeLong, externalSignalScore, correctionSignal, truthScore, gaussianAlignment);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return ComputeLongHaulMetaManagedFallback(safeShort, safeMid, safeLong, externalSignalScore, correctionSignal, truthScore, gaussianAlignment);
+        }
+    }
+
     private static double ComputeKnaaQnaaManagedFallback(
         double[] shortValues,
         double[] midValues,
@@ -300,6 +349,28 @@ public sealed class NativeHermesLearningBridge
         var fidelity = 1.0d / (1.0d + (mse * 200.0d));
         var compressionRatio = 1.0d - (8.0d / 64.0d);
         return Math.Clamp((fidelity * 0.72d) + (compressionRatio * 0.28d), 0.0d, 1.0d);
+    }
+
+    private static double ComputeLongHaulMetaManagedFallback(
+        double[] shortValues,
+        double[] midValues,
+        double[] longValues,
+        double externalSignalScore,
+        double correctionSignal,
+        double truthScore,
+        double gaussianAlignment)
+    {
+        static double Mean(double[] values) => values.Length == 0 ? 0.0d : values.Average();
+        var shortAvg = Mean(shortValues);
+        var midAvg = Mean(midValues);
+        var longAvg = Mean(longValues);
+        var horizonStability = (shortAvg * 0.20d) + (midAvg * 0.33d) + (longAvg * 0.47d);
+        var signalQuality =
+            (Math.Clamp(externalSignalScore, 0.0d, 1.0d) * 0.34d) +
+            (Math.Clamp(truthScore, 0.0d, 1.0d) * 0.41d) +
+            (Math.Clamp(gaussianAlignment, 0.0d, 1.0d) * 0.25d);
+        var correction = 0.5d + (Math.Clamp(correctionSignal, -1.0d, 1.0d) * 0.5d);
+        return Math.Clamp((horizonStability * 0.58d) + (signalQuality * 0.30d) + (correction * 0.12d), 0.0d, 1.0d);
     }
 
     private static double Sigmoid(double value) => 1.0d / (1.0d + Math.Exp(-value));

@@ -358,6 +358,7 @@ class HermesSuperOrchestrator:
             "knaa_qnaa_memory": [],
             "punishment_memory": [],
             "fleet_shape_memory": [],
+            "long_haul_meta_memory": [],
         }
         self.goal_shape_targets = {
             "quality": (0.90, 0.62, 0.52),
@@ -540,6 +541,7 @@ class HermesSuperOrchestrator:
             "long_score": event["long_score"],
             "retention_score": event["long_variables"]["retention_score"],
             "correction": event["punishment_correction"],
+            "long_haul_meta_score": event["long_haul_meta_score"],
             "reward_score": event["reward_score"],
         }
         self.store.write_memory_band("short", "short_ttl", short_payload["short_score"], short_payload)
@@ -555,6 +557,34 @@ class HermesSuperOrchestrator:
         values = [*short_variables.values(), *mid_variables.values(), *long_variables.values()]
         safe_values = [max(0.0, min(1.0, v)) for v in values]
         return self.native_bridge.quantized_compression_score(safe_values)
+
+    def _long_haul_meta_score(
+        self,
+        short_variables: Dict[str, float],
+        mid_variables: Dict[str, float],
+        long_variables: Dict[str, float],
+        external_signal_score: float,
+        correction_signal: float,
+        truth_score: float,
+        gaussian_alignment: float,
+    ) -> float:
+        short_values = [max(0.0, min(1.0, v)) for v in short_variables.values()]
+        mid_values = [max(0.0, min(1.0, v)) for v in mid_variables.values()]
+        long_values = [max(0.0, min(1.0, v)) for v in long_variables.values()]
+        score = self.native_bridge.long_haul_meta_score(
+            short_values=short_values,
+            mid_values=mid_values,
+            long_values=long_values,
+            external_signal_score=max(0.0, min(1.0, external_signal_score)),
+            correction_signal=max(-1.0, min(1.0, correction_signal)),
+            truth_score=max(0.0, min(1.0, truth_score)),
+            gaussian_alignment=max(0.0, min(1.0, gaussian_alignment)),
+        )
+        mem = self.algorithm_state["long_haul_meta_memory"]
+        mem.append(score)
+        if len(mem) > 2000:
+            del mem[: len(mem) - 2000]
+        return score
 
     def _natural_selection(self) -> None:
         inactive_candidates = [a for a in self.agents if a.success_rate < 0.2 and a.reward_score < 0.1]
@@ -655,10 +685,25 @@ class HermesSuperOrchestrator:
                 quality=quality,
                 drift=mid_variables["stability_drift"],
             )
+            gaussian_alignment = self._gaussian_3d_shape_score(
+                point=(truth_score, quality, speed),
+                target=self.goal_shape_targets["balanced"],
+                sigma=0.24,
+            )
+            long_haul_meta_score = self._long_haul_meta_score(
+                short_variables=short_variables,
+                mid_variables=mid_variables,
+                long_variables=long_variables,
+                external_signal_score=external_signal_score,
+                correction_signal=punishment_correction,
+                truth_score=truth_score,
+                gaussian_alignment=gaussian_alignment,
+            )
             objective_score += knaa_qnaa_score * 0.12
             objective_score += quantized_compression_score * 0.06
             objective_score += fleet_shape_score * 0.08
             objective_score += external_signal_score * 0.05
+            objective_score += long_haul_meta_score * 0.10
             objective_score = (objective_score * 0.55) + (self._multi_objective_score(outcome) * 0.45)
             delta = self._truth_gate_adjustment(objective_score, truth_score)
             delta += punishment_correction
@@ -702,6 +747,8 @@ class HermesSuperOrchestrator:
                 "fleet_shape_score": fleet_shape_score,
                 "external_signal_score": external_signal_score,
                 "punishment_correction": punishment_correction,
+                "gaussian_alignment": gaussian_alignment,
+                "long_haul_meta_score": long_haul_meta_score,
                 "objective_score": objective_score,
                 "reward_score": agent.reward_score,
                 "success_rate": agent.success_rate,
@@ -729,6 +776,7 @@ class HermesSuperOrchestrator:
         avg_knaa_qnaa = sum(r["knaa_qnaa_score"] for r in results) / len(results)
         avg_quantized_compression = sum(r["quantized_compression_score"] for r in results) / len(results)
         avg_fleet_shape = sum(r["fleet_shape_score"] for r in results) / len(results)
+        avg_long_haul_meta = sum(r["long_haul_meta_score"] for r in results) / len(results)
         truth_violations = len([r for r in results if r["truth_score"] < self.truth_threshold])
         return {
             "steps": steps,
@@ -743,6 +791,7 @@ class HermesSuperOrchestrator:
             "avg_knaa_qnaa_score": avg_knaa_qnaa,
             "avg_quantized_compression_score": avg_quantized_compression,
             "avg_fleet_shape_score": avg_fleet_shape,
+            "avg_long_haul_meta_score": avg_long_haul_meta,
             "truth_violations": truth_violations,
             "reward_weights": self.reward_weights,
         }
@@ -893,6 +942,7 @@ class HermesSuperOrchestrator:
             "knaa_qnaa_memory_tail": self.algorithm_state["knaa_qnaa_memory"][-20:],
             "fleet_shape_memory_tail": self.algorithm_state["fleet_shape_memory"][-20:],
             "punishment_memory_tail": self.algorithm_state["punishment_memory"][-20:],
+            "long_haul_meta_memory_tail": self.algorithm_state["long_haul_meta_memory"][-20:],
             "agents": [asdict(a) for a in self.agents],
             "recent_events": self.store.recent_events(limit=10),
         }

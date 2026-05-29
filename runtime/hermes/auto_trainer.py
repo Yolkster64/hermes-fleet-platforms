@@ -28,6 +28,7 @@ def run_cycle() -> None:
                 "avg_reward_score": data.get("avg_reward_score"),
                 "avg_knaa_qnaa_score": data.get("avg_knaa_qnaa_score"),
                 "avg_fleet_shape_score": data.get("avg_fleet_shape_score"),
+                "avg_long_haul_meta_score": data.get("avg_long_haul_meta_score"),
             },
         },
         timeout=30,
@@ -43,7 +44,7 @@ def run_cycle() -> None:
             json={
                 "sql_signal": data.get("avg_quantized_compression_score", 0.5),
                 "internet_signal": data.get("avg_fleet_shape_score", 0.5),
-                "llm_signal": data.get("avg_knaa_qnaa_score", 0.5),
+                "llm_signal": data.get("avg_long_haul_meta_score", data.get("avg_knaa_qnaa_score", 0.5)),
                 "stability_bias": data.get("avg_truth_score", 0.6),
             },
             timeout=30,
@@ -53,7 +54,8 @@ def run_cycle() -> None:
         f"avg_reward={data.get('avg_reward_score'):.4f} "
         f"avg_truth={data.get('avg_truth_score'):.4f} "
         f"avg_knaa_qnaa={data.get('avg_knaa_qnaa_score', 0.0):.4f} "
-        f"avg_fleet_shape={data.get('avg_fleet_shape_score', 0.0):.4f}"
+        f"avg_fleet_shape={data.get('avg_fleet_shape_score', 0.0):.4f} "
+        f"avg_long_haul_meta={data.get('avg_long_haul_meta_score', 0.0):.4f}"
     )
 
 

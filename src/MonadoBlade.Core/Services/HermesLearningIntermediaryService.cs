@@ -32,10 +32,33 @@ public sealed class HermesLearningIntermediaryService
     {
         var knaaQnaa = _nativeBridge.ComputeKnaaQnaaScore(shortValues, midValues, longValues, truthScore, rewardScore);
         var fleetShape = _nativeBridge.ComputeFleetShapeScore(activeAgents, latencyMs, throughputRps, errorRate, diversity, memoryRetention);
-        var quantizedCompression = _nativeBridge.ComputeQuantizedCompressionScore(
-            shortValues.Concat(midValues).Concat(longValues).ToArray());
-        var composite = Math.Clamp((knaaQnaa * 0.46d) + (fleetShape * 0.34d) + (quantizedCompression * 0.20d), 0.0d, 1.0d);
-        return new HermesIntermediaryScore(knaaQnaa, fleetShape, quantizedCompression, composite);
+        var allValues = shortValues.Concat(midValues).Concat(longValues).ToArray();
+        var quantizedCompression = _nativeBridge.ComputeQuantizedCompressionScore(allValues);
+        var gaussianAlignment = _nativeBridge.ComputeGaussian3DScore(
+            x: truthScore,
+            y: fleetShape,
+            z: quantizedCompression,
+            targetX: 0.85d,
+            targetY: 0.80d,
+            targetZ: 0.78d,
+            sigma: 0.24d);
+        var correctionSignal = (truthScore - 0.68d) + (rewardScore - 0.50d);
+        var longHaulMeta = _nativeBridge.ComputeLongHaulMetaScore(
+            shortValues,
+            midValues,
+            longValues,
+            externalSignalScore: (knaaQnaa + fleetShape) / 2.0d,
+            correctionSignal: correctionSignal,
+            truthScore: truthScore,
+            gaussianAlignment: gaussianAlignment);
+        var composite = Math.Clamp(
+            (knaaQnaa * 0.32d) +
+            (fleetShape * 0.24d) +
+            (quantizedCompression * 0.16d) +
+            (longHaulMeta * 0.28d),
+            0.0d,
+            1.0d);
+        return new HermesIntermediaryScore(knaaQnaa, fleetShape, quantizedCompression, longHaulMeta, composite);
     }
 
     public async Task<HermesCuratedLearningPlan> CurateLearningAsync(
@@ -78,6 +101,7 @@ public sealed class HermesLearningIntermediaryService
                 knaa_qnaa = score.KnaaQnaa,
                 fleet_shape = score.FleetShape,
                 quantized_compression = score.QuantizedCompression,
+                long_haul_meta = score.LongHaulMeta,
                 composite = score.Composite,
             },
         };
@@ -94,6 +118,7 @@ public sealed record HermesIntermediaryScore(
     double KnaaQnaa,
     double FleetShape,
     double QuantizedCompression,
+    double LongHaulMeta,
     double Composite);
 
 public sealed record HermesCuratedLearningPlan(

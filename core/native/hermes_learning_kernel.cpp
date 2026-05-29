@@ -172,4 +172,29 @@ __declspec(dllexport) double hermes_quantized_compression_score(
     return std::clamp((fidelity * 0.72) + (compression_ratio * 0.28), 0.0, 1.0);
 }
 
+__declspec(dllexport) double hermes_long_haul_meta_score(
+    const double* short_values,
+    std::size_t short_len,
+    const double* mid_values,
+    std::size_t mid_len,
+    const double* long_values,
+    std::size_t long_len,
+    double external_signal_score,
+    double correction_signal,
+    double truth_score,
+    double gaussian_alignment) {
+    const double short_avg = mean_or_zero(short_values, short_len);
+    const double mid_avg = mean_or_zero(mid_values, mid_len);
+    const double long_avg = mean_or_zero(long_values, long_len);
+    const double horizon_stability = (short_avg * 0.20) + (mid_avg * 0.33) + (long_avg * 0.47);
+
+    const double signal_quality =
+        (std::clamp(external_signal_score, 0.0, 1.0) * 0.34) +
+        (std::clamp(truth_score, 0.0, 1.0) * 0.41) +
+        (std::clamp(gaussian_alignment, 0.0, 1.0) * 0.25);
+
+    const double correction = 0.5 + std::clamp(correction_signal, -1.0, 1.0) * 0.5;
+    return std::clamp((horizon_stability * 0.58) + (signal_quality * 0.30) + (correction * 0.12), 0.0, 1.0);
+}
+
 }
