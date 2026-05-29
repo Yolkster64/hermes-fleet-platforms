@@ -113,7 +113,7 @@ services:
       context: ../..
       dockerfile: runtime/hermes/Dockerfile
     container_name: hermes-trainer
-    command: python runtime/hermes/apps/fleet_trainer_service.py
+    command: python runtime/hermes/apps/runtime_entrypoint.py --app trainer
     environment:
       HERMES_API_BASE_URL: http://hermes-gateway:8788
       HERMES_GATEWAY_KEY: "local-hermes-ui-key"

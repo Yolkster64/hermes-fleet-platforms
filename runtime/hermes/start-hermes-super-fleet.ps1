@@ -1,2 +1,2 @@
-Write-Host "start-hermes-super-fleet.ps1 delegates to scripts/startup/start_super_fleet.ps1"
-& "$PSScriptRoot\scripts\startup\start_super_fleet.ps1"
+Write-Host "start-hermes-super-fleet.ps1 delegates to scripts/startup/start_runtime.ps1 -Mode super"
+& "$PSScriptRoot\scripts\startup\start_runtime.ps1" -Mode super
