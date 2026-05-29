@@ -6,15 +6,29 @@ import subprocess
 import time
 from typing import Dict, List
 
+_SCHEMA_READY: set[str] = set()
+
 
 def _db_path(volume_root: str) -> str:
     return os.path.join(volume_root, "training", "hermes_training_intel.sqlite3")
 
 
+def _connect(db: str) -> sqlite3.Connection:
+    conn = sqlite3.connect(db)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA temp_store=MEMORY")
+    conn.execute("PRAGMA foreign_keys=OFF")
+    conn.execute("PRAGMA cache_size=-20000")
+    return conn
+
+
 def ensure_training_sql(volume_root: str) -> str:
     db = _db_path(volume_root)
     os.makedirs(os.path.dirname(db), exist_ok=True)
-    with sqlite3.connect(db) as conn:
+    if db in _SCHEMA_READY and os.path.exists(db):
+        return db
+    with _connect(db) as conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS training_cycles (
@@ -63,6 +77,7 @@ def ensure_training_sql(volume_root: str) -> str:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_vars_hermes ON hermes_agent_variables(hermes_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_github_context_created ON github_context(created_unix)")
         conn.commit()
+    _SCHEMA_READY.add(db)
     return db
 
 
@@ -74,7 +89,7 @@ def prune_training_sql(
 ) -> Dict[str, int]:
     db = ensure_training_sql(volume_root)
     pruned = {"training_cycles": 0, "hermes_agent_variables": 0, "github_context": 0}
-    with sqlite3.connect(db) as conn:
+    with _connect(db) as conn:
         conn.execute(
             """
             DELETE FROM training_cycles
@@ -120,7 +135,7 @@ def record_training_cycle(
     training_variables: Dict[str, float],
 ) -> None:
     db = ensure_training_sql(volume_root)
-    with sqlite3.connect(db) as conn:
+    with _connect(db) as conn:
         conn.execute(
             """
             INSERT INTO training_cycles (
@@ -240,7 +255,7 @@ def _benefits_and_ideas(art_pattern: Dict[str, float], trend: float) -> tuple[Li
 
 def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str, object]:
     db = ensure_training_sql(volume_root)
-    with sqlite3.connect(db) as conn:
+    with _connect(db) as conn:
         rows = conn.execute(
             """
             SELECT cycle, signal_score, reward, truth_score, shape_score, training_variables_json
@@ -341,8 +356,11 @@ def ingest_github_context(volume_root: str, repo_root: str) -> Dict[str, object]
         commit_subject = subprocess.check_output(["git", "log", "-1", "--pretty=%s"], cwd=repo_root, text=True).strip()
         status = subprocess.check_output(["git", "--no-pager", "status", "--short"], cwd=repo_root, text=True)
         changed_files = len([line for line in status.splitlines() if line.strip()])
-    except Exception:
-        pass
+    except (subprocess.CalledProcessError, OSError):
+        branch = "unknown"
+        commit_sha = "unknown"
+        commit_subject = ""
+        changed_files = 0
     payload = {
         "branch": branch,
         "commit_sha": commit_sha,
@@ -350,7 +368,7 @@ def ingest_github_context(volume_root: str, repo_root: str) -> Dict[str, object]
         "changed_files": int(changed_files),
         "created_unix": time.time(),
     }
-    with sqlite3.connect(db) as conn:
+    with _connect(db) as conn:
         conn.execute(
             """
             INSERT INTO github_context (branch, commit_sha, commit_subject, changed_files, created_unix)
@@ -373,37 +391,42 @@ def record_hermes_agent_variables(
     db = ensure_training_sql(volume_root)
     count = max(6, min(24, int(micro_agents // 12)))
     base = {k: float(v) for k, v in training_variables.items() if isinstance(v, (int, float))}
-    with sqlite3.connect(db) as conn:
-        for idx in range(count):
-            ratio = (idx + 1) / max(1.0, float(count))
-            agent_vars = dict(base)
-            agent_vars["agent_focus"] = max(0.0, min(1.0, base.get("success_signal", 0.5) * (0.7 + ratio * 0.6)))
-            agent_vars["agent_exploration"] = max(0.0, min(1.0, base.get("wrongness_signal", 0.3) * (1.2 - ratio * 0.5)))
-            agent_vars["agent_memory_depth"] = max(0.0, min(1.0, base.get("retention_strength", 0.5) * (0.8 + ratio * 0.4)))
-            art_pattern_score = max(
-                0.0,
-                min(
-                    1.0,
-                    (agent_vars.get("agent_focus", 0.5) * 0.35)
-                    + ((1.0 - agent_vars.get("agent_exploration", 0.5)) * 0.20)
-                    + (agent_vars.get("agent_memory_depth", 0.5) * 0.20)
-                    + (agent_vars.get("coordination_cohesion", 0.5) * 0.25),
-                ),
+    rows = []
+    now = time.time()
+    for idx in range(count):
+        ratio = (idx + 1) / max(1.0, float(count))
+        agent_vars = dict(base)
+        agent_vars["agent_focus"] = max(0.0, min(1.0, base.get("success_signal", 0.5) * (0.7 + ratio * 0.6)))
+        agent_vars["agent_exploration"] = max(0.0, min(1.0, base.get("wrongness_signal", 0.3) * (1.2 - ratio * 0.5)))
+        agent_vars["agent_memory_depth"] = max(0.0, min(1.0, base.get("retention_strength", 0.5) * (0.8 + ratio * 0.4)))
+        art_pattern_score = max(
+            0.0,
+            min(
+                1.0,
+                (agent_vars.get("agent_focus", 0.5) * 0.35)
+                + ((1.0 - agent_vars.get("agent_exploration", 0.5)) * 0.20)
+                + (agent_vars.get("agent_memory_depth", 0.5) * 0.20)
+                + (agent_vars.get("coordination_cohesion", 0.5) * 0.25),
+            ),
+        )
+        rows.append(
+            (
+                int(cycle),
+                f"hermes-{idx + 1:03d}",
+                str(specialty),
+                float(signal_score),
+                float(art_pattern_score),
+                json.dumps(agent_vars, sort_keys=True),
+                now,
             )
-            conn.execute(
-                """
-                INSERT INTO hermes_agent_variables (
-                    cycle, hermes_id, specialty, signal_score, art_pattern_score, variables_json, created_unix
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    int(cycle),
-                    f"hermes-{idx + 1:03d}",
-                    str(specialty),
-                    float(signal_score),
-                    float(art_pattern_score),
-                    json.dumps(agent_vars, sort_keys=True),
-                    time.time(),
-                ),
-            )
+        )
+    with _connect(db) as conn:
+        conn.executemany(
+            """
+            INSERT INTO hermes_agent_variables (
+                cycle, hermes_id, specialty, signal_score, art_pattern_score, variables_json, created_unix
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
         conn.commit()
