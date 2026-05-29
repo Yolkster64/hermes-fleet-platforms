@@ -511,6 +511,35 @@ if st.button("Force Training Pulse Now", use_container_width=True):
         log_text("force-training-pulse", pulse_now)
         st.success("Training pulse triggered.")
 
+brain_catalog = snapshot_data.get("brain_horizon_catalog", {}) if isinstance(snapshot_data, dict) else {}
+brain_profile = snapshot_data.get("brain_horizon_profile", {}) if isinstance(snapshot_data, dict) else {}
+with st.expander("Brain Variables: Short / Mid / Long + Growth Maturity", expanded=False):
+    if brain_profile:
+        st.caption("Live integrated profile")
+        st.dataframe(
+            [
+                {
+                    "Short Horizon": round(float(brain_profile.get("short_horizon", 0.0)), 4),
+                    "Mid Horizon": round(float(brain_profile.get("mid_horizon", 0.0)), 4),
+                    "Long Horizon": round(float(brain_profile.get("long_horizon", 0.0)), 4),
+                    "Growth": round(float(brain_profile.get("growth_index", 0.0)), 4),
+                    "Maturity": round(float(brain_profile.get("maturity_index", 0.0)), 4),
+                    "Softening": round(float(brain_profile.get("softening_factor", 0.0)), 4),
+                }
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+    if brain_catalog:
+        rows = []
+        for horizon, entries in brain_catalog.items():
+            if isinstance(entries, dict):
+                for key, desc in entries.items():
+                    rows.append({"Horizon": horizon, "Variable": key, "Description": str(desc)})
+        if rows:
+            st.caption("Tracked brain variables")
+            st.dataframe(rows, use_container_width=True, hide_index=True)
+
 cpp1, cpp2, cpp3 = st.columns(3)
 cpp_available = bool(cpp_kernel.get("available", False)) if not cpp_kernel_err else False
 cpp1.metric("C++ Brain Kernel", "Active" if cpp_available else "Fallback")

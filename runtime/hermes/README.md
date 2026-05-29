@@ -93,6 +93,11 @@ This runtime enables:
   - Chaotic factor randomization (`sql/internet/llm/stability/steps/candidates` ratios) is applied per cycle for broader search
   - Evidence matrix tracks strategy + ratio + agent-size combinations and feeds top-performing combinations back through `/ingest-signal`
   - Auto trainer can emit GitHub↔field knowledge sync signals (`auto_trainer.github_knowledge_sync`) for continuous memory exchange
+  - Integrated brain horizon model:
+    - **Short horizon** variables (latency/cache/IO/consistency/recovery)
+    - **Mid horizon** variables (drift/schema/alignment/coordination/reward adaptation)
+    - **Long horizon** variables (retention/generalization/longevity/transfer/maturity stability)
+  - Growth + maturity + softening factors are now baked into adaptive scoring and surfaced in snapshot/training UX
   - Composite `value_brain` scoring blends ease/correctness/opposite-pressure/reward/truth/shape/special-reaction into one dynamic weighted score
   - Spatial overlap map compares strategy groups/setups in multi-analysis form (overlap + distance) for stronger setting selection
   - Strategy memory now updates with value-brain-assisted reward weighting for longer-term, smarter adaptation

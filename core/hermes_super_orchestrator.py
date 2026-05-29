@@ -809,6 +809,67 @@ class HermesSuperOrchestrator:
             },
         }
 
+    def _soft_blend(self, current: float, target: float, alpha: float = 0.24) -> float:
+        c = max(0.0, min(1.0, float(current)))
+        t = max(0.0, min(1.0, float(target)))
+        a = max(0.05, min(0.95, float(alpha)))
+        return max(0.0, min(1.0, (c * (1.0 - a)) + (t * a)))
+
+    def _brain_horizon_profile(
+        self,
+        short_variables: Dict[str, float],
+        mid_variables: Dict[str, float],
+        long_variables: Dict[str, float],
+        aihub_bonus: float,
+    ) -> Dict[str, float]:
+        short_avg = sum(max(0.0, min(1.0, float(v))) for v in short_variables.values()) / max(1, len(short_variables))
+        mid_avg = sum(max(0.0, min(1.0, float(v))) for v in mid_variables.values()) / max(1, len(mid_variables))
+        long_avg = sum(max(0.0, min(1.0, float(v))) for v in long_variables.values()) / max(1, len(long_variables))
+        growth = float(self.growth_metrics().get("growth_index", 0.0))
+        maturity = max(0.0, min(1.0, (long_avg * 0.40) + (growth * 0.35) + (aihub_bonus * 0.25)))
+        learning_velocity = max(0.0, min(1.0, (short_avg * 0.34) + (mid_avg * 0.44) + ((1.0 - abs(short_avg - mid_avg)) * 0.22)))
+        softening = max(0.0, min(1.0, (mid_avg * 0.48) + (maturity * 0.32) + ((1.0 - abs(short_avg - long_avg)) * 0.20)))
+        return {
+            "short_horizon": short_avg,
+            "mid_horizon": mid_avg,
+            "long_horizon": long_avg,
+            "growth_index": growth,
+            "maturity_index": maturity,
+            "learning_velocity": learning_velocity,
+            "softening_factor": softening,
+        }
+
+    def _horizon_variable_catalog(self) -> Dict[str, Dict[str, str]]:
+        return {
+            "short_horizon": {
+                "latency_pressure": "Immediate response pressure under active workload.",
+                "cache_hit_proxy": "Short-cycle memory/cache reuse efficiency.",
+                "io_efficiency": "Near-term IO throughput quality.",
+                "response_consistency": "Stability of immediate output across retries.",
+                "micro_recovery": "Ability to recover quickly from micro-errors.",
+            },
+            "mid_horizon": {
+                "stability_drift": "Deviation trend over medium windows.",
+                "schema_health": "Data/contract reliability over active sessions.",
+                "agent_alignment": "Alignment among agents toward shared goals.",
+                "coordination_cohesion": "Team-level coordination quality.",
+                "reward_adaptation": "How quickly reward signals are incorporated.",
+            },
+            "long_horizon": {
+                "retention_score": "Long-term memory preservation strength.",
+                "generalization": "Transfer quality across new domains/tasks.",
+                "compression_longevity": "Durability of compressed knowledge.",
+                "knowledge_transfer": "Cross-agent/domain transfer effectiveness.",
+                "maturity_stability": "Long-run stability of learned behavior.",
+            },
+            "integrated_growth": {
+                "growth_index": "Overall learning growth from core memory bands.",
+                "maturity_index": "Long-run readiness blending long horizon + AIHub + growth.",
+                "learning_velocity": "Current learning speed across short/mid horizons.",
+                "softening_factor": "How softly decisions should be blended vs sharply pivoted.",
+            },
+        }
+
     def cpp_kernel_status(self) -> Dict:
         return {
             "available": self.native_bridge.available,
@@ -1323,16 +1384,22 @@ class HermesSuperOrchestrator:
                 "latency_pressure": max(0.0, min(1.0, random.gauss(0.62, 0.18))),
                 "cache_hit_proxy": max(0.0, min(1.0, random.gauss(0.66, 0.20))),
                 "io_efficiency": max(0.0, min(1.0, random.gauss(0.6, 0.21))),
+                "response_consistency": max(0.0, min(1.0, random.gauss(0.64, 0.17))),
+                "micro_recovery": max(0.0, min(1.0, random.gauss(0.61, 0.20))),
             }
             mid_variables = {
                 "stability_drift": max(0.0, min(1.0, random.gauss(0.52, 0.22))),
                 "schema_health": max(0.0, min(1.0, random.gauss(0.7, 0.18))),
                 "agent_alignment": max(0.0, min(1.0, random.gauss(0.68, 0.17))),
+                "coordination_cohesion": max(0.0, min(1.0, random.gauss(0.66, 0.19))),
+                "reward_adaptation": max(0.0, min(1.0, random.gauss(0.63, 0.20))),
             }
             long_variables = {
                 "retention_score": max(0.0, min(1.0, random.gauss(0.71, 0.19))),
                 "generalization": max(0.0, min(1.0, random.gauss(0.65, 0.23))),
                 "compression_longevity": max(0.0, min(1.0, random.gauss(0.63, 0.21))),
+                "knowledge_transfer": max(0.0, min(1.0, random.gauss(0.67, 0.20))),
+                "maturity_stability": max(0.0, min(1.0, random.gauss(0.69, 0.18))),
             }
             external_signal_score = max(0.0, min(1.0, self.store.recent_external_signal_score()))
             outcome = InteractionOutcome(
@@ -1396,6 +1463,8 @@ class HermesSuperOrchestrator:
                 truth_score=truth_score,
                 gaussian_alignment=gaussian_alignment,
             )
+            aihub_bonus_live = self.compute_aihub_bonus(persist=False)
+            horizon_profile = self._brain_horizon_profile(short_variables, mid_variables, long_variables, aihub_bonus_live)
             adaptive_variables = [
                 quality,
                 speed,
@@ -1411,6 +1480,12 @@ class HermesSuperOrchestrator:
                 long_haul_meta_score,
                 external_signal_score,
                 gaussian_alignment,
+                horizon_profile["short_horizon"],
+                horizon_profile["mid_horizon"],
+                horizon_profile["long_horizon"],
+                horizon_profile["learning_velocity"],
+                horizon_profile["maturity_index"],
+                horizon_profile["softening_factor"],
             ]
             adaptive_weights = [
                 self.reward_weights["quality"],
@@ -1427,19 +1502,41 @@ class HermesSuperOrchestrator:
                 0.11,
                 0.06,
                 0.07,
+                0.06,
+                0.07,
+                0.08,
+                0.07,
+                0.09,
+                0.05,
             ]
             adaptive_decision = self._adaptive_brain_decision(
                 variables=adaptive_variables,
                 variable_weights=adaptive_weights,
                 truth_score=truth_score,
-                stability_signal=max(0.0, min(1.0, 1.0 - mid_variables["stability_drift"])),
-                exploration_pressure=max(0.0, min(1.0, (1.0 - truth_score) * 0.55 + (1.0 - long_variables["generalization"]) * 0.25 + novelty * 0.20)),
-                chaos_control=max(0.0, min(1.0, abs(mid_variables["stability_drift"] - long_variables["retention_score"]) * 0.7 + pattern_diversity * 0.3)),
-                proactive_bias=max(0.0, min(1.0, (self.algorithm_state["bandit_values"].get(agent.specialty, 0.5) * 0.5) + (data_freshness * 0.5))),
+                stability_signal=self._soft_blend(
+                    max(0.0, min(1.0, 1.0 - mid_variables["stability_drift"])),
+                    horizon_profile["maturity_index"],
+                    alpha=0.14,
+                ),
+                exploration_pressure=self._soft_blend(
+                    max(0.0, min(1.0, (1.0 - truth_score) * 0.55 + (1.0 - long_variables["generalization"]) * 0.25 + novelty * 0.20)),
+                    horizon_profile["learning_velocity"],
+                    alpha=0.12,
+                ),
+                chaos_control=self._soft_blend(
+                    max(0.0, min(1.0, abs(mid_variables["stability_drift"] - long_variables["retention_score"]) * 0.7 + pattern_diversity * 0.3)),
+                    horizon_profile["softening_factor"],
+                    alpha=0.10,
+                ),
+                proactive_bias=self._soft_blend(
+                    max(0.0, min(1.0, (self.algorithm_state["bandit_values"].get(agent.specialty, 0.5) * 0.5) + (data_freshness * 0.5))),
+                    horizon_profile["growth_index"],
+                    alpha=0.12,
+                ),
             )
             big_decision_plan = self._build_big_decision_plan(specialty_hint=specialty_hint, adaptive_decision=adaptive_decision, workload_complexity=effective_work)
             hard_fact = self._apply_hard_facts(agent.specialty, adaptive_decision, truth_score, quality)
-            aihub_bonus = self.compute_aihub_bonus()
+            aihub_bonus = self._soft_blend(self.compute_aihub_bonus(), aihub_bonus_live, alpha=0.22)
             objective_score += knaa_qnaa_score * 0.12
             objective_score += quantized_compression_score * 0.06
             objective_score += fleet_shape_score * 0.08
@@ -1455,7 +1552,10 @@ class HermesSuperOrchestrator:
                 objective_score += 0.07
                 adaptive_decision["chaos_intensity"] = max(0.0, adaptive_decision["chaos_intensity"] * 0.55)
             objective_score += aihub_bonus * 0.09
+            objective_score += horizon_profile["learning_velocity"] * 0.04
+            objective_score += horizon_profile["maturity_index"] * 0.04
             objective_score = (objective_score * 0.55) + (self._multi_objective_score(outcome) * 0.45)
+            objective_score = self._soft_blend(objective_score, horizon_profile["growth_index"], alpha=(0.10 + (horizon_profile["softening_factor"] * 0.18)))
             delta = self._truth_gate_adjustment(objective_score, truth_score)
             delta += punishment_correction
             delta += (adaptive_decision["confidence"] - 0.5) * 0.20
@@ -1511,6 +1611,7 @@ class HermesSuperOrchestrator:
                 "adaptive_brain": adaptive_decision,
                 "big_decision_plan": big_decision_plan,
                 "hard_fact": hard_fact,
+                "horizon_profile": horizon_profile,
                 "aihub_bonus": aihub_bonus,
                 "objective_score": objective_score,
                 "reward_score": agent.reward_score,
@@ -1982,6 +2083,14 @@ class HermesSuperOrchestrator:
 
     def snapshot(self) -> Dict:
         p = self.governor.pressure()
+        growth = self.growth_metrics()
+        aihub_live = self.compute_aihub_bonus(persist=False)
+        horizon_profile = self._brain_horizon_profile(
+            short_variables={"latency_pressure": 0.5, "cache_hit_proxy": 0.5, "io_efficiency": 0.5, "response_consistency": 0.5, "micro_recovery": 0.5},
+            mid_variables={"stability_drift": 0.5, "schema_health": 0.5, "agent_alignment": 0.5, "coordination_cohesion": 0.5, "reward_adaptation": 0.5},
+            long_variables={"retention_score": 0.5, "generalization": 0.5, "compression_longevity": 0.5, "knowledge_transfer": 0.5, "maturity_stability": 0.5},
+            aihub_bonus=aihub_live,
+        )
         return {
             "resource_pressure": p,
             "reward_weights": self.reward_weights,
@@ -1994,10 +2103,12 @@ class HermesSuperOrchestrator:
             "aihub_bonus_memory_tail": self.algorithm_state["aihub_bonus_memory"][-20:],
             "agents": [asdict(a) for a in self.agents],
             "unified_config": self.unified_config,
-            "growth": self.growth_metrics(),
+            "growth": growth,
+            "brain_horizon_catalog": self._horizon_variable_catalog(),
+            "brain_horizon_profile": horizon_profile,
             "cpp_kernel": self.cpp_kernel_status(),
             "knowledge_mesh": self.knowledge_mesh_state(),
-            "aihub_bonus_live": self.compute_aihub_bonus(persist=False),
+            "aihub_bonus_live": aihub_live,
             "learning_state_path": self._resolved_learning_state_path(),
             "recent_events": self.store.recent_events(limit=10),
             "external_signals_tail": self.store.recent_external_signals(limit=20),
@@ -2053,6 +2164,8 @@ class HermesSuperOrchestrator:
             "recent_learning_events": len([e for e in recent_events if e.get("event_type") == "learning_pulse"]),
             "recent_train_steps": len([e for e in recent_events if e.get("event_type") == "train_step"]),
             "recent_trainer_signals": len([s for s in recent_signals if "trainer" in str(s.get("source", "")).lower()]),
+            "brain_horizon_catalog": self._horizon_variable_catalog(),
+            "growth": self.growth_metrics(),
             "rules": rules,
             "rule_score": f"{passing_rules}/{len(rules)}",
             "recommended_action": "continue_training" if training_active else "trigger_learning_pulse_or_auto_trainer",

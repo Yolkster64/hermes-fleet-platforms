@@ -364,6 +364,23 @@ def _composite_value_brain(data: dict, factors: dict[str, float], algo: dict[str
     }
 
 
+def _horizon_growth_profile(data: dict, brain_value: dict[str, float], signal_score: float) -> dict[str, float]:
+    short_horizon = max(0.0, min(1.0, (float(data.get("avg_reward_score", 0.5)) * 0.42) + (float(brain_value.get("ease", 0.5)) * 0.33) + (float(data.get("avg_quality", 0.5)) * 0.25)))
+    mid_horizon = max(0.0, min(1.0, (float(data.get("avg_truth_score", 0.5)) * 0.40) + (float(data.get("avg_fleet_shape_score", 0.5)) * 0.35) + (float(brain_value.get("correctness", 0.5)) * 0.25)))
+    long_horizon = max(0.0, min(1.0, (float(data.get("avg_long_haul_meta_score", 0.5)) * 0.45) + (float(data.get("avg_knaa_qnaa_score", 0.5)) * 0.30) + (float(brain_value.get("value", 0.5)) * 0.25)))
+    growth = max(0.0, min(1.0, (short_horizon * 0.30) + (mid_horizon * 0.35) + (long_horizon * 0.35)))
+    maturity = max(0.0, min(1.0, (long_horizon * 0.48) + (growth * 0.32) + (signal_score * 0.20)))
+    softening = max(0.0, min(1.0, (mid_horizon * 0.45) + (maturity * 0.35) + ((1.0 - abs(short_horizon - long_horizon)) * 0.20)))
+    return {
+        "short_horizon": short_horizon,
+        "mid_horizon": mid_horizon,
+        "long_horizon": long_horizon,
+        "growth_index": growth,
+        "maturity_index": maturity,
+        "softening_factor": softening,
+    }
+
+
 def _spatial_overlap_map(occasion: str) -> list[dict]:
     local = _strategy_memory.get(occasion, {})
     names = list(local.keys())
@@ -538,6 +555,7 @@ def _emit_strategy_feedback(
                 },
                 "score_components": {"reward": reward, "truth": truth, "fleet_shape": shape},
                 "value_brain": brain_value,
+                "horizon_profile": horizon_profile,
                 "value_brain_history_tail": _value_brain_history[-40:],
                 "strategy_leaderboard": [{"strategy": s, "score": sc} for s, sc in leaderboard],
                 "evidence_top_combinations": _top_evidence(),
@@ -667,7 +685,8 @@ def run_cycle() -> None:
     algo_profile = _algo_live.get(selected_strategy, STRATEGY_ALGOS["hybrid"])
     factors = _chaotic_factor_pack(chaos_rate)
     brain_value = _composite_value_brain(data, factors, algo_profile, occasion, focus, chaos_rate)
-    dynamic_specialty = f"{SPECIALTY}:{selected_strategy}:{focus}"
+    horizon_profile = _horizon_growth_profile(data, brain_value, signal_score)
+    dynamic_specialty = f"{SPECIALTY}:{selected_strategy}:{focus}:m{horizon_profile['maturity_index']:.2f}"
     requests.post(
         f"{API_BASE}/ingest-signal",
         json={
@@ -687,6 +706,7 @@ def run_cycle() -> None:
                 "strategy_algorithm": algo_profile,
                 "chaotic_factor_pack": factors,
                 "value_brain": brain_value,
+                "horizon_profile": horizon_profile,
                 "chaos_3d_vector": {"x": x, "y": y, "z": z, "chaos_rate": chaos_rate},
                 "cpp_kernel": cpp_kernel,
             },
@@ -708,6 +728,7 @@ def run_cycle() -> None:
         internet_signal = min(0.14, max(0.06, internet_signal))
     llm_signal = max(0.60, min(0.99, (llm_signal + algo_profile["llm_boost"]) * factors["ratio_llm"]))
     stability_bias = max(0.55, min(0.99, (stability_bias + algo_profile["stability_boost"]) * factors["ratio_stability"]))
+    stability_bias = max(0.55, min(0.99, (stability_bias * (0.82 + (horizon_profile["softening_factor"] * 0.18)))))
     pulse_steps = min(620, max(140, int((STEPS * (0.28 + (0.45 * HIGH_LEVEL_LEARNING))) if MAX_MODE else STEPS // 2)))
     pulse_steps = min(680, max(120, int(pulse_steps * algo_profile["step_mult"] * factors["ratio_steps"])))
     pulse_candidates = (
