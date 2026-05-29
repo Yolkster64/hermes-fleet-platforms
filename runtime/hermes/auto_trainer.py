@@ -113,6 +113,7 @@ _REQUEST_HEADERS = {"X-Hermes-Key": GATEWAY_KEY.strip()} if GATEWAY_KEY.strip() 
 _HTTP_SESSION = requests.Session()
 _HTTP_SESSION.mount("http://", HTTPAdapter(pool_connections=24, pool_maxsize=24, max_retries=0))
 _HTTP_SESSION.mount("https://", HTTPAdapter(pool_connections=12, pool_maxsize=12, max_retries=0))
+_cpp_status_cache: dict[str, object] = {"cycle": 0, "payload": {"available": False}}
 
 STRATEGY_ALGOS: dict[str, dict[str, float]] = {
     "nano-swarm": {"sql_boost": 0.05, "internet_boost": 0.09, "llm_boost": 0.06, "stability_boost": -0.02, "step_mult": 0.82, "candidate_mult": 1.35},
@@ -198,6 +199,23 @@ def _get(path: str, timeout: int = 30) -> dict:
     response = _HTTP_SESSION.get(f"{API_BASE}{path}", headers=_REQUEST_HEADERS, timeout=timeout)
     response.raise_for_status()
     return response.json()
+
+
+def _cpp_kernel_status(cycle: int) -> tuple[dict, bool]:
+    cached_cycle = int(_cpp_status_cache.get("cycle", 0))
+    cached_payload = _cpp_status_cache.get("payload", {"available": False})
+    if isinstance(cached_payload, dict) and cached_cycle > 0 and (cycle - cached_cycle) < 5:
+        available = bool(cached_payload.get("available", False))
+        return cached_payload, available
+    try:
+        payload = _get("/cpp-kernel-status", timeout=20)
+        if not isinstance(payload, dict):
+            payload = {"available": False}
+    except requests.RequestException:
+        payload = {"available": False}
+    _cpp_status_cache["cycle"] = int(cycle)
+    _cpp_status_cache["payload"] = payload
+    return payload, bool(payload.get("available", False))
 
 
 def _emit_signal(source: str, signal_score: float, payload: dict, timeout: int = 45) -> dict:
@@ -750,13 +768,7 @@ def run_cycle() -> None:
         timeout=120,
     )
     signal_score = max(0.0, min(1.0, (data.get("avg_truth_score", 0.5) * 0.6) + (data.get("avg_quality", 0.5) * 0.4)))
-    cpp_kernel = {}
-    cpp_available = False
-    try:
-        cpp_kernel = _get("/cpp-kernel-status", timeout=20)
-        cpp_available = bool(cpp_kernel.get("available", False))
-    except requests.RequestException:
-        cpp_kernel = {"available": False}
+    cpp_kernel, cpp_available = _cpp_kernel_status(_cycle)
     focus = _occasion_focus(data)
     occasion = _occasion_type(focus)
     x, y, z, chaos_rate = _chaos_vector(_cycle, data)
