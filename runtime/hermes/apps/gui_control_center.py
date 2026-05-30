@@ -401,6 +401,58 @@ def _build_agent(name: str, family: str, type_name: str) -> dict:
     }
 
 
+def _build_auto_mix_agent(name: str, family: str) -> dict:
+    if family == "Hermes":
+        return {
+            "name": name,
+            "family": "Hermes",
+            "type": "Hermes Core",
+            "tier": "ultimate-x5",
+            "profile": "balanced",
+            "subagents": ["planner", "coder", "deployer", "observer"],
+            "subagent_count": 4,
+            "fleet_mode": "adaptive",
+            "fleet_assigned": True,
+            "speed": 82,
+            "intelligence": 80,
+            "stability": 90,
+            "memory": 86,
+            "power": 84,
+            "xp_boost": 84,
+            "sql_level": 83,
+            "max_cpu": 87,
+            "max_gpu": 85,
+            "max_ram": 88,
+            "deployed": False,
+            "created_utc": datetime.now(timezone.utc).isoformat(),
+        }
+    return {
+        "name": name,
+        "family": "X",
+        "type": "X Core",
+        "tier": "ultimate-x6",
+        "profile": "balanced",
+        "subagents": ["planner", "researcher", "coder", "sql-engineer", "deployer"],
+        "subagent_count": 5,
+        "fleet_mode": "adaptive",
+        "fleet_assigned": True,
+        "speed": 90,
+        "intelligence": 92,
+        "stability": 92,
+        "memory": 92,
+        "power": 93,
+        "xp_boost": 92,
+        "sql_level": 92,
+        "max_cpu": 92,
+        "max_gpu": 93,
+        "max_ram": 93,
+        "deployed": False,
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+MAX_AGENTS_ALLOWED = 500
+
 b1, b2, b3, b4 = st.columns(4)
 with b1:
     if st.button("Buy 10 Hermes", use_container_width=True):
@@ -428,8 +480,31 @@ with b4:
         _save_agent_state()
         st.success("Saved selected build.")
 
+if st.button("Auto Buy Mix +40 (50% Hermes Core / 50% X Core)", use_container_width=True):
+    current_total = len(st.session_state["agents"])
+    open_slots = max(0, MAX_AGENTS_ALLOWED - current_total)
+    if open_slots <= 0:
+        st.warning("Max capacity reached.")
+    else:
+        to_add = min(40, open_slots)
+        hermes_add = to_add // 2
+        x_add = to_add - hermes_add
+
+        hermes_existing = [a for a in st.session_state["agents"] if str(a.get("name", "")).startswith("hermes-auto-")]
+        x_existing = [a for a in st.session_state["agents"] if str(a.get("name", "")).startswith("xcore-auto-")]
+        next_h = len(hermes_existing) + 1
+        next_x = len(x_existing) + 1
+
+        for i in range(hermes_add):
+            _upsert_agent(_build_auto_mix_agent(f"hermes-auto-{next_h + i:03d}", "Hermes"))
+        for i in range(x_add):
+            _upsert_agent(_build_auto_mix_agent(f"xcore-auto-{next_x + i:03d}", "X"))
+
+        _save_agent_state()
+        st.success(f"Added {to_add} optimized agents (Hermes Core: {hermes_add}, X Core: {x_add}).")
+
 saved_agent_names = [str(a.get("name", "")).strip() for a in st.session_state["agents"] if str(a.get("name", "")).strip()]
-max_agents_allowed = 500
+max_agents_allowed = MAX_AGENTS_ALLOWED
 current_agents = len(saved_agent_names)
 remaining_agents = max(0, max_agents_allowed - current_agents)
 m1, m2, m3 = st.columns(3)
