@@ -13,6 +13,26 @@
 3. GUI:
    - `http://localhost:${HERMES_GUI_PORT:-8501}`
 
+## Full Hermes Guide (quick master flow)
+
+1. **Choose mode + type**
+   - Mode: `Programming + C++` for intensive coding/perf, `GUI + Visual` for UX/layout polish.
+   - Type: `Ultimate ML X5` or `Ultimate AIHub Fusion` for max depth.
+2. **Enable deep learning/brain stack**
+   - Turn on: `X5 brain pack`, `X6 learning plus`, `both-sides training`, `auto X10 setup`.
+3. **Enable smart tool architecture**
+   - Keep core tools on: `chaos-engine-lab`, `multi-parallel-orchestrator`, `brain-fusion-monitor`.
+   - Use the dashboard smart tool table for all integrated tools + LLM bonus/splitting behavior.
+4. **Run SQL center flow**
+   - One-click SQL setup -> Ultimate upgrade -> snapshot save.
+   - This keeps volume-backed training evidence and SQL telemetry stable and clear.
+5. **Apply AIHub multi-LLM routing**
+   - Reasoning lane: deep planning/C++ logic.
+   - UI/UX lane: readability and interaction flow.
+   - Security lane: guardrails and risk-sensitive decisions.
+6. **Operate the fleet continuously**
+   - Keep auto-learning active, monitor thinking/specialization tables, and use deploy/return cycles for controlled orchestration.
+
 This runtime enables:
 - QNAA/KNAA training simulations through `/simulate` and `/horizon-tests`
 - External/online signal ingest through `/ingest-signal` for cross-model learning influence

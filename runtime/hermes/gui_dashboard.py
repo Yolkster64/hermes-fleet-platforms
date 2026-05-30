@@ -1626,6 +1626,21 @@ ultimate_guide_rows = [
 ]
 st.dataframe(ultimate_guide_rows, use_container_width=True, hide_index=True)
 st.caption("C++ intensive default recommendation: Programming + C++ mode + Ultimate ML X5 + chaos-engine/multi-parallel/brain-fusion tools.")
+with st.expander("Full Hermes Guide (complete quick-reference)", expanded=False):
+    st.dataframe(
+        [
+            {"Step": "1) Pick operation mode", "What to choose": "Programming + C++ for intensive engineering, GUI + Visual for UX polish", "Why it matters": "Sets learning profile, swarm behavior, and pressure deltas"},
+            {"Step": "2) Choose Hermes type", "What to choose": "Ultimate ML X5 or Ultimate AIHub Fusion for max depth", "Why it matters": "Defines base strategy, techniques, and specialization identity"},
+            {"Step": "3) Enable deep brain packs", "What to choose": "X5 brain pack + X6 learning plus + both-sides training", "Why it matters": "Boosts long-horizon retention and dual-signal adaptation"},
+            {"Step": "4) Turn on smart tools", "What to choose": "chaos-engine-lab, multi-parallel-orchestrator, brain-fusion-monitor (+ others as needed)", "Why it matters": "Adds split routing, automation quality, and advanced coordination"},
+            {"Step": "5) Run SQL center setup", "What to choose": "One-Click setup, then Ultimate upgrade, then snapshot", "Why it matters": "Stabilizes volume-backed learning evidence and clear SQL telemetry"},
+            {"Step": "6) Use AIHub multi-LLM blend", "What to choose": "Reasoning lane for C++, UI/UX lane for visual flow, Security lane for guardrails", "Why it matters": "Improves output quality by specialization-aware model routing"},
+            {"Step": "7) Keep auto-learning active", "What to choose": "Auto X10 + periodic pulse/deploy/return cycles", "Why it matters": "Maintains continuous training, adaptation, and fleet readiness"},
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.caption("Best overall preset: use the 'Enable Ultimate + All Options' button, then run SQL Center setup and AIHub next-level upgrade.")
 
 st.subheader("Activity Goal Profile (Fast User Controls)")
 entry_defaults = default_user_entry_profile()
