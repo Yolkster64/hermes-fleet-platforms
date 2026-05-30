@@ -1481,6 +1481,17 @@ st.markdown(
     "- **Intensive Throughput:** use for large parallel workloads and mass operations; favors swarm speed.\n"
     "- **Learning Depth:** use for long-horizon retention and adaptive growth; favors gaussian smoothing + memory quality."
 )
+if st.button("Enable Ultimate + All Options (X5/X6/Smart/AIHub)", use_container_width=True):
+    st.session_state["ctl_operation_mode"] = "Programming + C++"
+    st.session_state["ctl_hermes_type"] = "ultimate-ml-x5"
+    st.session_state["ctl_x5_brain_pack"] = True
+    st.session_state["ctl_x6_learning_pack"] = True
+    st.session_state["ctl_auto_x10_setup"] = True
+    st.session_state["ctl_both_sides_training"] = True
+    st.session_state["ctl_study_areas"] = ["Security", "Optimization", "AIHub", "Fleet Topology", "Learning Retention", "Truth & Safety", "Internet Signals", "Cost Efficiency"]
+    st.session_state["ctl_smart_tools"] = list(SMART_TOOL_CATALOG.keys())
+    st.success("Ultimate stack enabled with all options, smart tools, and deep learning settings.")
+    st.rerun()
 if x5_brain_pack:
     st.info(
         "X5 pack enabled: training pulses, candidate search, and brain-horizon learning are multiplied for maximum depth. "
@@ -1574,6 +1585,47 @@ for tool_key in list(SMART_TOOL_CATALOG.keys()):
         }
     )
 st.dataframe(tool_rows, use_container_width=True, hide_index=True)
+st.markdown("#### Ultimate Built-In Guide (clear stack view)")
+ultimate_guide_rows = [
+    {
+        "Layer": "Ultimate ML X5",
+        "Status": "Enabled" if bool(st.session_state.get("ctl_x5_brain_pack", False)) else "Available",
+        "Best for": "maximum deep learning + brain growth",
+        "Recommended action": "Apply Ultimate ML X5 Type + Brain Setup",
+    },
+    {
+        "Layer": "Programming + C++",
+        "Status": "Active" if str(st.session_state.get("ctl_operation_mode", "Programming + C++")) == "Programming + C++" else "Ready",
+        "Best for": "intensive compile/debug/refactor workloads",
+        "Recommended action": "Set mode to Programming + C++ for heavy engineering runs",
+    },
+    {
+        "Layer": "Smart tools architecture",
+        "Status": f"{len(st.session_state.get('ctl_smart_tools', []))} selected",
+        "Best for": "automation, split routing, and fleet coordination",
+        "Recommended action": "Keep chaos-engine + multi-parallel + brain-fusion enabled",
+    },
+    {
+        "Layer": "AIHub bonus + Multi-LLM",
+        "Status": "Integrated",
+        "Best for": "blended reasoning quality and specialization routing",
+        "Recommended action": "Use AIHub Next-Level upgrade for higher LLM blend pressure",
+    },
+    {
+        "Layer": "Clear SQL center",
+        "Status": "Integrated",
+        "Best for": "storage visibility and evidence confidence",
+        "Recommended action": "Use SQL Center one-click setup and design bars",
+    },
+    {
+        "Layer": "Deep learning + brain system",
+        "Status": "Integrated",
+        "Best for": "long-horizon retention and adaptive memory",
+        "Recommended action": "Enable X6 Learning Plus + Auto X10 setup",
+    },
+]
+st.dataframe(ultimate_guide_rows, use_container_width=True, hide_index=True)
+st.caption("C++ intensive default recommendation: Programming + C++ mode + Ultimate ML X5 + chaos-engine/multi-parallel/brain-fusion tools.")
 
 st.subheader("Activity Goal Profile (Fast User Controls)")
 entry_defaults = default_user_entry_profile()

@@ -141,6 +141,11 @@ def render_next_level_control_center(
     _inject_next_level_theme()
     st.markdown("### Level 5 AIHub + SQL Command Center")
     st.markdown('<div class="hermes-glow"><span class="recommended-pill">LEVEL 5</span> <span class="cool-title">Enhanced visuals, center SQL design, richer bars/animations, fleet styling, and guided deployment</span></div>', unsafe_allow_html=True)
+    smart_tools = [str(x) for x in st.session_state.get("ctl_smart_tools", []) if isinstance(x, str)]
+    both_sides_training = bool(st.session_state.get("ctl_both_sides_training", True))
+    x5_brain_pack = bool(st.session_state.get("ctl_x5_brain_pack", False))
+    x6_learning_pack = bool(st.session_state.get("ctl_x6_learning_pack", True)
+)
 
     tabs = st.tabs(["SQL Center", "AIHub Lab", "Fleet Table", "Evidence Advisor", "Security + Benchmark", "Clock + Style"])
     sql_health = sql_intel.get("sql_health", {}) if isinstance(sql_intel, dict) else {}
@@ -185,8 +190,10 @@ def render_next_level_control_center(
                         "specialty": "fleet:sql-training-easy-setup",
                         "steps": 460,
                         "candidates": 260,
-                        "both_sides_training": True,
-                        "x6_learning_pack": True,
+                        "both_sides_training": both_sides_training,
+                        "x5_brain_pack": x5_brain_pack,
+                        "x6_learning_pack": x6_learning_pack,
+                        "smart_tools": smart_tools,
                         "sql_signal": 0.97,
                         "internet_signal": 0.05,
                         "llm_signal": 0.94,
@@ -205,8 +212,10 @@ def render_next_level_control_center(
                         "specialty": "fleet:ultimate-hermes-aihub",
                         "steps": 980,
                         "candidates": 420,
-                        "both_sides_training": True,
-                        "x6_learning_pack": True,
+                        "both_sides_training": both_sides_training,
+                        "x5_brain_pack": x5_brain_pack,
+                        "x6_learning_pack": x6_learning_pack,
+                        "smart_tools": smart_tools,
                         "sql_signal": 0.98,
                         "internet_signal": 0.08,
                         "llm_signal": 0.97,
@@ -225,8 +234,10 @@ def render_next_level_control_center(
                         "specialty": "fleet:ultimate-ml-x5-brain",
                         "steps": 1400,
                         "candidates": 900,
-                        "both_sides_training": True,
-                        "x6_learning_pack": True,
+                        "both_sides_training": both_sides_training,
+                        "x5_brain_pack": True,
+                        "x6_learning_pack": x6_learning_pack,
+                        "smart_tools": smart_tools,
                         "sql_signal": 0.99,
                         "internet_signal": 0.08,
                         "llm_signal": 0.98,
@@ -237,6 +248,17 @@ def render_next_level_control_center(
                     timeout=220,
                 )
         st.caption("Use One-Click setup first, then run Ultimate upgrade, then Ultimate ML X5 for max complexity and brain depth.")
+        st.dataframe(
+            [
+                {"Layer": "Ultimate X5 brain", "Status": "ON" if x5_brain_pack else "Standby", "Why": "Deep horizon training and stronger retention"},
+                {"Layer": "X6 learning plus", "Status": "ON" if x6_learning_pack else "Off", "Why": "Extends learning pressure over longer cycles"},
+                {"Layer": "C++ path", "Status": "Ready" if bool(cpp_kernel.get("available", False)) else "Fallback", "Why": "Higher compile/runtime efficiency for intensive workloads"},
+                {"Layer": "Smart tools", "Status": f"{len(smart_tools)} enabled", "Why": "Operational automation + split routing quality"},
+                {"Layer": "Both-sides training", "Status": "ON" if both_sides_training else "Off", "Why": "Combines defensive and offensive learning signals"},
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
         if st.button("Save Hermes Snapshot Now", use_container_width=True):
             info = export_hermes_profiles_snapshot(volume_root, max_rows=600)
             st.success(f"Hermes snapshot saved: {info.get('path', 'unknown')} ({info.get('rows', 0)} rows)")
@@ -272,6 +294,17 @@ def render_next_level_control_center(
             use_container_width=True,
             hide_index=True,
         )
+        st.markdown("#### Multi-LLM Blend Guide")
+        st.dataframe(
+            [
+                {"Lane": "Reasoning LLM", "Primary role": "deep planning and C++ logic", "Best for": "intensive coding + architecture"},
+                {"Lane": "UI/UX LLM", "Primary role": "layout readability and interaction polishing", "Best for": "clear dashboard flows"},
+                {"Lane": "Security LLM", "Primary role": "guardrails and anomaly checks", "Best for": "safe autonomous behavior"},
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.caption("Blend rule: route complex logic to Reasoning, visual clarity to UI/UX, and risk decisions to Security lane.")
         if st.button("Run AIHub Next-Level Upgrade", use_container_width=True):
             run_logged_post_action(
                 label="aihub-next-level-upgrade",
@@ -280,6 +313,10 @@ def render_next_level_control_center(
                     "specialty": "fleet:next-level-aihub",
                     "steps": int(720 + (_clamp01(aibox) * 240)),
                     "candidates": int(280 + (_clamp01(aibox) * 120)),
+                    "both_sides_training": both_sides_training,
+                    "x5_brain_pack": x5_brain_pack,
+                    "x6_learning_pack": x6_learning_pack,
+                    "smart_tools": smart_tools,
                     "sql_signal": min(0.99, 0.86 + (_clamp01(aibox) * 0.10)),
                     "internet_signal": 0.08,
                     "llm_signal": min(0.99, 0.90 + (_clamp01(aibox) * 0.08)),
