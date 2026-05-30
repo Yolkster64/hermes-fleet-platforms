@@ -34,6 +34,49 @@ def _role_for_specialty(specialty: str) -> str:
     return "Builder"
 
 
+def _accessories_for_role(role: str) -> str:
+    mapping = {
+        "Guardian": "Aegis visor • shield mesh • audit pin",
+        "Designer": "Prism brush • UX lens • palette chip",
+        "Data Pilot": "SQL lens • index ring • insight relay",
+        "Coordinator": "Nexus pin • route compass • swarm relay",
+        "Builder": "Forge grip • patch kit • deploy anchor",
+    }
+    return mapping.get(role, "Core badge • utility belt • comm node")
+
+
+def _stable_bot_name(index: int, row: Dict[str, Any]) -> str:
+    existing = str(row.get("hermes_id", "")).strip()
+    if existing:
+        return existing
+    seeds = [
+        "Hermes Nova",
+        "Hermes Aegis",
+        "Hermes Prism",
+        "Hermes Oracle",
+        "Hermes Atlas",
+        "Hermes Chrono",
+        "Hermes Pulse",
+        "Hermes Vector",
+        "Hermes Ether",
+        "Hermes Zenith",
+    ]
+    return f"{seeds[index % len(seeds)]}-{index + 1:02d}"
+
+
+def _sort_cards(cards: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    role_rank = {"Coordinator": 0, "Data Pilot": 1, "Designer": 2, "Guardian": 3, "Builder": 4}
+    return sorted(
+        cards,
+        key=lambda row: (
+            role_rank.get(_role_for_specialty(str(row.get("specialty", "fleet"))), 99),
+            -float(row.get("level", 0.0)),
+            -float(row.get("experience_xp", 0.0)),
+            str(row.get("specialty", "")),
+        ),
+    )
+
+
 def _god_style_name(specialty: str, level: int) -> str:
     s = specialty.lower()
     if "security" in s:
@@ -80,16 +123,19 @@ def _render_cosmic_scroll(cards: List[Dict[str, Any]]) -> None:
         token = float(row.get("token_power_gain", 0.0)) * 100.0
         xp_pct = max(0.0, min(100.0, (xp / 10000.0) * 100.0))
         lvl_pct = max(0.0, min(100.0, (level / 120.0) * 100.0))
+        bot_name = _stable_bot_name(i, row)
+        accessory = _accessories_for_role(role)
         rows.append(
             (
                 f"<div class='hf-card'>"
-                f"<div class='hf-head'><span class='hf-avatar'>{html.escape(avatar)}</span><span>{html.escape(str(row.get('hermes_id', f'hermes-{i+1}')))}</span></div>"
+                f"<div class='hf-head'><span class='hf-avatar'>{html.escape(avatar)}</span><span>{html.escape(bot_name)}</span></div>"
                 f"<div class='hf-god'>{html.escape(god_name)}</div>"
                 f"<div class='hf-meta'>{html.escape(role)} • {html.escape(specialty)}</div>"
                 f"<div class='hf-meta'>Tools: {html.escape(tools)}</div>"
                 f"<div class='hf-bar'><span style='width:{xp_pct:.1f}%'></span></div><div class='hf-txt'>XP {xp}</div>"
                 f"<div class='hf-bar'><span style='width:{lvl_pct:.1f}%'></span></div><div class='hf-txt'>Level {level}</div>"
                 f"<div class='hf-meta'>Boosts: speed +{speed:.1f}% • token +{token:.1f}%</div>"
+                f"<div class='hf-meta'>Accessories: {html.escape(accessory)}</div>"
                 f"</div>"
             )
         )
@@ -122,7 +168,7 @@ def render_fleet_showcase_panels(
     profiles = sql_intel.get("recent_hermes_profiles", []) if isinstance(sql_intel, dict) else []
     if not isinstance(profiles, list):
         profiles = []
-    cards = [p for p in profiles if isinstance(p, dict)][:12]
+    cards = _sort_cards([p for p in profiles if isinstance(p, dict)])[:16]
 
     growth = float(growth_data.get("growth_index", 0.0)) if isinstance(growth_data, dict) else 0.0
     maturity = float(growth_data.get("maturity_index", 0.0)) if isinstance(growth_data, dict) else 0.0
@@ -151,6 +197,28 @@ def render_fleet_showcase_panels(
         "Big Area": "Control plane (gateway), AIHub brain, learning trainer, and runtime fleet telemetry all in one loop.",
     }
     st.json(guide, expanded=False)
+    eta_rows = []
+    for i, row in enumerate(cards[:10]):
+        specialty = str(row.get("specialty", "fleet"))
+        role = _role_for_specialty(specialty)
+        level = float(row.get("level", 1.0))
+        xp = float(row.get("experience_xp", 0.0))
+        speed = float(row.get("speed_bonus", 0.0))
+        role_weight = {"Coordinator": 0.88, "Data Pilot": 0.92, "Designer": 1.00, "Guardian": 1.08, "Builder": 1.03}.get(role, 1.0)
+        role_eta = max(0.2, (eta_hours * role_weight) * (1.0 - min(0.55, (level / 160.0) + (speed * 0.35) + (xp / 30000.0))))
+        eta_rows.append(
+            {
+                "bot": _stable_bot_name(i, row),
+                "role": role,
+                "area": specialty,
+                "eta_h": round(role_eta, 2),
+                "level": int(level),
+                "xp": int(xp),
+            }
+        )
+    if eta_rows:
+        st.caption("Detailed ETA by role / area")
+        st.dataframe(eta_rows, use_container_width=True, hide_index=True)
 
     if not cards:
         st.caption("No saved Hermes profiles yet — run training to populate the fleet arena cards.")
@@ -169,7 +237,7 @@ def render_fleet_showcase_panels(
                 xp = float(row.get("experience_xp", 0.0))
                 speed = float(row.get("speed_bonus", 0.0))
                 token = float(row.get("token_power_gain", 0.0))
-                bot_name = str(row.get("hermes_id", f"hermes-{chunk_start + idx + 1}"))
+                bot_name = _stable_bot_name(chunk_start + idx, row)
                 tiny = _tiny_avatar(chunk_start + idx, size_mode)
                 role = _role_for_specialty(specialty)
                 st.markdown(f"**{tiny} {bot_name}**")
@@ -177,4 +245,5 @@ def render_fleet_showcase_panels(
                 st.caption(f"Design: {_design_pack(size_mode)}")
                 st.progress(min(1.0, xp / 10000.0), text=f"XP {int(xp)}")
                 st.progress(min(1.0, level / 120.0), text=f"Level {level}")
-                st.caption(f"Accessories: speed +{speed * 100:.1f}% • token +{token * 100:.1f}%")
+                st.caption(f"Accessories: {_accessories_for_role(role)}")
+                st.caption(f"Boosts: speed +{speed * 100:.1f}% • token +{token * 100:.1f}%")

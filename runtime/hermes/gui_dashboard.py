@@ -134,6 +134,33 @@ def _effective_internet_signal(raw_signal: float, low_cap: bool = False) -> floa
     return raw_signal
 
 
+def _guided_auto_bond_status(
+    *,
+    unified_err: str,
+    watch_err: str,
+    gateway_watch_err: str,
+    auto_bootstrap: Dict[str, Any],
+    sql_intel: Dict[str, Any],
+    volume_root: str,
+) -> Dict[str, Any]:
+    sql_health = sql_intel.get("sql_health", {}) if isinstance(sql_intel, dict) else {}
+    if not isinstance(sql_health, dict):
+        sql_health = {}
+    db_mb = float(sql_health.get("db_mb", 0.0))
+    wal_mb = float(sql_health.get("wal_mb", 0.0))
+    volume_ok = bool(os.path.isdir(volume_root))
+    signals = {
+        "api_link": 1.0 if not unified_err else 0.0,
+        "watch_link": 1.0 if not watch_err else 0.0,
+        "gateway_link": 1.0 if not gateway_watch_err else 0.0,
+        "volume_link": 1.0 if volume_ok else 0.0,
+        "auto_setup": 1.0 if bool(auto_bootstrap.get("ok", False)) else 0.0,
+        "sql_link": max(0.0, min(1.0, 1.0 - min(1.0, (db_mb / 1536.0) + (wal_mb / 384.0)))),
+    }
+    bond_score = max(0.0, min(1.0, (signals["api_link"] * 0.23) + (signals["watch_link"] * 0.17) + (signals["gateway_link"] * 0.15) + (signals["volume_link"] * 0.17) + (signals["auto_setup"] * 0.13) + (signals["sql_link"] * 0.15)))
+    return {"signals": signals, "bond_score": bond_score, "db_mb": db_mb, "wal_mb": wal_mb}
+
+
 def _initialize_session_state() -> None:
     defaults: Dict[str, Any] = {
         "api_key": DEFAULT_API_KEY,
@@ -409,6 +436,27 @@ if isinstance(auto_bootstrap, dict):
         )
     elif auto_bootstrap.get("error"):
         st.caption(f"Container auto-setup warning: {auto_bootstrap.get('error')}")
+bond = _guided_auto_bond_status(
+    unified_err=unified_err,
+    watch_err=watch_err,
+    gateway_watch_err=gateway_watch_err,
+    auto_bootstrap=auto_bootstrap if isinstance(auto_bootstrap, dict) else {},
+    sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
+    volume_root=live_volume_root,
+)
+bond_signals = bond.get("signals", {})
+b1, b2, b3, b4, b5, b6 = st.columns(6)
+b1.metric("Auto Bond", f"{float(bond.get('bond_score', 0.0)) * 100:.1f}%")
+b2.metric("API", "OK" if float(bond_signals.get("api_link", 0.0)) > 0.5 else "Pending")
+b3.metric("Watch", "OK" if float(bond_signals.get("watch_link", 0.0)) > 0.5 else "Pending")
+b4.metric("Gateway", "OK" if float(bond_signals.get("gateway_link", 0.0)) > 0.5 else "Pending")
+b5.metric("Volume", "OK" if float(bond_signals.get("volume_link", 0.0)) > 0.5 else "Missing")
+b6.metric("SQL", "OK" if float(bond_signals.get("sql_link", 0.0)) > 0.5 else "Pressure")
+st.caption(
+    f"Guided auto-local bonding: api={int(float(bond_signals.get('api_link', 0.0)))} | watch={int(float(bond_signals.get('watch_link', 0.0)))} | "
+    f"gateway={int(float(bond_signals.get('gateway_link', 0.0)))} | volume={int(float(bond_signals.get('volume_link', 0.0)))} | "
+    f"auto_setup={int(float(bond_signals.get('auto_setup', 0.0)))} | sql_load(db/wal)={float(bond.get('db_mb', 0.0)):.1f}/{float(bond.get('wal_mb', 0.0)):.1f}MB"
+)
 if not watch_err and isinstance(watch_payload, dict):
     st.caption(f"Watch stream: {watch_payload.get('watch_timestamp_utc', 'n/a')} (gateway aggregated)")
 orchestration_counts = snapshot.get("super_orchestration_counts", {}) if isinstance(snapshot, dict) else {}
@@ -540,11 +588,11 @@ if st.button("Force Training Pulse Now", use_container_width=True):
         timeout=120,
     )
 
-brain_catalog = snapshot_data.get("brain_horizon_catalog", {}) if isinstance(snapshot_data, dict) else {}
+brain_catalog = snapshot.get("brain_horizon_catalog", {}) if isinstance(snapshot, dict) else {}
 if not isinstance(brain_catalog, dict) or not brain_catalog:
     brain_catalog = dict(VARIABLE_CATALOG)
-brain_profile = snapshot_data.get("brain_horizon_profile", {}) if isinstance(snapshot_data, dict) else {}
-training_variables = snapshot_data.get("training_variables", {}) if isinstance(snapshot_data, dict) else {}
+brain_profile = snapshot.get("brain_horizon_profile", {}) if isinstance(snapshot, dict) else {}
+training_variables = snapshot.get("training_variables", {}) if isinstance(snapshot, dict) else {}
 with st.expander("Brain Variables: Short / Mid / Long + Growth Maturity", expanded=False):
     if brain_profile:
         st.caption("Live integrated profile")
@@ -863,8 +911,9 @@ with summary_left:
 with summary_right:
     st.subheader("Quick Actions")
     action_mode = st.radio("Action view", ["Simple", "Advanced"], horizontal=True, index=0)
+    show_extended_actions = st.checkbox("Show extended deploy controls", value=False)
     deploy_batch = st.slider("Deploy batch size", min_value=1, max_value=50, value=10, step=1)
-    st.caption("Simple view keeps the most-used controls only. Advanced view exposes all orchestration actions.")
+    st.caption("Simple view keeps the most-used controls only. Advanced view exposes full orchestration actions.")
     st.caption("These actions run immediately.")
     if st.button("Generate Fleet Health Report", use_container_width=True):
         report_prompt = (
@@ -881,69 +930,72 @@ with summary_right:
             st.session_state["last_chat"] = chat.get("response_text", "")
             log_text("fleet-health-report", chat)
             st.success("Fleet health report generated.")
-    if st.button("🚀 Deploy All Hermes", use_container_width=True):
-        run_logged_post_action(
-            label="deploy-all-hermes",
-            path="/runtime-orchestrate/deploy",
-            payload={
-                "mode": "deploy",
-                "scope": "all",
-                "batch_size": deploy_batch,
-                "specialty": "fleet",
-                "steps": 240,
-                "candidates": 160,
-                "sql_signal": min(0.99, technique_profile["sql_signal"] + 0.05),
-                "internet_signal": 0.0 if OFFLINE_ONLY_MODE else technique_profile["internet_signal"],
-                "llm_signal": min(0.99, technique_profile["llm_signal"] + 0.05),
-                "stability_bias": min(0.99, technique_profile["stability_bias"] + 0.02),
-            },
-            success_message="All Hermes units deployed and synced.",
-            error_prefix="Deploy orchestration failed",
-            timeout=120,
-        )
-    if st.button("🚚 Deploy 10 Hermes", use_container_width=True):
-        run_logged_post_action(
-            label="deploy-batch-hermes",
-            path="/runtime-orchestrate/deploy",
-            payload={
-                "mode": "deploy",
-                "scope": "batch",
-                "batch_size": deploy_batch,
-                "specialty": "fleet",
-                "steps": 180,
-                "candidates": max(80, deploy_batch * 6),
-                "sql_signal": min(0.99, technique_profile["sql_signal"] + 0.03),
-                "internet_signal": 0.0 if OFFLINE_ONLY_MODE else technique_profile["internet_signal"],
-                "llm_signal": min(0.99, technique_profile["llm_signal"] + 0.03),
-                "stability_bias": min(0.99, technique_profile["stability_bias"] + 0.02),
-            },
-            success_message=f"Batch deploy completed for {deploy_batch} Hermes units.",
-            error_prefix="Batch deploy failed",
-            timeout=120,
-        )
-    if st.button("↩️ Return Hermes", use_container_width=True):
-        run_logged_post_action(
-            label="return-hermes",
-            path="/runtime-orchestrate/return",
-            payload={"mode": "return", "specialty": "fleet", "units": deploy_batch, "reason": "gui-return-request", "confidence": 0.88},
-            success_message=f"Return signal sent for {deploy_batch} Hermes units.",
-            error_prefix="Return action failed",
-            timeout=90,
-        )
-    if st.button("⚡ Permanent Bonus Boost", use_container_width=True):
-        boost1, e1 = safe_post(
-            "/curate-learning",
-            {
-                "sql_signal": min(0.99, technique_profile["sql_signal"] + 0.04),
-                "internet_signal": 0.0 if OFFLINE_ONLY_MODE else (min(0.14, technique_profile["internet_signal"] + 0.01) if USER_ROUTED_INTERNET else min(0.99, technique_profile["internet_signal"] + 0.04)),
-                "llm_signal": min(0.99, technique_profile["llm_signal"] + 0.04),
-                "stability_bias": min(0.99, technique_profile["stability_bias"] + 0.03),
-            },
-            timeout=90,
-        )
-        boost2, e2 = safe_post("/dedupe-optimize", {"roots": ["core", "runtime", "src"], "max_file_mb": 8}, timeout=120)
-        log_text("permanent-bonus-boost", {"curate_learning": boost1, "dedupe": boost2, "errors": [e1, e2]})
-        st.success("Permanent bonus boost tools applied.")
+    if show_extended_actions:
+        if st.button("🚀 Deploy All Hermes", use_container_width=True):
+            run_logged_post_action(
+                label="deploy-all-hermes",
+                path="/runtime-orchestrate/deploy",
+                payload={
+                    "mode": "deploy",
+                    "scope": "all",
+                    "batch_size": deploy_batch,
+                    "specialty": "fleet",
+                    "steps": 240,
+                    "candidates": 160,
+                    "sql_signal": min(0.99, technique_profile["sql_signal"] + 0.05),
+                    "internet_signal": 0.0 if OFFLINE_ONLY_MODE else technique_profile["internet_signal"],
+                    "llm_signal": min(0.99, technique_profile["llm_signal"] + 0.05),
+                    "stability_bias": min(0.99, technique_profile["stability_bias"] + 0.02),
+                },
+                success_message="All Hermes units deployed and synced.",
+                error_prefix="Deploy orchestration failed",
+                timeout=120,
+            )
+        if st.button("🚚 Deploy 10 Hermes", use_container_width=True):
+            run_logged_post_action(
+                label="deploy-batch-hermes",
+                path="/runtime-orchestrate/deploy",
+                payload={
+                    "mode": "deploy",
+                    "scope": "batch",
+                    "batch_size": deploy_batch,
+                    "specialty": "fleet",
+                    "steps": 180,
+                    "candidates": max(80, deploy_batch * 6),
+                    "sql_signal": min(0.99, technique_profile["sql_signal"] + 0.03),
+                    "internet_signal": 0.0 if OFFLINE_ONLY_MODE else technique_profile["internet_signal"],
+                    "llm_signal": min(0.99, technique_profile["llm_signal"] + 0.03),
+                    "stability_bias": min(0.99, technique_profile["stability_bias"] + 0.02),
+                },
+                success_message=f"Batch deploy completed for {deploy_batch} Hermes units.",
+                error_prefix="Batch deploy failed",
+                timeout=120,
+            )
+        if st.button("↩️ Return Hermes", use_container_width=True):
+            run_logged_post_action(
+                label="return-hermes",
+                path="/runtime-orchestrate/return",
+                payload={"mode": "return", "specialty": "fleet", "units": deploy_batch, "reason": "gui-return-request", "confidence": 0.88},
+                success_message=f"Return signal sent for {deploy_batch} Hermes units.",
+                error_prefix="Return action failed",
+                timeout=90,
+            )
+        if st.button("⚡ Permanent Bonus Boost", use_container_width=True):
+            boost1, e1 = safe_post(
+                "/curate-learning",
+                {
+                    "sql_signal": min(0.99, technique_profile["sql_signal"] + 0.04),
+                    "internet_signal": 0.0 if OFFLINE_ONLY_MODE else (min(0.14, technique_profile["internet_signal"] + 0.01) if USER_ROUTED_INTERNET else min(0.99, technique_profile["internet_signal"] + 0.04)),
+                    "llm_signal": min(0.99, technique_profile["llm_signal"] + 0.04),
+                    "stability_bias": min(0.99, technique_profile["stability_bias"] + 0.03),
+                },
+                timeout=90,
+            )
+            boost2, e2 = safe_post("/dedupe-optimize", {"roots": ["core", "runtime", "src"], "max_file_mb": 8}, timeout=120)
+            log_text("permanent-bonus-boost", {"curate_learning": boost1, "dedupe": boost2, "errors": [e1, e2]})
+            st.success("Permanent bonus boost tools applied.")
+    else:
+        st.caption("Extended deploy controls are hidden for cleaner operation.")
 
 if action_mode == "Simple":
     simple1, simple2, simple3 = st.columns(3)

@@ -136,6 +136,9 @@ This runtime enables:
   - API + GUI container startup now runs `runtime/hermes/apps/bootstrap_volume_sql.py` so volume manifest and training SQL are prepared before serving
   - GUI now auto-runs volume layout bootstrap on first load and surfaces container auto-setup status directly in the dashboard header
   - SQL intelligence now includes `strategy_leaderboard` + `super_training` (health/storage pressure/auto-setup guidance) for stronger training decisions
+  - Final GUI pass now adds a hybrid **AIHub/SQL/Fleet Nexus** centerpiece, deterministic fleet auto-sorting, richer tiny-avatar identity/accessory cards, and both global + per-role ETA surfaces
+  - Guided auto-local bonding now surfaces API/watch/gateway/volume/SQL readiness in one status band for cleaner setup visibility and access confidence
+  - Quick action clutter is reduced by default with optional extended deploy controls, while preserving all advanced actions behind a single toggle
   - GUI now shows per-Hermes level/XP/speed bonus/token gain bars, GitHub CLI connection panel, and fleet lock/unlock controls for hard-problem mode
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
   - Deep Auto Learning Zone (`♾️`) with study-area targeting and multi-round comparison

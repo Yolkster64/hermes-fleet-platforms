@@ -41,6 +41,61 @@ def _role_area_for_specialty(specialty: str) -> str:
     return "General Bay"
 
 
+def _sort_map_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    area_rank = {
+        "Fleet Nexus": 0,
+        "SQL Core": 1,
+        "Learning Grid": 2,
+        "Design Deck": 3,
+        "Security Ring": 4,
+        "General Bay": 5,
+    }
+    return sorted(
+        rows,
+        key=lambda row: (
+            area_rank.get(str(row.get("area", "General Bay")), 99),
+            -int(row.get("level", 0)),
+            -int(row.get("xp", 0)),
+            str(row.get("bot", "")),
+        ),
+    )
+
+
+def _render_center_nexus(
+    *,
+    sql_health: Dict[str, Any],
+    growth_data: Dict[str, Any],
+    training_status: Dict[str, Any],
+    unified: Dict[str, Any],
+    cpp_kernel: Dict[str, Any],
+) -> None:
+    db_mb = float(sql_health.get("db_mb", 0.0))
+    wal_mb = float(sql_health.get("wal_mb", 0.0))
+    growth = float(growth_data.get("growth_index", 0.0)) if isinstance(growth_data, dict) else 0.0
+    maturity = float(growth_data.get("maturity_index", 0.0)) if isinstance(growth_data, dict) else 0.0
+    active = int(training_status.get("active_agents", 0)) if isinstance(training_status, dict) else 0
+    total = max(1, int(training_status.get("agent_count", 1))) if isinstance(training_status, dict) else 1
+    collab = _clamp01((active / total) * 0.45 + (growth * 0.30) + (maturity * 0.25))
+    cpp_ready = bool(cpp_kernel.get("available", cpp_kernel.get("cpp_ready", False))) if isinstance(cpp_kernel, dict) else False
+    speed_band = "C++ Safe Path ON" if cpp_ready else "Python Fallback Path"
+    center_score = _clamp01((growth * 0.30) + (maturity * 0.24) + ((1.0 - _clamp01((db_mb / 1024.0) + (wal_mb / 256.0))) * 0.20) + (collab * 0.26))
+    st.markdown(
+        f"""
+<div style="border:1px solid rgba(0,230,255,0.35); border-radius:16px; padding:14px; background:radial-gradient(circle at 50% 20%, rgba(74,148,255,0.22), rgba(13,19,36,0.84));">
+  <div style="font-weight:800; color:#e9f5ff; margin-bottom:6px;">AIHub / SQL / Fleet Nexus</div>
+  <div style="display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px;">
+    <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px;"><div style="font-size:0.72rem; color:#a7d6ff;">Nexus Score</div><div style="font-size:1.08rem; color:#ecf7ff;">{center_score * 100:.1f}%</div></div>
+    <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px;"><div style="font-size:0.72rem; color:#a7d6ff;">Fleet Collaboration</div><div style="font-size:1.08rem; color:#ecf7ff;">{collab * 100:.1f}%</div></div>
+    <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px;"><div style="font-size:0.72rem; color:#a7d6ff;">SQL Load</div><div style="font-size:1.08rem; color:#ecf7ff;">DB {db_mb:.1f}MB / WAL {wal_mb:.1f}MB</div></div>
+    <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px;"><div style="font-size:0.72rem; color:#a7d6ff;">Speed Path</div><div style="font-size:1.08rem; color:#ecf7ff;">{speed_band}</div></div>
+  </div>
+  <div style="margin-top:8px; font-size:0.78rem; color:#cfe6ff;">Model: {str(unified.get('aihub_shared_model_id', 'aihub-unified-v1'))} • Entry: {str(unified.get('single_exe_entrypoint', 'hermes-gateway'))}</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def render_next_level_control_center(
     *,
     sql_intel: Dict[str, Any],
@@ -129,6 +184,13 @@ def render_next_level_control_center(
             )
 
     with tabs[2]:
+        _render_center_nexus(
+            sql_health=sql_health,
+            growth_data=growth_data,
+            training_status=training_status,
+            unified=unified,
+            cpp_kernel=cpp_kernel,
+        )
         profiles = sql_intel.get("recent_hermes_profiles", []) if isinstance(sql_intel, dict) else []
         if not isinstance(profiles, list):
             profiles = []
@@ -144,6 +206,7 @@ def render_next_level_control_center(
                     "size_mode": item.get("size_mode", "mid"),
                 }
             )
+        map_rows = _sort_map_rows(map_rows)
         if map_rows:
             st.dataframe(map_rows, use_container_width=True, hide_index=True)
         else:
