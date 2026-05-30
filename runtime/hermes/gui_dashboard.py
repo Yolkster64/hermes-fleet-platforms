@@ -74,7 +74,7 @@ SIZE_MODE_DETAILS = {
 }
 HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
     "vanguard-guardian": {
-        "title": "Vanguard Guardian",
+        "title": "Balanced Thinker",
         "swarm_strategy": "mesh",
         "micro_agents": 176,
         "gaussian_pressure": 0.84,
@@ -83,7 +83,7 @@ HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
         "specialty_tag": "guardian",
     },
     "sql-oracle": {
-        "title": "SQL Oracle",
+        "title": "Deep Thinker",
         "swarm_strategy": "specialist-mix",
         "micro_agents": 208,
         "gaussian_pressure": 0.88,
@@ -92,7 +92,7 @@ HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
         "specialty_tag": "sql-oracle",
     },
     "cpp-striker": {
-        "title": "C++ Striker",
+        "title": "Quick Thinker",
         "swarm_strategy": "swarm",
         "micro_agents": 224,
         "gaussian_pressure": 0.82,
@@ -101,7 +101,7 @@ HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
         "specialty_tag": "cpp-striker",
     },
     "aibox-architect": {
-        "title": "AIBox Architect",
+        "title": "Creative Thinker",
         "swarm_strategy": "multipolar",
         "micro_agents": 192,
         "gaussian_pressure": 0.90,
