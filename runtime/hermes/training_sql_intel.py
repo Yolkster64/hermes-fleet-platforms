@@ -278,6 +278,7 @@ def _art_pattern_metrics(variable_means: Dict[str, float]) -> Dict[str, float]:
 
 
 def _derive_hermes_profile_fields(signal_score: float, art_pattern_score: float, vars_payload: Dict[str, object]) -> Dict[str, object]:
+    watch_efficiency = _clamp01(float(vars_payload.get("watch_efficiency", 0.5)))
     xp = max(
         0.0,
         min(
@@ -287,19 +288,26 @@ def _derive_hermes_profile_fields(signal_score: float, art_pattern_score: float,
                 + float(art_pattern_score) * 1800.0
                 + float(vars_payload.get("retention_strength", 0.5)) * 1600.0
                 + float(vars_payload.get("knowledge_transfer", 0.5)) * 1400.0
+                + watch_efficiency * 1000.0
             ),
         ),
     )
     level = max(1, min(99, int(1 + (xp / 140.0))))
-    speed_bonus = _clamp01(float(vars_payload.get("speed_efficiency", 0.5)) * 0.8 + float(vars_payload.get("position_score", 0.5)) * 0.2)
-    token_power_gain = _clamp01(float(vars_payload.get("yield_efficiency", 0.5)) * 0.7 + float(art_pattern_score) * 0.3)
+    speed_bonus = _clamp01(
+        float(vars_payload.get("speed_efficiency", 0.5)) * 0.65
+        + float(vars_payload.get("position_score", 0.5)) * 0.20
+        + watch_efficiency * 0.15
+    )
+    token_power_gain = _clamp01(float(vars_payload.get("yield_efficiency", 0.5)) * 0.60 + float(art_pattern_score) * 0.25 + watch_efficiency * 0.15)
     size_mode = "mini" if float(vars_payload.get("size_factor", 0.5)) < 0.45 else ("full" if float(vars_payload.get("size_factor", 0.5)) > 0.70 else "mid")
     specialties = [
         "pattern-hunter",
         "sql-reasoner" if float(vars_payload.get("retention_strength", 0.5)) > 0.55 else "fast-explorer",
         "aihub-bridge" if float(vars_payload.get("knowledge_transfer", 0.5)) > 0.55 else "field-adapter",
     ]
-    tools = ["compression", "3d-overlap", "xp-memory", "token-optimizer"]
+    if watch_efficiency > 0.56:
+        specialties.append("observer-core")
+    tools = ["compression", "3d-overlap", "xp-memory", "token-optimizer", "watch-grid"]
     return {
         "experience_xp": float(xp),
         "level": int(level),
