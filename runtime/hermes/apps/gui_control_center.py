@@ -292,6 +292,14 @@ with cgpu:
 ultimate_sql_level = st.slider("Ultimate SQL Level", 0, 100, 88)
 micro_count = st.slider("Microservices (toggleable amount)", 1, 64, 12)
 micro_auto_scale = st.toggle("Auto-scale microservices", value=True)
+specializations = st.multiselect(
+    "Specializations",
+    options=["reasoning", "coding", "sql", "deployment", "security", "ops", "vision", "research", "routing", "agent-swarm"],
+    default=["reasoning", "coding", "deployment"],
+)
+micro_parallelism = st.slider("Agent Micro Parallelization", 1, 128, 24)
+macro_parallelism = st.slider("Agent Macro Parallelization", 1, 64, 12)
+agent_swarm_size = st.slider("Agent Swarm Size", 1, 256, 32)
 
 with st.expander("Quick Guide", expanded=False):
     st.markdown(
@@ -376,6 +384,10 @@ with bb1:
                 "selected_packs": selected_packs,
                 "micro_count": micro_count,
                 "micro_auto_scale": micro_auto_scale,
+                "specializations": specializations,
+                "micro_parallelism": micro_parallelism,
+                "macro_parallelism": macro_parallelism,
+                "agent_swarm_size": agent_swarm_size,
                 "max_cpu": max_cpu,
                 "max_ram": max_ram,
                 "max_gpu": max_gpu,
@@ -419,6 +431,10 @@ with a1:
                     "feature_packs": len(selected_packs),
                     "micro_count": micro_count,
                     "micro_auto_scale": micro_auto_scale,
+                    "specializations": specializations,
+                    "micro_parallelism": micro_parallelism,
+                    "macro_parallelism": macro_parallelism,
+                    "agent_swarm_size": agent_swarm_size,
                     "max_cpu": max_cpu,
                     "max_ram": max_ram,
                     "max_gpu": max_gpu,
@@ -450,6 +466,10 @@ with a2:
             active_packs = (backbone or {}).get("selected_packs", selected_packs)
             active_micro_count = int((backbone or {}).get("micro_count", micro_count))
             active_micro_auto = bool((backbone or {}).get("micro_auto_scale", micro_auto_scale))
+            active_specializations = (backbone or {}).get("specializations", specializations)
+            active_micro_parallel = int((backbone or {}).get("micro_parallelism", micro_parallelism))
+            active_macro_parallel = int((backbone or {}).get("macro_parallelism", macro_parallelism))
+            active_swarm = int((backbone or {}).get("agent_swarm_size", agent_swarm_size))
             active_cpu = int((backbone or {}).get("max_cpu", max_cpu))
             active_ram = int((backbone or {}).get("max_ram", max_ram))
             active_gpu = int((backbone or {}).get("max_gpu", max_gpu))
@@ -465,6 +485,9 @@ with a2:
                 active_training = max(420, active_training)
                 active_micro_count = max(32, active_micro_count)
                 active_micro_auto = True
+                active_micro_parallel = max(96, active_micro_parallel)
+                active_macro_parallel = max(32, active_macro_parallel)
+                active_swarm = max(128, active_swarm)
                 active_cpu = max(95, active_cpu)
                 active_ram = max(92, active_ram)
                 active_gpu = max(98, active_gpu)
@@ -476,6 +499,9 @@ with a2:
                 active_aihub = "max"
                 active_llm_mesh = ["openai", "anthropic", "gemini", "mistral", "grok", "deepseek", "llama", "qwen"]
                 active_dynamic = True
+                active_micro_parallel = max(96, active_micro_parallel)
+                active_macro_parallel = max(32, active_macro_parallel)
+                active_swarm = max(128, active_swarm)
 
             pack_count = len(active_packs) if isinstance(active_packs, list) else len(selected_packs)
             if earlier_ultimate_bundle:
@@ -484,7 +510,9 @@ with a2:
             mesh_suffix = "+".join(active_llm_mesh[:3]) if isinstance(active_llm_mesh, list) and active_llm_mesh else "default-mesh"
             share_suffix = "shared" if active_learning_share else "solo"
             micro_suffix = f"m{active_micro_count}-{'auto' if active_micro_auto else 'manual'}"
-            specialty = f"{agent_type}-{active_brain}-{active_aihub}-{active_learning_mode}-{share_suffix}-{mesh_suffix}-{micro_suffix}"
+            spec_suffix = "+".join(active_specializations[:3]) if isinstance(active_specializations, list) and active_specializations else "general"
+            parallel_suffix = f"pmi{active_micro_parallel}-pma{active_macro_parallel}-sw{active_swarm}"
+            specialty = f"{agent_type}-{active_brain}-{active_aihub}-{active_learning_mode}-{share_suffix}-{mesh_suffix}-{micro_suffix}-{spec_suffix}-{parallel_suffix}"
             specialty = f"{specialty}-{ai_mind_mode}"
             if active_dynamic:
                 specialty = f"{specialty}-dynamic"
@@ -493,7 +521,7 @@ with a2:
             steps = max(60, int(active_training))
             if active_dynamic:
                 steps = min(560, steps + 60)
-            candidates = max(40, min(240, max(pack_count * 8, active_micro_count * 4)))
+            candidates = max(40, min(240, max(pack_count * 8, active_micro_count * 4, active_swarm)))
             sql_signal = max(0.4, min(1.0, active_cpu / 100.0))
             internet_signal = max(0.3, min(1.0, active_ram / 100.0))
             llm_signal = max(0.4, min(1.0, active_gpu / 100.0))
