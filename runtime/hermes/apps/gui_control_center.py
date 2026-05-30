@@ -147,6 +147,34 @@ def _deploy_agent(
         return False, str(exc)
 
 
+def _apply_aihub_upgrade(
+    key: str,
+    specialty: str,
+    steps: int,
+    candidates: int,
+    sql_signal: float,
+    internet_signal: float,
+    llm_signal: float,
+    stability_bias: float,
+) -> tuple[bool, str]:
+    payload = {
+        "Specialty": specialty,
+        "Steps": steps,
+        "Candidates": candidates,
+        "SqlSignal": sql_signal,
+        "InternetSignal": internet_signal,
+        "LlmSignal": llm_signal,
+        "StabilityBias": stability_bias,
+    }
+    headers = {"X-Hermes-Key": key.strip()}
+    try:
+        r = requests.post(f"{_gateway_base()}/aihub-max-upgrade", json=payload, headers=headers, timeout=30)
+        r.raise_for_status()
+        return True, ""
+    except requests.RequestException as exc:
+        return False, str(exc)
+
+
 st.set_page_config(page_title="Hermes Simple GUI", layout="centered")
 st.title("Hermes Simple GUI")
 st.caption("Ultra-minimal login and gateway health check.")
@@ -212,6 +240,16 @@ with cbrain:
 with caihub:
     aihub_mode = st.selectbox("AIHub Mode", options=["off", "assist", "max"], index=2)
 
+st.subheader("Global Hermes Learning Core")
+earlier_ultimate_bundle = st.toggle("Everything from earlier (ultimate bundle)", value=True)
+carry_learning_all_agents = st.toggle("Carry learning to all agents", value=True)
+hermes_learning_mode = st.selectbox("Hermes Learning Mode", options=["standard", "advanced", "ultimate"], index=2)
+llm_mesh = st.multiselect(
+    "Ultimate AIHub LLM Mesh",
+    options=["openai", "anthropic", "gemini", "mistral", "grok", "deepseek", "llama", "qwen"],
+    default=["openai", "anthropic", "gemini", "deepseek"],
+)
+
 ccpu, cram, cgpu = st.columns(3)
 with ccpu:
     max_cpu = st.slider("Max CPU %", 10, 100, 85)
@@ -246,6 +284,9 @@ with bb1:
                 "name": name,
                 "brain_mode": brain_mode,
                 "aihub_mode": aihub_mode,
+                "hermes_learning_mode": hermes_learning_mode,
+                "carry_learning_all_agents": carry_learning_all_agents,
+                "llm_mesh": llm_mesh,
                 "xp_boost": xp_boost,
                 "saber_power": saber_power,
                 "training_intensity": training_intensity,
@@ -284,6 +325,9 @@ with a1:
                     "type": agent_type,
                     "brain_mode": brain_mode,
                     "aihub_mode": aihub_mode,
+                    "hermes_learning_mode": hermes_learning_mode,
+                    "carry_learning_all_agents": carry_learning_all_agents,
+                    "llm_mesh": llm_mesh,
                     "xp_boost": xp_boost,
                     "saber_power": saber_power,
                     "feature_packs": len(selected_packs),
@@ -310,6 +354,9 @@ with a2:
             target_name = deploy_target if deploy_target != "(new agent)" else (agent_name.strip() or "hermes-agent")
             active_brain = str((backbone or {}).get("brain_mode", brain_mode))
             active_aihub = str((backbone or {}).get("aihub_mode", aihub_mode))
+            active_learning_mode = str((backbone or {}).get("hermes_learning_mode", hermes_learning_mode))
+            active_learning_share = bool((backbone or {}).get("carry_learning_all_agents", carry_learning_all_agents))
+            active_llm_mesh = (backbone or {}).get("llm_mesh", llm_mesh)
             active_training = int((backbone or {}).get("training_intensity", training_intensity))
             active_packs = (backbone or {}).get("selected_packs", selected_packs)
             active_cpu = int((backbone or {}).get("max_cpu", max_cpu))
@@ -317,9 +364,27 @@ with a2:
             active_gpu = int((backbone or {}).get("max_gpu", max_gpu))
             active_xp = int((backbone or {}).get("xp_boost", xp_boost))
             active_saber = int((backbone or {}).get("saber_power", saber_power))
-            pack_count = len(active_packs) if isinstance(active_packs, list) else len(selected_packs)
 
-            specialty = f"{agent_type}-{active_brain}-{active_aihub}"
+            if earlier_ultimate_bundle:
+                active_brain = "x6"
+                active_aihub = "max"
+                active_learning_mode = "ultimate"
+                active_learning_share = True
+                active_llm_mesh = ["openai", "anthropic", "gemini", "mistral", "grok", "deepseek", "llama", "qwen"]
+                active_training = max(420, active_training)
+                active_cpu = max(95, active_cpu)
+                active_ram = max(92, active_ram)
+                active_gpu = max(98, active_gpu)
+                active_xp = max(95, active_xp)
+                active_saber = max(95, active_saber)
+
+            pack_count = len(active_packs) if isinstance(active_packs, list) else len(selected_packs)
+            if earlier_ultimate_bundle:
+                pack_count = 30
+
+            mesh_suffix = "+".join(active_llm_mesh[:3]) if isinstance(active_llm_mesh, list) and active_llm_mesh else "default-mesh"
+            share_suffix = "shared" if active_learning_share else "solo"
+            specialty = f"{agent_type}-{active_brain}-{active_aihub}-{active_learning_mode}-{share_suffix}-{mesh_suffix}"
             steps = max(60, int(active_training))
             candidates = max(40, min(240, pack_count * 8))
             sql_signal = max(0.4, min(1.0, active_cpu / 100.0))
@@ -341,6 +406,37 @@ with a2:
                 st.success(f"Deploy triggered for {target_name} ({specialty}) using {source}.")
             else:
                 st.error(f"Deploy failed: {err}")
+
+st.divider()
+st.subheader("AIHub Upgrade")
+if st.button("Apply Ultimate AIHub for All Agents", use_container_width=True):
+    if not st.session_state["login_ok"]:
+        st.error("Log in first, then apply AIHub upgrade.")
+    else:
+        if earlier_ultimate_bundle:
+            llm_factor = 0.99
+            aihub_steps = max(520, training_intensity)
+            aihub_candidates = 240
+            aihub_specialty = "global-aihub-ultimate-earlier"
+        else:
+            llm_factor = min(0.99, max(0.60, 0.60 + (0.04 * len(llm_mesh))))
+            aihub_steps = max(300, training_intensity)
+            aihub_candidates = max(120, len(selected_packs) * 12)
+            aihub_specialty = f"global-aihub-{hermes_learning_mode}"
+        ok, err = _apply_aihub_upgrade(
+            st.session_state["api_key"],
+            specialty=aihub_specialty,
+            steps=aihub_steps,
+            candidates=aihub_candidates,
+            sql_signal=max(0.75, max_cpu / 100.0),
+            internet_signal=max(0.12, min(0.60, max_ram / 100.0)),
+            llm_signal=llm_factor,
+            stability_bias=max(0.72, ((xp_boost + saber_power) / 2) / 100.0),
+        )
+        if ok:
+            st.success("Ultimate AIHub upgrade applied.")
+        else:
+            st.error(f"AIHub upgrade failed: {err}")
 
 if st.session_state["agents"]:
     st.caption(f"Agents created: {len(st.session_state['agents'])}")
