@@ -54,7 +54,7 @@ This runtime enables:
   - GUI AIHub watch/forecast panels split: `runtime/hermes/gui_watch_panels.py`
   - Runtime volume bootstrap: `runtime/hermes/volume_setup.py` (shared by trainer + GUI)
   - SQL training intelligence: `runtime/hermes/training_sql_intel.py` (deep variable-pattern tracking + GitHub context)
-  - Variable registry now includes watch/observer variables (`signal_stability`, `watch_coverage`, `anomaly_resistance`, `drift_control`) for brain+SQL alignment
+  - Variable registry now includes watch + conscious variables and optimized derived metrics (`conscious_efficiency`, `harmony_index`, `decision_readiness`, `learning_elasticity`) for stronger brain+SQL alignment
   - Trainer alias: `runtime/hermes/apps/fleet_trainer_service.py`
   - Startup helpers: `runtime/hermes/scripts/startup/helpers.ps1`
   - Legacy aliases remain (`gui_fleet_control_center.py`, `trainer_fleet_super.py`, `gui_dashboard.py`, `auto_trainer.py`, `start-local.ps1`, `start-agent-fleet.ps1`, `start-common.ps1`, `start-hermes-local-runtime.ps1`, `start-hermes-super-fleet.ps1`, `startup-helpers.ps1`) for compatibility
