@@ -204,6 +204,32 @@ def _run_learning_sql_pulse(
         return False, str(exc)
 
 
+def _llm_optimization_factor(
+    mesh_size: int,
+    cost_bias: int,
+    power_bias: int,
+    perf_bias: int,
+    profile: str,
+    force_ultimate: bool = False,
+) -> float:
+    base = 0.60 + (0.03 * max(0, mesh_size))
+    profile_boosts = {
+        "balanced": 0.00,
+        "cost-saver": -0.06,
+        "power-max": 0.08,
+        "latency-max": 0.06,
+        "throughput-max": 0.10,
+    }
+    profile_boost = profile_boosts.get(profile, 0.0)
+    cost_penalty = (max(0, min(100, cost_bias)) / 100.0) * 0.18
+    power_boost = (max(0, min(100, power_bias)) / 100.0) * 0.20
+    perf_boost = (max(0, min(100, perf_bias)) / 100.0) * 0.20
+    score = base + profile_boost + power_boost + perf_boost - cost_penalty
+    if force_ultimate:
+        score = max(score, 0.99)
+    return max(0.35, min(0.99, score))
+
+
 st.set_page_config(page_title="Hermes Simple GUI", layout="centered")
 st.title("Hermes Simple GUI")
 st.caption("Ultra-minimal login and gateway health check.")
@@ -281,6 +307,25 @@ llm_mesh = st.multiselect(
     "Ultimate AIHub LLM Mesh",
     options=["openai", "anthropic", "gemini", "mistral", "grok", "deepseek", "llama", "qwen"],
     default=["openai", "anthropic", "gemini", "deepseek"],
+)
+if earlier_ultimate_bundle or universal_apply_all or aihub_mode == "max":
+    llm_optimization_profile = "throughput-max"
+    llm_cost_bias = 10
+    llm_power_bias = 99
+    llm_perf_bias = 99
+elif aihub_mode == "assist":
+    llm_optimization_profile = "balanced"
+    llm_cost_bias = 35
+    llm_power_bias = 84
+    llm_perf_bias = 82
+else:
+    llm_optimization_profile = "cost-saver"
+    llm_cost_bias = 55
+    llm_power_bias = 72
+    llm_perf_bias = 70
+st.caption(
+    f"LLM optimization is automatic: {llm_optimization_profile} "
+    f"(cost {llm_cost_bias}, power {llm_power_bias}, perf {llm_perf_bias})"
 )
 
 ccpu, cram, cgpu = st.columns(3)
@@ -379,6 +424,10 @@ with bb1:
                 "dynamic_brain_learning": dynamic_brain_learning,
                 "carry_learning_all_agents": carry_learning_all_agents,
                 "llm_mesh": llm_mesh,
+                "llm_optimization_profile": llm_optimization_profile,
+                "llm_cost_bias": llm_cost_bias,
+                "llm_power_bias": llm_power_bias,
+                "llm_perf_bias": llm_perf_bias,
                 "xp_boost": xp_boost,
                 "saber_power": saber_power,
                 "training_intensity": training_intensity,
@@ -427,6 +476,10 @@ with a1:
                     "dynamic_brain_learning": dynamic_brain_learning,
                     "carry_learning_all_agents": carry_learning_all_agents,
                     "llm_mesh": llm_mesh,
+                    "llm_optimization_profile": llm_optimization_profile,
+                    "llm_cost_bias": llm_cost_bias,
+                    "llm_power_bias": llm_power_bias,
+                    "llm_perf_bias": llm_perf_bias,
                     "xp_boost": xp_boost,
                     "saber_power": saber_power,
                     "feature_packs": len(selected_packs),
@@ -463,6 +516,10 @@ with a2:
             active_dynamic = bool((backbone or {}).get("dynamic_brain_learning", dynamic_brain_learning))
             active_learning_share = bool((backbone or {}).get("carry_learning_all_agents", carry_learning_all_agents))
             active_llm_mesh = (backbone or {}).get("llm_mesh", llm_mesh)
+            active_llm_opt_profile = str((backbone or {}).get("llm_optimization_profile", llm_optimization_profile))
+            active_llm_cost = int((backbone or {}).get("llm_cost_bias", llm_cost_bias))
+            active_llm_power = int((backbone or {}).get("llm_power_bias", llm_power_bias))
+            active_llm_perf = int((backbone or {}).get("llm_perf_bias", llm_perf_bias))
             active_training = int((backbone or {}).get("training_intensity", training_intensity))
             active_packs = (backbone or {}).get("selected_packs", selected_packs)
             active_micro_count = int((backbone or {}).get("micro_count", micro_count))
@@ -483,6 +540,10 @@ with a2:
                 active_learning_mode = "ultimate"
                 active_learning_share = True
                 active_llm_mesh = ["openai", "anthropic", "gemini", "mistral", "grok", "deepseek", "llama", "qwen"]
+                active_llm_opt_profile = "throughput-max"
+                active_llm_cost = min(20, active_llm_cost)
+                active_llm_power = max(95, active_llm_power)
+                active_llm_perf = max(95, active_llm_perf)
                 active_training = max(420, active_training)
                 active_micro_count = max(32, active_micro_count)
                 active_micro_auto = True
@@ -499,6 +560,10 @@ with a2:
                 active_learning_share = True
                 active_aihub = "max"
                 active_llm_mesh = ["openai", "anthropic", "gemini", "mistral", "grok", "deepseek", "llama", "qwen"]
+                active_llm_opt_profile = "throughput-max"
+                active_llm_cost = min(20, active_llm_cost)
+                active_llm_power = max(95, active_llm_power)
+                active_llm_perf = max(95, active_llm_perf)
                 active_dynamic = True
                 active_micro_parallel = max(96, active_micro_parallel)
                 active_macro_parallel = max(32, active_macro_parallel)
@@ -513,7 +578,8 @@ with a2:
             micro_suffix = f"m{active_micro_count}-{'auto' if active_micro_auto else 'manual'}"
             spec_suffix = "+".join(active_specializations[:3]) if isinstance(active_specializations, list) and active_specializations else "general"
             parallel_suffix = f"pmi{active_micro_parallel}-pma{active_macro_parallel}-sw{active_swarm}"
-            specialty = f"{agent_type}-{active_brain}-{active_aihub}-{active_learning_mode}-{share_suffix}-{mesh_suffix}-{micro_suffix}-{spec_suffix}-{parallel_suffix}"
+            opt_suffix = f"opt-{active_llm_opt_profile}-c{active_llm_cost}-p{active_llm_power}-f{active_llm_perf}"
+            specialty = f"{agent_type}-{active_brain}-{active_aihub}-{active_learning_mode}-{share_suffix}-{mesh_suffix}-{micro_suffix}-{spec_suffix}-{parallel_suffix}-{opt_suffix}"
             specialty = f"{specialty}-{ai_mind_mode}"
             if active_dynamic:
                 specialty = f"{specialty}-dynamic"
@@ -525,7 +591,14 @@ with a2:
             candidates = max(40, min(240, max(pack_count * 8, active_micro_count * 4, active_swarm)))
             sql_signal = max(0.4, min(1.0, active_cpu / 100.0))
             internet_signal = max(0.3, min(1.0, active_ram / 100.0))
-            llm_signal = max(0.4, min(1.0, active_gpu / 100.0))
+            llm_signal = _llm_optimization_factor(
+                mesh_size=len(active_llm_mesh) if isinstance(active_llm_mesh, list) else len(llm_mesh),
+                cost_bias=active_llm_cost,
+                power_bias=active_llm_power,
+                perf_bias=active_llm_perf,
+                profile=active_llm_opt_profile,
+                force_ultimate=(earlier_ultimate_bundle or universal_apply_all),
+            )
             stability_bias = max(0.4, min(1.0, ((active_xp + active_saber) / 2) / 100.0))
             ok, err = _deploy_agent(
                 st.session_state["api_key"],
@@ -557,6 +630,10 @@ with px1:
                 "hermes_learning_mode": "ultimate",
                 "carry_learning_all_agents": True,
                 "llm_mesh": ["openai", "anthropic", "gemini", "deepseek"],
+                "llm_optimization_profile": "power-max",
+                "llm_cost_bias": 25,
+                "llm_power_bias": 95,
+                "llm_perf_bias": 92,
                 "xp_boost": 95,
                 "saber_power": 95,
                 "feature_packs": 30,
@@ -585,6 +662,10 @@ with px2:
                 "hermes_learning_mode": "ultimate",
                 "carry_learning_all_agents": True,
                 "llm_mesh": ["openai", "anthropic", "gemini", "mistral", "grok", "deepseek", "llama", "qwen"],
+                "llm_optimization_profile": "throughput-max",
+                "llm_cost_bias": 15,
+                "llm_power_bias": 98,
+                "llm_perf_bias": 98,
                 "xp_boost": 98,
                 "saber_power": 98,
                 "feature_packs": 30,
@@ -607,13 +688,19 @@ if st.button("Apply Ultimate AIHub for All Agents", use_container_width=True):
     if not st.session_state["login_ok"]:
         st.error("Log in first, then apply AIHub upgrade.")
     else:
+        llm_factor = _llm_optimization_factor(
+            mesh_size=len(llm_mesh),
+            cost_bias=llm_cost_bias,
+            power_bias=llm_power_bias,
+            perf_bias=llm_perf_bias,
+            profile=llm_optimization_profile,
+            force_ultimate=earlier_ultimate_bundle,
+        )
         if earlier_ultimate_bundle:
-            llm_factor = 0.99
             aihub_steps = max(520, training_intensity)
             aihub_candidates = 240
             aihub_specialty = "global-aihub-ultimate-earlier"
         else:
-            llm_factor = min(0.99, max(0.60, 0.60 + (0.04 * len(llm_mesh))))
             aihub_steps = max(300, training_intensity)
             aihub_candidates = max(120, len(selected_packs) * 12)
             aihub_specialty = f"global-aihub-{hermes_learning_mode}"
@@ -637,13 +724,21 @@ if st.button("Apply Ultimate AIHub for All Agents", use_container_width=True):
 
 st.divider()
 st.subheader("Ultimate Learning + Ultimate AIHub + LLMs")
-if st.button("Run Ultimate Learning + AIHub + LLMs", use_container_width=True):
-    if not st.session_state["login_ok"]:
-        st.error("Log in first, then run this ultimate flow.")
-    else:
-        llm_factor = min(0.99, max(0.75, 0.60 + (0.04 * len(llm_mesh))))
-        if earlier_ultimate_bundle:
-            llm_factor = 0.99
+if "last_auto_learning_aihub_ts" not in st.session_state:
+    st.session_state["last_auto_learning_aihub_ts"] = 0.0
+if not st.session_state["login_ok"]:
+    st.info("Automatic learning + AIHub + LLM flow is armed. Log in to activate it.")
+else:
+    now_ts = time.time()
+    if now_ts - float(st.session_state["last_auto_learning_aihub_ts"]) >= 75.0:
+        llm_factor = _llm_optimization_factor(
+            mesh_size=len(llm_mesh),
+            cost_bias=llm_cost_bias,
+            power_bias=llm_power_bias,
+            perf_bias=llm_perf_bias,
+            profile=llm_optimization_profile,
+            force_ultimate=earlier_ultimate_bundle,
+        )
         flow_specialty = f"ultimate-learning-aihub-llms-{ultimate_x_tier}-{ai_mind_mode}"
         if universal_apply_all:
             flow_specialty = f"{flow_specialty}-universal-all"
@@ -667,20 +762,22 @@ if st.button("Run Ultimate Learning + AIHub + LLMs", use_container_width=True):
             llm_signal=llm_factor,
             stability_bias=max(0.84, ((xp_boost + saber_power) / 2) / 100.0),
         )
+        st.session_state["last_auto_learning_aihub_ts"] = now_ts
         if aihub_ok and learn_ok:
-            st.success("Ultimate learning + AIHub + LLMs completed.")
+            st.success("Automatic ultimate learning + AIHub + LLMs completed.")
         else:
             if not aihub_ok:
-                st.error(f"Ultimate AIHub phase failed: {aihub_err}")
+                st.error(f"Automatic AIHub phase failed: {aihub_err}")
             if not learn_ok:
-                st.error(f"Ultimate learning phase failed: {learn_err}")
+                st.error(f"Automatic learning phase failed: {learn_err}")
 
 st.divider()
 st.subheader("Brain Ultimate AI Upgrading")
-if st.button("Run Brain Ultimate AI Upgrading", use_container_width=True):
-    if not st.session_state["login_ok"]:
-        st.error("Log in first, then run brain upgrade.")
-    else:
+if "last_auto_brain_upgrade_ts" not in st.session_state:
+    st.session_state["last_auto_brain_upgrade_ts"] = 0.0
+if st.session_state["login_ok"]:
+    now_ts = time.time()
+    if now_ts - float(st.session_state["last_auto_brain_upgrade_ts"]) >= 105.0:
         brain_upgrade_specialty = f"brain-ultimate-{ultimate_x_tier}-{ai_mind_mode}"
         if universal_apply_all:
             brain_upgrade_specialty = f"{brain_upgrade_specialty}-universal-all"
@@ -691,7 +788,14 @@ if st.button("Run Brain Ultimate AI Upgrading", use_container_width=True):
             candidates=220,
             sql_signal=0.96,
             internet_signal=0.55,
-            llm_signal=0.99,
+            llm_signal=_llm_optimization_factor(
+                mesh_size=len(llm_mesh),
+                cost_bias=llm_cost_bias,
+                power_bias=llm_power_bias,
+                perf_bias=llm_perf_bias,
+                profile=llm_optimization_profile,
+                force_ultimate=True,
+            ),
             stability_bias=0.95,
         )
         pulse_ok, pulse_err = _run_learning_sql_pulse(
@@ -701,42 +805,58 @@ if st.button("Run Brain Ultimate AI Upgrading", use_container_width=True):
             candidates=220,
             sql_signal=0.95,
             internet_signal=0.90,
-            llm_signal=0.99,
+            llm_signal=_llm_optimization_factor(
+                mesh_size=len(llm_mesh),
+                cost_bias=llm_cost_bias,
+                power_bias=llm_power_bias,
+                perf_bias=llm_perf_bias,
+                profile=llm_optimization_profile,
+                force_ultimate=True,
+            ),
             stability_bias=0.94,
         )
+        st.session_state["last_auto_brain_upgrade_ts"] = now_ts
         if aihub_ok and pulse_ok:
-            st.success("Brain Ultimate AI upgrading completed.")
+            st.success("Automatic brain ultimate AI upgrading completed.")
         else:
             if not aihub_ok:
-                st.error(f"Brain AIHub phase failed: {aihub_err}")
+                st.error(f"Automatic brain AIHub phase failed: {aihub_err}")
             if not pulse_ok:
-                st.error(f"Brain learning phase failed: {pulse_err}")
+                st.error(f"Automatic brain learning phase failed: {pulse_err}")
 
 st.divider()
-st.subheader("Ultimate Learning + SQL")
-if st.button("Run Ultimate Learning + SQL Pulse", use_container_width=True):
-    if not st.session_state["login_ok"]:
-        st.error("Log in first, then run learning pulse.")
-    else:
-        sql_signal = max(0.60, min(1.0, ultimate_sql_level / 100.0))
-        llm_factor = min(0.99, max(0.60, 0.60 + (0.04 * len(llm_mesh))))
-        if earlier_ultimate_bundle:
-            sql_signal = max(sql_signal, 0.95)
-            llm_factor = 0.99
+st.subheader("Ultimate Learning + SQL Data Comprehension")
+if "last_auto_sql_comprehension_ts" not in st.session_state:
+    st.session_state["last_auto_sql_comprehension_ts"] = 0.0
+if st.session_state["login_ok"]:
+    now_ts = time.time()
+    if now_ts - float(st.session_state["last_auto_sql_comprehension_ts"]) >= 80.0:
+        sql_signal = max(0.85, min(1.0, ultimate_sql_level / 100.0))
+        llm_factor = _llm_optimization_factor(
+            mesh_size=len(llm_mesh),
+            cost_bias=llm_cost_bias,
+            power_bias=llm_power_bias,
+            perf_bias=llm_perf_bias,
+            profile=llm_optimization_profile,
+            force_ultimate=earlier_ultimate_bundle,
+        )
+        if earlier_ultimate_bundle or universal_apply_all:
+            sql_signal = max(sql_signal, 0.97)
         ok, err = _run_learning_sql_pulse(
             st.session_state["api_key"],
-            specialty=f"ultimate-learning-sql-{ai_mind_mode}{'-universal-all' if universal_apply_all else ''}",
-            steps=max(280, training_intensity),
-            candidates=max(120, len(selected_packs) * 10),
+            specialty=f"ultimate-learning-sql-comprehension-{ai_mind_mode}{'-universal-all' if universal_apply_all else ''}",
+            steps=max(320, training_intensity),
+            candidates=max(140, len(selected_packs) * 10),
             sql_signal=sql_signal,
-            internet_signal=max(0.35, min(1.0, max_ram / 100.0)),
+            internet_signal=max(0.40, min(1.0, max_ram / 100.0)),
             llm_signal=llm_factor,
-            stability_bias=max(0.70, ((xp_boost + saber_power) / 2) / 100.0),
+            stability_bias=max(0.78, ((xp_boost + saber_power) / 2) / 100.0),
         )
+        st.session_state["last_auto_sql_comprehension_ts"] = now_ts
         if ok:
-            st.success("Ultimate learning + SQL pulse triggered.")
+            st.success("Automatic ultimate SQL data-comprehension pulse completed.")
         else:
-            st.error(f"Learning pulse failed: {err}")
+            st.error(f"Automatic SQL data-comprehension failed: {err}")
 
 st.divider()
 st.subheader("Ultimate Everything (Backend Only)")
@@ -760,7 +880,14 @@ if auto_ultimate_upgrade:
                 candidates=240,
                 sql_signal=0.98,
                 internet_signal=0.55,
-                llm_signal=0.99,
+                llm_signal=_llm_optimization_factor(
+                    mesh_size=len(llm_mesh),
+                    cost_bias=llm_cost_bias,
+                    power_bias=llm_power_bias,
+                    perf_bias=llm_perf_bias,
+                    profile=llm_optimization_profile,
+                    force_ultimate=True,
+                ),
                 stability_bias=0.96,
             )
             learning_ok, learning_err = _run_learning_sql_pulse(
@@ -770,7 +897,14 @@ if auto_ultimate_upgrade:
                 candidates=240,
                 sql_signal=0.98,
                 internet_signal=0.92,
-                llm_signal=0.99,
+                llm_signal=_llm_optimization_factor(
+                    mesh_size=len(llm_mesh),
+                    cost_bias=llm_cost_bias,
+                    power_bias=llm_power_bias,
+                    perf_bias=llm_perf_bias,
+                    profile=llm_optimization_profile,
+                    force_ultimate=True,
+                ),
                 stability_bias=0.95,
             )
             deploy_ok, deploy_err = _deploy_agent(
@@ -780,7 +914,14 @@ if auto_ultimate_upgrade:
                 candidates=240,
                 sql_signal=0.98,
                 internet_signal=0.92,
-                llm_signal=0.99,
+                llm_signal=_llm_optimization_factor(
+                    mesh_size=len(llm_mesh),
+                    cost_bias=llm_cost_bias,
+                    power_bias=llm_power_bias,
+                    perf_bias=llm_perf_bias,
+                    profile=llm_optimization_profile,
+                    force_ultimate=True,
+                ),
                 stability_bias=0.96,
             )
             st.session_state["last_auto_ultimate_ts"] = now_ts
