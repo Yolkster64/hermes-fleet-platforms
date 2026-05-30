@@ -439,6 +439,64 @@ with a2:
             else:
                 st.error(f"Deploy failed: {err}")
 
+px1, px2 = st.columns(2)
+with px1:
+    if st.button("Create Next Ultimate X5", use_container_width=True):
+        name = "ultimate-x5"
+        agents = [a for a in st.session_state["agents"] if a.get("name") != name]
+        agents.append(
+            {
+                "name": name,
+                "type": "ultimate-x",
+                "brain_mode": "ultimate-x5",
+                "aihub_mode": "max",
+                "hermes_learning_mode": "ultimate",
+                "carry_learning_all_agents": True,
+                "llm_mesh": ["openai", "anthropic", "gemini", "deepseek"],
+                "xp_boost": 95,
+                "saber_power": 95,
+                "feature_packs": 30,
+                "max_cpu": 95,
+                "max_ram": 92,
+                "max_gpu": 98,
+                "created_utc": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        st.session_state["agents"] = agents
+        saved, save_err = _save_agents(agents)
+        if saved:
+            st.success("Created next preset agent: ultimate-x5")
+        else:
+            st.error(f"Created in session, but save failed: {save_err}")
+with px2:
+    if st.button("Create Next Ultimate X6", use_container_width=True):
+        name = "ultimate-x6"
+        agents = [a for a in st.session_state["agents"] if a.get("name") != name]
+        agents.append(
+            {
+                "name": name,
+                "type": "ultimate-x",
+                "brain_mode": "ultimate-x6",
+                "aihub_mode": "max",
+                "hermes_learning_mode": "ultimate",
+                "carry_learning_all_agents": True,
+                "llm_mesh": ["openai", "anthropic", "gemini", "mistral", "grok", "deepseek", "llama", "qwen"],
+                "xp_boost": 98,
+                "saber_power": 98,
+                "feature_packs": 30,
+                "max_cpu": 98,
+                "max_ram": 95,
+                "max_gpu": 99,
+                "created_utc": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        st.session_state["agents"] = agents
+        saved, save_err = _save_agents(agents)
+        if saved:
+            st.success("Created next preset agent: ultimate-x6")
+        else:
+            st.error(f"Created in session, but save failed: {save_err}")
+
 st.divider()
 st.subheader("AIHub Upgrade")
 if st.button("Apply Ultimate AIHub for All Agents", use_container_width=True):
