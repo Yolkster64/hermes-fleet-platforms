@@ -1743,6 +1743,82 @@ with st.expander("X-Everything Smart Mix Guide (best settings by project)", expa
         st.success(f"Applied smart mix: {mix_choice}")
         st.rerun()
 
+st.subheader("Personal Decision Coach (what to do next)")
+decision_profiles: Dict[str, Dict[str, Any]] = {
+    "Ship feature fast": {
+        "mode": "Programming + C++",
+        "type": "quantum-cpp-mesh",
+        "mind": "C++ Performance Mind",
+        "mix": "C++ intensive + performance",
+        "next_action": "Automatic Training Loop",
+        "why": "Fast compile loops + strong throughput for quick delivery.",
+    },
+    "Stabilize and secure production": {
+        "mode": "Learning Depth",
+        "type": "security-fortress-core",
+        "mind": "Security Fortress Mind",
+        "mix": "Security + reliability",
+        "next_action": "Apply Remote/Hidden Machine Lockdown",
+        "why": "Higher guardrails and resilient behavior for production safety.",
+    },
+    "Polish UX and dashboard quality": {
+        "mode": "GUI + Visual",
+        "type": "visual-ux-oracle",
+        "mind": "Optimal Balanced Mind",
+        "mix": "UI/UX + SQL clarity",
+        "next_action": "Run AIHub Scroll Upgrade",
+        "why": "Best visual coherence and guided interaction clarity.",
+    },
+    "Deep training and intelligence growth": {
+        "mode": "Learning Depth",
+        "type": "ultimate-ml-x5",
+        "mind": "Learning Hyper Mind",
+        "mix": "Best overall project mix",
+        "next_action": "Chaos Training Burst",
+        "why": "Maximizes long-horizon retention and adaptive learning depth.",
+    },
+}
+goal_focus = st.selectbox("Your current goal", list(decision_profiles.keys()), key="ctl_goal_focus")
+decision = decision_profiles.get(goal_focus, decision_profiles["Ship feature fast"])
+d1, d2, d3 = st.columns(3)
+d1.metric("Recommended mode", str(decision.get("mode", "Programming + C++")))
+d2.metric("Recommended type", str(decision.get("type", "ultimate-ml-x5")))
+d3.metric("Suggested top mind", str(decision.get("mind", "Optimal Balanced Mind")))
+st.dataframe(
+    [
+        {
+            "For your goal": goal_focus,
+            "Best smart mix": str(decision.get("mix", "Best overall project mix")),
+            "Press this next": str(decision.get("next_action", "Apply Selected Smart Mix")),
+            "Why this path": str(decision.get("why", "")),
+        }
+    ],
+    use_container_width=True,
+    hide_index=True,
+)
+if st.button("Apply Decision Coach Recommendations", use_container_width=True):
+    chosen_mix = str(decision.get("mix", "Best overall project mix"))
+    chosen = smart_mix_catalog.get(chosen_mix, smart_mix_catalog["Best overall project mix"])
+    st.session_state["ctl_operation_mode"] = str(chosen.get("mode", "Programming + C++"))
+    st.session_state["ctl_hermes_type"] = str(chosen.get("type", "ultimate-ml-x5"))
+    st.session_state["ctl_swarm_strategy"] = str(chosen.get("swarm", "hybrid"))
+    st.session_state["ctl_micro_agents"] = int(max(16, min(256, int(chosen.get("micro_agents", 160)))))
+    st.session_state["ctl_gaussian_pressure"] = float(max(0.40, min(1.00, float(chosen.get("gaussian_pressure", 0.80)))))
+    st.session_state["ctl_high_level_learning"] = float(max(0.0, min(1.0, float(chosen.get("high_level_learning", 0.72)))))
+    st.session_state["ctl_study_areas"] = list(chosen.get("study_areas", []))
+    st.session_state["ctl_smart_tools"] = [t for t in list(chosen.get("tools", [])) if t in SMART_TOOL_CATALOG]
+    st.session_state["ctl_x5_brain_pack"] = True
+    st.session_state["ctl_x6_learning_pack"] = True
+    st.session_state["ctl_both_sides_training"] = True
+    st.success(f"Decision coach applied: {goal_focus}. Next suggested action: {decision.get('next_action', 'Apply Selected Smart Mix')}")
+    st.rerun()
+coverage = [
+    {"Area": "Smart tools enabled", "Value": f"{len(st.session_state.get('ctl_smart_tools', []))} / {len(SMART_TOOL_CATALOG)}"},
+    {"Area": "Deep learning stack", "Value": "X5 + X6 ON" if (bool(st.session_state.get("ctl_x5_brain_pack", False)) and bool(st.session_state.get("ctl_x6_learning_pack", False))) else "Partial"},
+    {"Area": "Safety posture", "Value": "Both-sides training ON" if bool(st.session_state.get("ctl_both_sides_training", False)) else "Needs enable"},
+]
+st.dataframe(coverage, use_container_width=True, hide_index=True)
+
 st.subheader("Activity Goal Profile (Fast User Controls)")
 entry_defaults = default_user_entry_profile()
 goal_profile = st.selectbox(

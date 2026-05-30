@@ -49,6 +49,7 @@
 - Center SQL area includes **shape studio** (Monado ring / hex / pulse) with interactive intensity bars.
 - Fleet showcase includes **Move Studio** for bot position planning (X/Y/Z).
 - Added one-click **Manual Training Pulse**, **Automatic Training Loop**, and **Chaos Training Burst** controls plus **Top-Level Mind** selector with recommendations.
+- Added **Personal Decision Coach** section to recommend what to do next by goal and apply suggested settings in one click.
 
 ## X-Everything Smart Guide (best mix by project)
 
