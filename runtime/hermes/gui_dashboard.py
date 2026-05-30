@@ -434,12 +434,32 @@ with st.sidebar:
     st.subheader("Connection")
     st.text_input("API Key", key="api_key", type="password")
     st.caption(f"Gateway/API: {current_api_base()}")
-    st.caption("Default Docker key is pre-filled.")
+    login_profile = st.selectbox(
+        "Quick login profile",
+        options=["auto", "local-hermes-ui-key", "local-hermes-dev-key"],
+        index=0,
+    )
+    l1, l2 = st.columns(2)
+    with l1:
+        if st.button("Login", use_container_width=True):
+            if login_profile != "auto":
+                st.session_state["api_key"] = login_profile
+            st.success("Login profile applied.")
+    with l2:
+        if st.button("Reconnect", use_container_width=True):
+            ping, ping_err = safe_get("/system-watch", timeout=12)
+            if ping_err:
+                st.error(f"Reconnect failed: {ping_err}")
+            else:
+                st.success("Hermes connection restored.")
+                st.rerun()
+    st.caption("Quick login uses local Hermes keys and reconnect checks.")
     st.markdown("### How it works")
     st.caption("1. Send prompt or click auto action\n2. Hermes fleet simulates + learns\n3. Bonus and XP improve")
     live_refresh = st.checkbox("Live fleet auto-refresh", value=True)
     refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, value=20, step=5)
     focused_layout = st.checkbox("Focused layout (clean view)", value=True)
+    show_giant_diagram = st.checkbox("Show giant center diagram", value=False)
     st.markdown("### Hermes Type + Model")
     hermes_type_labels = {k: str(v.get("title", k)) for k, v in HERMES_TYPE_PRESETS.items()}
     hermes_type_keys = list(hermes_type_labels.keys())
@@ -556,6 +576,15 @@ c3.metric("Active Hermes", str(active_hermes))
 c4.metric("AIHub Bonus", f"{aihub_bonus * 100:.1f}%")
 active_model_display = _selected_model_override() or str(unified.get("aihub_shared_model_id", "aihub-unified-v1"))
 c5.metric("Model", active_model_display)
+if unified_err:
+    st.warning("Hermes is not connected yet. Use Login/Reconnect in the sidebar.")
+    if st.button("Retry Hermes Connection", use_container_width=True):
+        retry_watch, retry_err = safe_get("/system-watch", timeout=12)
+        if retry_err:
+            st.error(f"Still offline: {retry_err}")
+        else:
+            st.success("Hermes connection is back online.")
+            st.rerun()
 auto_bootstrap = st.session_state.get("auto_volume_bootstrap", {})
 if isinstance(auto_bootstrap, dict):
     if bool(auto_bootstrap.get("ok", False)):
@@ -646,52 +675,56 @@ if st.button("Run Ultimate Entrance Upgrade", use_container_width=True):
         error_prefix="Ultimate entrance upgrade failed",
         timeout=180,
     )
-render_learning_diagram()
-render_evolution_centerpiece(
-    agent_rows=agent_rows,
-    sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
-    growth_data=growth_data if isinstance(growth_data, dict) else {},
-    training_status=training_status if isinstance(training_status, dict) else {},
-)
-render_learning_graphs(live_sql_intel if isinstance(live_sql_intel, dict) else {})
-render_fleet_showcase_panels(
-    sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
-    growth_data=growth_data if isinstance(growth_data, dict) else {},
-    training_status=training_status if isinstance(training_status, dict) else {},
-    cpp_kernel=cpp_kernel if isinstance(cpp_kernel, dict) else {},
-)
-render_next_level_control_center(
-    sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
-    growth_data=growth_data if isinstance(growth_data, dict) else {},
-    training_status=training_status if isinstance(training_status, dict) else {},
-    watch_payload=watch_payload if isinstance(watch_payload, dict) else {},
-    unified=unified if isinstance(unified, dict) else {},
-    cpp_kernel=cpp_kernel if isinstance(cpp_kernel, dict) else {},
-    ultimate_entrance=ultimate_entrance if isinstance(ultimate_entrance, dict) else {},
-    volume_root=live_volume_root,
-    run_logged_post_action=run_logged_post_action,
-)
-watch_plan = render_aihub_watch_panels(
-    unified=unified if isinstance(unified, dict) else {},
-    watch_payload=watch_payload if isinstance(watch_payload, dict) else {},
-    gateway_status=gateway_watch if isinstance(gateway_watch, dict) else {},
-    sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
-    training_status=training_status if isinstance(training_status, dict) else {},
-    growth_data=growth_data if isinstance(growth_data, dict) else {},
-    optimizer_state=st.session_state.get("last_chat_optimizer", {}),
-)
-if gateway_watch_err:
-    st.caption(f"Gateway watch telemetry pending: {gateway_watch_err}")
-if st.button("Auto-Design AIHub Plan for Complex Situations", use_container_width=True):
-    payload = watch_plan.get("recommended_payload", {}) if isinstance(watch_plan, dict) else {}
-    run_logged_post_action(
-        label="aihub-max-upgrade",
-        path="/aihub-max-upgrade",
-        payload=payload,
-        success_message="AIHub max-upgrade plan triggered.",
-        error_prefix="AIHub max-upgrade failed",
-        timeout=160,
+if not focused_layout:
+    render_learning_diagram()
+    render_evolution_centerpiece(
+        agent_rows=agent_rows,
+        sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
+        growth_data=growth_data if isinstance(growth_data, dict) else {},
+        training_status=training_status if isinstance(training_status, dict) else {},
     )
+    render_learning_graphs(live_sql_intel if isinstance(live_sql_intel, dict) else {})
+    render_fleet_showcase_panels(
+        sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
+        growth_data=growth_data if isinstance(growth_data, dict) else {},
+        training_status=training_status if isinstance(training_status, dict) else {},
+        cpp_kernel=cpp_kernel if isinstance(cpp_kernel, dict) else {},
+    )
+    render_next_level_control_center(
+        sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
+        growth_data=growth_data if isinstance(growth_data, dict) else {},
+        training_status=training_status if isinstance(training_status, dict) else {},
+        watch_payload=watch_payload if isinstance(watch_payload, dict) else {},
+        unified=unified if isinstance(unified, dict) else {},
+        cpp_kernel=cpp_kernel if isinstance(cpp_kernel, dict) else {},
+        ultimate_entrance=ultimate_entrance if isinstance(ultimate_entrance, dict) else {},
+        volume_root=live_volume_root,
+        run_logged_post_action=run_logged_post_action,
+        show_center_nexus=show_giant_diagram,
+    )
+    watch_plan = render_aihub_watch_panels(
+        unified=unified if isinstance(unified, dict) else {},
+        watch_payload=watch_payload if isinstance(watch_payload, dict) else {},
+        gateway_status=gateway_watch if isinstance(gateway_watch, dict) else {},
+        sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
+        training_status=training_status if isinstance(training_status, dict) else {},
+        growth_data=growth_data if isinstance(growth_data, dict) else {},
+        optimizer_state=st.session_state.get("last_chat_optimizer", {}),
+    )
+    if gateway_watch_err:
+        st.caption(f"Gateway watch telemetry pending: {gateway_watch_err}")
+    if st.button("Auto-Design AIHub Plan for Complex Situations", use_container_width=True):
+        payload = watch_plan.get("recommended_payload", {}) if isinstance(watch_plan, dict) else {}
+        run_logged_post_action(
+            label="aihub-max-upgrade",
+            path="/aihub-max-upgrade",
+            payload=payload,
+            success_message="AIHub max-upgrade plan triggered.",
+            error_prefix="AIHub max-upgrade failed",
+            timeout=160,
+        )
+else:
+    st.caption("Focused mode hides diagram-heavy legacy panels for a cleaner UI.")
 
 if focused_layout:
     st.subheader("Focused SQL + Upgrade Center")

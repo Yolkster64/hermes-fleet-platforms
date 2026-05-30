@@ -110,6 +110,7 @@ def render_next_level_control_center(
     ultimate_entrance: Dict[str, Any],
     volume_root: str,
     run_logged_post_action: Callable[..., None],
+    show_center_nexus: bool = False,
 ) -> None:
     _inject_next_level_theme()
     st.markdown("### Next-Level AIHub + SQL Command Center")
@@ -187,13 +188,14 @@ def render_next_level_control_center(
             )
 
     with tabs[2]:
-        _render_center_nexus(
-            sql_health=sql_health,
-            growth_data=growth_data,
-            training_status=training_status,
-            unified=unified,
-            cpp_kernel=cpp_kernel,
-        )
+        if show_center_nexus:
+            _render_center_nexus(
+                sql_health=sql_health,
+                growth_data=growth_data,
+                training_status=training_status,
+                unified=unified,
+                cpp_kernel=cpp_kernel,
+            )
         profiles = sql_intel.get("recent_hermes_profiles", []) if isinstance(sql_intel, dict) else []
         if not isinstance(profiles, list):
             profiles = []
