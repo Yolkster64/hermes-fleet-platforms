@@ -86,8 +86,6 @@ def _request_json(method: str, path: str, timeout: int = 30, payload: Optional[D
                     response = _session().post(f"{base}{path}", json=(payload or {}), headers=request_headers, timeout=timeout)
                 response.raise_for_status()
                 st.session_state["_active_api_base"] = base
-                if key and str(st.session_state.get("api_key", "")).strip() != key:
-                    st.session_state["api_key"] = key
                 return response.json()
             except requests.HTTPError as exc:
                 last_exc = exc

@@ -587,6 +587,7 @@ def _initialize_session_state() -> None:
         "ctl_refresh_seconds": 20,
         "ctl_focused_layout": True,
         "ctl_show_legacy_map_ui": True,
+        "ctl_render_mode": "Lite Stable",
         "ctl_auto_enabled": False,
         "ctl_auto_interval": 45,
         "ctl_intelligent_shuffle": True,
@@ -901,6 +902,7 @@ if "stability_bootstrap_done" not in st.session_state:
     # One-time guard to neutralize stale browser session values that can cause UI churn.
     st.session_state["ctl_live_refresh"] = False
     st.session_state["ctl_auto_enabled"] = False
+    st.session_state["ctl_render_mode"] = "Lite Stable"
     st.session_state["ctl_refresh_seconds"] = int(st.session_state.get("ctl_refresh_seconds", 20))
     st.session_state["ctl_auto_interval"] = int(st.session_state.get("ctl_auto_interval", 45))
     st.session_state["stability_bootstrap_done"] = True
@@ -935,6 +937,7 @@ with st.sidebar:
     refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, step=5, key="ctl_refresh_seconds")
     focused_layout = st.checkbox("Focused layout (clean view)", key="ctl_focused_layout")
     show_legacy_map_ui = st.checkbox("Show AIHub Hub + Map panels", key="ctl_show_legacy_map_ui")
+    render_mode = st.selectbox("Render mode", options=["Lite Stable", "Full Experience"], key="ctl_render_mode")
     if st.button("Stay Logged In + Data Saver", use_container_width=True):
         if not str(st.session_state.get("api_key", "")).strip():
             st.session_state["api_key"] = "local-hermes-ui-key"
@@ -942,6 +945,7 @@ with st.sidebar:
         st.session_state["ctl_refresh_seconds"] = 60
         st.session_state["ctl_focused_layout"] = True
         st.session_state["ctl_show_legacy_map_ui"] = False
+        st.session_state["ctl_render_mode"] = "Lite Stable"
         ping, ping_err = safe_get("/system-watch", timeout=12)
         if ping_err:
             st.warning("Data Saver profile applied. Reconnect may still be needed once.")
@@ -1436,6 +1440,20 @@ if focused_layout:
         st.caption(f"Live refresh active: updating every {refresh_seconds}s")
         time.sleep(refresh_seconds)
         st.rerun()
+
+if str(st.session_state.get("ctl_render_mode", "Lite Stable")) == "Lite Stable":
+    st.subheader("Lite Stable View")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Bond", f"{float(bond.get('bond_score', 0.0)) * 100:.1f}%")
+    c2.metric("DB MB", f"{float(bond.get('db_mb', 0.0)):.1f}")
+    c3.metric("WAL MB", f"{float(bond.get('wal_mb', 0.0)):.1f}")
+    c4.metric("Training", "Active" if bool(training_status.get("training_active", False)) else "Idle")
+    st.caption("Lite Stable mode keeps the Xenoblade look while reducing heavy UI rendering. Switch to Full Experience in the sidebar when ready.")
+    if live_refresh:
+        st.caption(f"Live refresh active: updating every {refresh_seconds}s")
+        time.sleep(refresh_seconds)
+        st.rerun()
+    st.stop()
 
 st.subheader("Training Compliance + Always-On Status")
 ts1, ts2, ts3, ts4, ts5 = st.columns(5)
