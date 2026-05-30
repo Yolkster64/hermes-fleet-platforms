@@ -140,6 +140,30 @@ app.Use(async (context, next) =>
     stat.Record(sw.Elapsed.TotalMilliseconds, context.Response.StatusCode >= 400);
 });
 
+UltimateEntranceMetrics ComputeUltimateEntranceMetrics()
+{
+    var totalRequests = gatewayStats.Sum(kvp => kvp.Value.Requests);
+    var totalErrors = gatewayStats.Sum(kvp => kvp.Value.Errors);
+    var avgRouteMs = gatewayStats.Count > 0 ? gatewayStats.Values.Average(s => s.AverageMs) : 0.0;
+    var maxRouteMs = gatewayStats.Count > 0 ? gatewayStats.Values.Max(s => s.MaxMs) : 0.0;
+    var errorRate = totalRequests > 0 ? (double)totalErrors / totalRequests : 0.0;
+    var routeDiversity = Math.Min(1.0, gatewayStats.Count / 48.0);
+    var responsiveness = Math.Clamp(1.0 - (avgRouteMs / 1800.0), 0.0, 1.0);
+    var reliability = Math.Clamp(1.0 - (errorRate * 2.0), 0.0, 1.0);
+    var integrationScore = Math.Clamp((routeDiversity * 0.28) + (responsiveness * 0.36) + (reliability * 0.36), 0.0, 1.0);
+    return new UltimateEntranceMetrics(
+        IntegrationScore: integrationScore,
+        Reliability: reliability,
+        Responsiveness: responsiveness,
+        RouteDiversity: routeDiversity,
+        Requests: totalRequests,
+        Errors: totalErrors,
+        ErrorRate: errorRate,
+        AverageRouteMs: avgRouteMs,
+        MaxRouteMs: maxRouteMs
+    );
+}
+
 app.MapGet("/", () =>
     Results.Json(new
     {
@@ -314,6 +338,7 @@ app.MapGet("/gateway-max-status", (HttpContext context) =>
             max_ms = kvp.Value.MaxMs
         })
         .ToArray();
+    var entrance = ComputeUltimateEntranceMetrics();
     return Results.Json(new
     {
         timestamp_utc = DateTimeOffset.UtcNow,
@@ -325,6 +350,7 @@ app.MapGet("/gateway-max-status", (HttpContext context) =>
             offline_only_mode = offlineOnlyMode,
             user_routed_internet = userRoutedInternet
         },
+        ultimate_entrance = entrance,
         routes = topRoutes
     });
 });
@@ -333,29 +359,21 @@ app.MapGet("/ultimate-entrance-status", (HttpContext context) =>
 {
     if (!Authorized(context))
         return Results.Unauthorized();
-    var totalRequests = gatewayStats.Sum(kvp => kvp.Value.Requests);
-    var totalErrors = gatewayStats.Sum(kvp => kvp.Value.Errors);
-    var avgRouteMs = gatewayStats.Count > 0 ? gatewayStats.Values.Average(s => s.AverageMs) : 0.0;
-    var maxRouteMs = gatewayStats.Count > 0 ? gatewayStats.Values.Max(s => s.MaxMs) : 0.0;
-    var errorRate = totalRequests > 0 ? (double)totalErrors / totalRequests : 0.0;
-    var routeDiversity = Math.Min(1.0, gatewayStats.Count / 48.0);
-    var responsiveness = Math.Clamp(1.0 - (avgRouteMs / 1800.0), 0.0, 1.0);
-    var reliability = Math.Clamp(1.0 - (errorRate * 2.0), 0.0, 1.0);
-    var integrationScore = Math.Clamp((routeDiversity * 0.28) + (responsiveness * 0.36) + (reliability * 0.36), 0.0, 1.0);
+    var entrance = ComputeUltimateEntranceMetrics();
     return Results.Json(new
     {
         timestamp_utc = DateTimeOffset.UtcNow,
         service = "hermes-gateway",
         mode = "ultimate-entrance",
-        integration_score = integrationScore,
-        reliability,
-        responsiveness,
-        route_diversity = routeDiversity,
-        requests = totalRequests,
-        errors = totalErrors,
-        error_rate = errorRate,
-        avg_route_ms = avgRouteMs,
-        max_route_ms = maxRouteMs,
+        integration_score = entrance.IntegrationScore,
+        reliability = entrance.Reliability,
+        responsiveness = entrance.Responsiveness,
+        route_diversity = entrance.RouteDiversity,
+        requests = entrance.Requests,
+        errors = entrance.Errors,
+        error_rate = entrance.ErrorRate,
+        avg_route_ms = entrance.AverageRouteMs,
+        max_route_ms = entrance.MaxRouteMs,
         low_bandwidth_mode = lowBandwidthMode,
         offline_only_mode = offlineOnlyMode,
         user_routed_internet = userRoutedInternet
@@ -699,6 +717,16 @@ public sealed record GatewayMaxUpgradeRequest(
     double InternetSignal = 0.12,
     double LlmSignal = 0.94,
     double StabilityBias = 0.84);
+public sealed record UltimateEntranceMetrics(
+    double IntegrationScore,
+    double Reliability,
+    double Responsiveness,
+    double RouteDiversity,
+    long Requests,
+    long Errors,
+    double ErrorRate,
+    double AverageRouteMs,
+    double MaxRouteMs);
 
 public sealed class GatewayRouteStats
 {

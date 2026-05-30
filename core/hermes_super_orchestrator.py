@@ -1310,10 +1310,19 @@ class HermesSuperOrchestrator:
         hard_facts = self.algorithm_state.get("hard_facts", {})
         locked_facts = len([f for f in hard_facts.values() if isinstance(f, dict) and f.get("locked")]) if isinstance(hard_facts, dict) else 0
         hard_fact_signal = _clamp(locked_facts / max(1, len(hard_facts))) if isinstance(hard_facts, dict) and hard_facts else 0.0
-        confidence_signal = _clamp((evidence_ratio * 0.6) + (truth_score * 0.2) + ((1.0 - chaos_control) * 0.1) + (hard_fact_signal * 0.1))
+        ultimate_super_signal = _clamp(float(self.store.recent_external_signal_score_by_source("ultimate_super_plan", lookback=120)))
+        entrance_signal = _clamp(float(self.store.recent_external_signal_score_by_source("ultimate_entrance", lookback=120)))
+        confidence_signal = _clamp(
+            (evidence_ratio * 0.52)
+            + (truth_score * 0.18)
+            + ((1.0 - chaos_control) * 0.08)
+            + (hard_fact_signal * 0.10)
+            + (ultimate_super_signal * 0.08)
+            + (entrance_signal * 0.04)
+        )
         modifier_gain = _clamp(0.55 + (confidence_signal ** 2.2), 0.35, 1.95)
         caution_level = _clamp(1.0 - confidence_signal)
-        pivot_bias = _clamp((pivot_ratio * 0.55) + (exploration_pressure * 0.25) + (chaos_control * 0.20))
+        pivot_bias = _clamp((pivot_ratio * 0.48) + (exploration_pressure * 0.22) + (chaos_control * 0.17) + ((1.0 - confidence_signal) * 0.08) + ((1.0 - ultimate_super_signal) * 0.05))
         risk_damping = _clamp((stability_signal * 0.45) + (hard_fact_signal * 0.35) + (evidence_ratio * 0.20))
         range_low = _clamp(center - spread)
         range_high = _clamp(center + spread)
@@ -1361,6 +1370,8 @@ class HermesSuperOrchestrator:
             "risk_damping": risk_damping,
             "hard_fact_signal": hard_fact_signal,
             "confidence_signal": confidence_signal,
+            "ultimate_super_signal": ultimate_super_signal,
+            "entrance_signal": entrance_signal,
         }
         self.algorithm_state["adaptive_dynamic_modifiers"] = decision["dynamic_context"]
         mem = self.algorithm_state["adaptive_brain_memory"]

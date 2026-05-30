@@ -115,6 +115,7 @@ This runtime enables:
   - AIHub bonus now fuses action-brain memory with adaptive/watch/SQL signals for stronger whole-brain scaling
   - GUI AIHub watch now includes an Ultimate Ops Center panel with brain/SQL/power/complexity stability and escalation indices
   - GUI now includes an Ultimate Entrance Command Deck with integrated gateway scorecards and one-click `fleet:ultimate-entrance` trigger
+  - Decision brain now blends `ultimate_super_plan` + entrance signals into adaptive confidence/pivot dynamics for more stable final-step routing
   - Docker services now explicitly set `HERMES_VOLUME_DATA_PATH=/workspace/runtime/hermes_persist` so SQL setup is auto-initialized in the mounted volume
   - GUI now shows per-Hermes level/XP/speed bonus/token gain bars, GitHub CLI connection panel, and fleet lock/unlock controls for hard-problem mode
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI

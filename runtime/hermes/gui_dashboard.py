@@ -398,26 +398,34 @@ if USER_ROUTED_INTERNET and not OFFLINE_ONLY_MODE:
     st.caption("Internet mode: routed through your controlled path only (capped low internet-signal).")
 st.subheader("Ultimate Entrance Command Deck")
 ue = ultimate_entrance if isinstance(ultimate_entrance, dict) else {}
+decision_integration = float(growth_data.get("integration_index", 0.0)) if isinstance(growth_data, dict) else 0.0
+decision_adaptive = float(growth_data.get("avg_adaptive_brain", 0.0)) if isinstance(growth_data, dict) else 0.0
+decision_action = float(growth_data.get("avg_action_brain", 0.0)) if isinstance(growth_data, dict) else 0.0
 u1, u2, u3, u4, u5 = st.columns(5)
 u1.metric("Entrance Integration", f"{float(ue.get('integration_score', 0.0)) * 100:.1f}%")
 u2.metric("Gateway Reliability", f"{float(ue.get('reliability', 0.0)) * 100:.1f}%")
 u3.metric("Gateway Response", f"{float(ue.get('responsiveness', 0.0)) * 100:.1f}%")
 u4.metric("Route Diversity", f"{float(ue.get('route_diversity', 0.0)) * 100:.1f}%")
 u5.metric("Gateway Errors", str(int(ue.get('errors', 0))))
+d1, d2, d3 = st.columns(3)
+d1.metric("Decision Integration", f"{decision_integration * 100:.1f}%")
+d2.metric("Adaptive Brain", f"{decision_adaptive * 100:.1f}%")
+d3.metric("Action Brain", f"{decision_action * 100:.1f}%")
 if ultimate_entrance_err:
     st.caption(f"Ultimate entrance telemetry pending: {ultimate_entrance_err}")
 if st.button("Run Ultimate Entrance Upgrade", use_container_width=True):
+    entrance_strength = max(0.0, min(1.0, (decision_integration * 0.5) + (decision_action * 0.25) + (decision_adaptive * 0.25)))
     run_logged_post_action(
         label="ultimate-entrance-upgrade",
         path="/aihub-max-upgrade",
         payload={
             "specialty": "fleet:ultimate-entrance",
-            "steps": 860,
-            "candidates": 340,
-            "sql_signal": 0.95,
+            "steps": int(860 + (entrance_strength * 120)),
+            "candidates": int(340 + (entrance_strength * 60)),
+            "sql_signal": min(0.98, 0.93 + (entrance_strength * 0.05)),
             "internet_signal": 0.08,
-            "llm_signal": 0.97,
-            "stability_bias": 0.90,
+            "llm_signal": min(0.99, 0.95 + (entrance_strength * 0.04)),
+            "stability_bias": min(0.96, 0.86 + (entrance_strength * 0.08)),
         },
         success_message="Ultimate entrance upgrade triggered.",
         error_prefix="Ultimate entrance upgrade failed",
