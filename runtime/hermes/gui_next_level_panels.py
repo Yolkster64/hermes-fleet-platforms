@@ -144,8 +144,7 @@ def render_next_level_control_center(
     smart_tools = [str(x) for x in st.session_state.get("ctl_smart_tools", []) if isinstance(x, str)]
     both_sides_training = bool(st.session_state.get("ctl_both_sides_training", True))
     x5_brain_pack = bool(st.session_state.get("ctl_x5_brain_pack", False))
-    x6_learning_pack = bool(st.session_state.get("ctl_x6_learning_pack", True)
-)
+    x6_learning_pack = bool(st.session_state.get("ctl_x6_learning_pack", True))
 
     tabs = st.tabs(["SQL Center", "AIHub Lab", "Fleet Table", "Evidence Advisor", "Security + Benchmark", "Clock + Style"])
     sql_health = sql_intel.get("sql_health", {}) if isinstance(sql_intel, dict) else {}

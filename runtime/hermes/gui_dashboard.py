@@ -1585,7 +1585,7 @@ for tool_key in list(SMART_TOOL_CATALOG.keys()):
         }
     )
 st.dataframe(tool_rows, use_container_width=True, hide_index=True)
-st.markdown("#### Ultimate Built-In Guide (clear stack view)")
+st.markdown("#### Hermes Guide Hub")
 ultimate_guide_rows = [
     {
         "Layer": "Ultimate ML X5",
@@ -1624,8 +1624,9 @@ ultimate_guide_rows = [
         "Recommended action": "Enable X6 Learning Plus + Auto X10 setup",
     },
 ]
-st.dataframe(ultimate_guide_rows, use_container_width=True, hide_index=True)
-st.caption("C++ intensive default recommendation: Programming + C++ mode + Ultimate ML X5 + chaos-engine/multi-parallel/brain-fusion tools.")
+with st.expander("Ultimate Built-In Guide (clear stack view)", expanded=True):
+    st.dataframe(ultimate_guide_rows, use_container_width=True, hide_index=True)
+    st.caption("C++ intensive default recommendation: Programming + C++ mode + Ultimate ML X5 + chaos-engine/multi-parallel/brain-fusion tools.")
 with st.expander("Full Hermes Guide (complete quick-reference)", expanded=False):
     st.dataframe(
         [
@@ -1642,7 +1643,6 @@ with st.expander("Full Hermes Guide (complete quick-reference)", expanded=False)
     )
     st.caption("Best overall preset: use the 'Enable Ultimate + All Options' button, then run SQL Center setup and AIHub next-level upgrade.")
 
-st.markdown("#### X-Everything Smart Mix Guide (best settings by project)")
 smart_mix_catalog: Dict[str, Dict[str, Any]] = {
     "Best overall project mix": {
         "mode": "Programming + C++",
@@ -1689,40 +1689,41 @@ smart_mix_catalog: Dict[str, Dict[str, Any]] = {
         "why": "Prioritizes hardening, safe decisions, and resilient long-horizon behavior.",
     },
 }
-st.dataframe(
-    [
-        {
-            "Mix": name,
-            "Mode": str(cfg.get("mode", "")),
-            "Type": str(cfg.get("type", "")),
-            "Swarm": str(cfg.get("swarm", "")),
-            "Micro agents": int(cfg.get("micro_agents", 160)),
-            "Gaussian": float(cfg.get("gaussian_pressure", 0.80)),
-            "High-level learning": float(cfg.get("high_level_learning", 0.72)),
-            "Why this mix": str(cfg.get("why", "")),
-        }
-        for name, cfg in smart_mix_catalog.items()
-    ],
-    use_container_width=True,
-    hide_index=True,
-)
-mix_choice = st.selectbox("Choose smart project mix", list(smart_mix_catalog.keys()), key="ctl_smart_mix_choice")
-mix_cfg = smart_mix_catalog.get(mix_choice, {})
-st.caption(f"Smart recommendation: {mix_cfg.get('why', 'Balanced operating profile.')}")
-if st.button("Apply Selected Smart Mix", use_container_width=True):
-    st.session_state["ctl_operation_mode"] = str(mix_cfg.get("mode", "Programming + C++"))
-    st.session_state["ctl_hermes_type"] = str(mix_cfg.get("type", "ultimate-ml-x5"))
-    st.session_state["ctl_swarm_strategy"] = str(mix_cfg.get("swarm", "hybrid"))
-    st.session_state["ctl_micro_agents"] = int(max(16, min(256, int(mix_cfg.get("micro_agents", 160)))))
-    st.session_state["ctl_gaussian_pressure"] = float(max(0.40, min(1.00, float(mix_cfg.get("gaussian_pressure", 0.80)))))
-    st.session_state["ctl_high_level_learning"] = float(max(0.0, min(1.0, float(mix_cfg.get("high_level_learning", 0.72)))))
-    st.session_state["ctl_study_areas"] = list(mix_cfg.get("study_areas", []))
-    st.session_state["ctl_smart_tools"] = [t for t in list(mix_cfg.get("tools", [])) if t in SMART_TOOL_CATALOG]
-    st.session_state["ctl_x5_brain_pack"] = True
-    st.session_state["ctl_x6_learning_pack"] = True
-    st.session_state["ctl_both_sides_training"] = True
-    st.success(f"Applied smart mix: {mix_choice}")
-    st.rerun()
+with st.expander("X-Everything Smart Mix Guide (best settings by project)", expanded=True):
+    st.dataframe(
+        [
+            {
+                "Mix": name,
+                "Mode": str(cfg.get("mode", "")),
+                "Type": str(cfg.get("type", "")),
+                "Swarm": str(cfg.get("swarm", "")),
+                "Micro agents": int(cfg.get("micro_agents", 160)),
+                "Gaussian": float(cfg.get("gaussian_pressure", 0.80)),
+                "High-level learning": float(cfg.get("high_level_learning", 0.72)),
+                "Why this mix": str(cfg.get("why", "")),
+            }
+            for name, cfg in smart_mix_catalog.items()
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    mix_choice = st.selectbox("Choose smart project mix", list(smart_mix_catalog.keys()), key="ctl_smart_mix_choice")
+    mix_cfg = smart_mix_catalog.get(mix_choice, {})
+    st.caption(f"Smart recommendation: {mix_cfg.get('why', 'Balanced operating profile.')}")
+    if st.button("Apply Selected Smart Mix", use_container_width=True):
+        st.session_state["ctl_operation_mode"] = str(mix_cfg.get("mode", "Programming + C++"))
+        st.session_state["ctl_hermes_type"] = str(mix_cfg.get("type", "ultimate-ml-x5"))
+        st.session_state["ctl_swarm_strategy"] = str(mix_cfg.get("swarm", "hybrid"))
+        st.session_state["ctl_micro_agents"] = int(max(16, min(256, int(mix_cfg.get("micro_agents", 160)))))
+        st.session_state["ctl_gaussian_pressure"] = float(max(0.40, min(1.00, float(mix_cfg.get("gaussian_pressure", 0.80)))))
+        st.session_state["ctl_high_level_learning"] = float(max(0.0, min(1.0, float(mix_cfg.get("high_level_learning", 0.72)))))
+        st.session_state["ctl_study_areas"] = list(mix_cfg.get("study_areas", []))
+        st.session_state["ctl_smart_tools"] = [t for t in list(mix_cfg.get("tools", [])) if t in SMART_TOOL_CATALOG]
+        st.session_state["ctl_x5_brain_pack"] = True
+        st.session_state["ctl_x6_learning_pack"] = True
+        st.session_state["ctl_both_sides_training"] = True
+        st.success(f"Applied smart mix: {mix_choice}")
+        st.rerun()
 
 st.subheader("Activity Goal Profile (Fast User Controls)")
 entry_defaults = default_user_entry_profile()
