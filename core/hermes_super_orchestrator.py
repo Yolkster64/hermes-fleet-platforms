@@ -1443,6 +1443,10 @@ class HermesSuperOrchestrator:
         watch_eff = max(0.0, min(1.0, float(training_variables.get("watch_efficiency", 0.5))))
         wrongness = max(0.0, min(1.0, float(training_variables.get("wrongness_signal", 0.5))))
         yield_eff = max(0.0, min(1.0, float(efficiency_profile.get("yield_efficiency", 0.5))))
+        decision_readiness = max(0.0, min(1.0, float(efficiency_profile.get("decision_readiness", 0.5))))
+        stability_guard = max(0.0, min(1.0, float(efficiency_profile.get("stability_guard", 0.5))))
+        efficiency_confidence = max(0.0, min(1.0, float(efficiency_profile.get("efficiency_confidence", 0.5))))
+        composite_efficiency = max(0.0, min(1.0, float(efficiency_profile.get("composite_efficiency", yield_eff))))
         dynamic_ctx = adaptive_decision.get("dynamic_context", {}) if isinstance(adaptive_decision, dict) else {}
         decision_train_signal = max(0.0, min(1.0, float(dynamic_ctx.get("decision_train_signal", 0.5))))
         conscious_signal = max(0.0, min(1.0, float(dynamic_ctx.get("conscious_signal", training_variables.get("conscious_efficiency", 0.5)))))
@@ -1457,8 +1461,10 @@ class HermesSuperOrchestrator:
                 + (watch_eff * 0.12)
                 + (confidence_to_pivot * 0.10)
                 + ((1.0 - workload_complexity) * 0.06)
-                + (decision_train_signal * 0.05),
-                + (conscious_signal * 0.07),
+                + (decision_train_signal * 0.05)
+                + (conscious_signal * 0.07)
+                + (decision_readiness * 0.06)
+                + (composite_efficiency * 0.04),
             ),
         )
         safety_guard = max(
@@ -1471,11 +1477,13 @@ class HermesSuperOrchestrator:
                 + (workload_complexity * 0.18)
                 + (0.08 if bool(hard_fact.get("locked", False)) else 0.0)
                 + ((1.0 - decision_train_signal) * 0.04)
-                + ((1.0 - conscious_signal) * 0.04),
+                + ((1.0 - conscious_signal) * 0.04)
+                + ((1.0 - stability_guard) * 0.06)
+                + ((1.0 - efficiency_confidence) * 0.04),
             ),
         )
         rollout_scale = max(0.2, min(1.4, 0.72 + (aggression * 0.56) - (safety_guard * 0.34)))
-        policy_score = max(0.0, min(1.0, (aggression * 0.62) + ((1.0 - safety_guard) * 0.38)))
+        policy_score = max(0.0, min(1.0, (aggression * 0.56) + ((1.0 - safety_guard) * 0.30) + (efficiency_confidence * 0.14)))
         action_mode = "burst" if aggression >= 0.68 and safety_guard <= 0.40 else ("guarded" if safety_guard >= 0.62 else "balanced")
         return {
             "aggression": aggression,
@@ -1485,6 +1493,9 @@ class HermesSuperOrchestrator:
             "action_mode": action_mode,
             "decision_train_signal": decision_train_signal,
             "conscious_signal": conscious_signal,
+            "decision_readiness": decision_readiness,
+            "composite_efficiency": composite_efficiency,
+            "efficiency_confidence": efficiency_confidence,
         }
 
     def _natural_selection(self) -> None:
@@ -1674,6 +1685,7 @@ class HermesSuperOrchestrator:
             )
             training_variables = self._training_variable_vector(agent, activity_model, horizon_profile)
             efficiency_profile = compute_efficiency_profile(training_variables)
+            training_variables = {**training_variables, **efficiency_profile}
             adaptive_variables = [
                 quality,
                 speed,
@@ -1709,6 +1721,9 @@ class HermesSuperOrchestrator:
                 efficiency_profile["energy_efficiency"],
                 efficiency_profile["speed_efficiency"],
                 efficiency_profile["yield_efficiency"],
+                efficiency_profile["decision_readiness"],
+                efficiency_profile["stability_guard"],
+                efficiency_profile["composite_efficiency"],
             ]
             adaptive_weights = [
                 self.reward_weights["quality"],
@@ -1745,6 +1760,9 @@ class HermesSuperOrchestrator:
                 0.07,
                 0.08,
                 0.10,
+                0.10,
+                0.09,
+                0.11,
             ]
             adaptive_decision = self._adaptive_brain_decision(
                 variables=adaptive_variables,
@@ -1812,6 +1830,9 @@ class HermesSuperOrchestrator:
             objective_score += training_variables["size_factor"] * 0.02
             objective_score += efficiency_profile["yield_efficiency"] * 0.045
             objective_score += efficiency_profile["energy_efficiency"] * (0.02 + (float(user_profile.get("energy_saver", 0.55)) * 0.03))
+            objective_score += efficiency_profile["decision_readiness"] * 0.035
+            objective_score += efficiency_profile["composite_efficiency"] * 0.040
+            objective_score += efficiency_profile["efficiency_confidence"] * 0.028
             objective_score += action_brain["policy_score"] * 0.08
             objective_score += action_brain["aggression"] * 0.03
             objective_score -= action_brain["safety_guard"] * 0.025
@@ -2260,6 +2281,10 @@ class HermesSuperOrchestrator:
         watch_coverage = max(0.0, min(1.0, float(training_variables.get("watch_coverage", 0.5))))
         watch_efficiency = max(0.0, min(1.0, float(training_variables.get("watch_efficiency", 0.5))))
         conscious_efficiency = max(0.0, min(1.0, float(training_variables.get("conscious_efficiency", 0.5))))
+        decision_readiness = max(0.0, min(1.0, float(training_variables.get("decision_readiness", 0.5))))
+        stability_guard = max(0.0, min(1.0, float(training_variables.get("stability_guard", 0.5))))
+        efficiency_confidence = max(0.0, min(1.0, float(training_variables.get("efficiency_confidence", 0.5))))
+        composite_efficiency = max(0.0, min(1.0, float(training_variables.get("composite_efficiency", 0.5))))
         action_tail = self.algorithm_state.get("action_brain_memory", [])[-80:]
         action_brain_signal = (sum(action_tail) / len(action_tail)) if action_tail else 0.5
         bonus_tail = self.algorithm_state.get("aihub_bonus_memory", [])[-80:]
@@ -2307,6 +2332,10 @@ class HermesSuperOrchestrator:
                 + (watch_coverage * cost_score * 0.04)
                 + (watch_efficiency * power_score * 0.06)
                 + (conscious_efficiency * power_score * 0.05)
+                + (decision_readiness * power_score * 0.06)
+                + (efficiency_confidence * power_score * 0.05)
+                + (composite_efficiency * power_score * 0.06)
+                + (stability_guard * cost_score * 0.04)
                 + (action_brain_signal * power_score * 0.07)
                 + (bonus_signal * power_score * 0.05)
                 + (aihub_brain_learning_signal * power_score * 0.08)
@@ -2338,6 +2367,10 @@ class HermesSuperOrchestrator:
                 "watch_coverage": watch_coverage,
                 "watch_efficiency": watch_efficiency,
                 "conscious_efficiency": conscious_efficiency,
+                "decision_readiness": decision_readiness,
+                "stability_guard": stability_guard,
+                "efficiency_confidence": efficiency_confidence,
+                "composite_efficiency": composite_efficiency,
                 "action_brain_signal": action_brain_signal,
                 "bonus_signal": bonus_signal,
                 "sql_pattern_signal": sql_pattern_signal,
