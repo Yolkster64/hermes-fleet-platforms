@@ -170,7 +170,7 @@ def render_next_level_control_center(
         st.code(json.dumps(report_payload, indent=2)[:4000], language="json")
         st.download_button("Download Instant Report", data=json.dumps(report_payload, indent=2), file_name=f"hermes_{report_scope}_report.json", mime="application/json", use_container_width=True)
         st.markdown("#### Easy Setup + Deploy")
-        s1, s2 = st.columns(2)
+        s1, s2, s3 = st.columns(3)
         with s1:
             if st.button("One-Click SQL + Training Setup", use_container_width=True):
                 run_logged_post_action(
@@ -207,7 +207,25 @@ def render_next_level_control_center(
                     error_prefix="Ultimate Hermes + AIHub upgrade failed",
                     timeout=200,
                 )
-        st.caption("Use One-Click setup first, then run Ultimate upgrade for max capability.")
+        with s3:
+            if st.button("Ultimate ML X5 Brain Setup", use_container_width=True):
+                run_logged_post_action(
+                    label="ultimate-ml-x5-brain-setup",
+                    path="/learning-pulse",
+                    payload={
+                        "specialty": "fleet:ultimate-ml-x5-brain",
+                        "steps": 1400,
+                        "candidates": 900,
+                        "sql_signal": 0.99,
+                        "internet_signal": 0.08,
+                        "llm_signal": 0.98,
+                        "stability_bias": 0.93,
+                    },
+                    success_message="Ultimate ML X5 brain setup triggered.",
+                    error_prefix="Ultimate ML X5 setup failed",
+                    timeout=220,
+                )
+        st.caption("Use One-Click setup first, then run Ultimate upgrade, then Ultimate ML X5 for max complexity and brain depth.")
         if st.button("Save Hermes Snapshot Now", use_container_width=True):
             info = export_hermes_profiles_snapshot(volume_root, max_rows=600)
             st.success(f"Hermes snapshot saved: {info.get('path', 'unknown')} ({info.get('rows', 0)} rows)")

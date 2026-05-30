@@ -133,6 +133,18 @@ HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
         "techniques": ["KNAA/QNAA reasoning", "GNAA adaptive memory", "Cross-agent communication mesh", "Multi-armed Bayesian planning"],
         "specialty_tag": "ultimate-aihub-fusion",
     },
+    "ultimate-ml-x5": {
+        "title": "Ultimate ML X5",
+        "group": "Official Hermes",
+        "personality": "Maximum-intensity machine learning profile for full brain integration and heavy training throughput.",
+        "description": "X5 profile for the most advanced training setup: deep reasoning, high memory retention, and multi-signal optimization.",
+        "swarm_strategy": "multipolar",
+        "micro_agents": 252,
+        "gaussian_pressure": 0.96,
+        "high_level_learning": 0.98,
+        "techniques": ["KNAA/QNAA reasoning", "GNAA adaptive memory", "Gaussian 3D evidence", "Cross-agent communication mesh", "Multi-armed Bayesian planning"],
+        "specialty_tag": "ultimate-ml-x5",
+    },
     "official-quick-thinker": {
         "title": "Quick Thinker",
         "group": "Official",
@@ -531,6 +543,7 @@ def _initialize_session_state() -> None:
         "ctl_hermes_species": "Hybrid",
         "ctl_enable_algorithmic_types": True,
         "ctl_operation_mode": "Programming + C++",
+        "ctl_x5_brain_pack": False,
         "ctl_model_override": "hermes-fleet-latest",
     }
     for key, value in defaults.items():
@@ -1270,10 +1283,12 @@ ts5.metric("GitHub Knowledge Sync", "Active" if github_sync else "Pending")
 if not is_training_active:
     st.warning("Training appears idle. Use 'Force Training Pulse Now' to restart immediate learning.")
 if st.button("Force Training Pulse Now", use_container_width=True):
+    pulse_steps = 1100 if bool(st.session_state.get("ctl_x5_brain_pack", False)) else 220
+    pulse_candidates = 700 if bool(st.session_state.get("ctl_x5_brain_pack", False)) else 140
     run_logged_post_action(
         label="force-training-pulse",
         path="/learning-pulse",
-        payload={"specialty": _specialty_base(), "steps": 220, "candidates": 140},
+        payload={"specialty": _specialty_base(), "steps": pulse_steps, "candidates": pulse_candidates},
         success_message="Training pulse triggered.",
         error_prefix="Training pulse failed",
         timeout=120,
@@ -1359,6 +1374,7 @@ else:
 mode = st.radio("Training Mode (4 modes)", list(OPERATION_MODES.keys()), horizontal=True, key="ctl_operation_mode")
 mode_cfg = OPERATION_MODES.get(mode, {})
 max_mode = mode in ("Intensive Throughput", "Learning Depth")
+x5_brain_pack = st.checkbox("Enable Ultimate Brain X5 Pack", key="ctl_x5_brain_pack")
 st.caption("Hermes sizes: mini units focus speed; full-size units focus deep reasoning and retention.")
 st.markdown(
     f"**Best fit guidance:** {mode_cfg.get('description', 'Balanced operation profile.')} "
@@ -1370,6 +1386,22 @@ st.markdown(
     "- **Intensive Throughput:** use for large parallel workloads and mass operations; favors swarm speed.\n"
     "- **Learning Depth:** use for long-horizon retention and adaptive growth; favors gaussian smoothing + memory quality."
 )
+if x5_brain_pack:
+    st.info(
+        "X5 pack enabled: training pulses, candidate search, and brain-horizon learning are multiplied for maximum depth. "
+        "Best type: Ultimate ML X5 or Ultimate AIHub Fusion."
+    )
+    if st.button("Apply Ultimate ML X5 Type + Brain Setup", use_container_width=True):
+        x5_preset = _all_hermes_presets().get("ultimate-ml-x5", {})
+        auto_x5 = _optimized_settings(x5_preset, str(st.session_state.get("ctl_hermes_species", "Hybrid")))
+        st.session_state["ctl_hermes_type"] = "ultimate-ml-x5"
+        st.session_state["ctl_swarm_strategy"] = str(x5_preset.get("swarm_strategy", "multipolar"))
+        st.session_state["ctl_micro_agents"] = int(max(16, min(256, int(auto_x5.get("micro_agents", 252)))))
+        st.session_state["ctl_gaussian_pressure"] = float(max(0.40, min(1.00, float(auto_x5.get("gaussian_pressure", 0.96)))))
+        st.session_state["ctl_high_level_learning"] = float(max(0.0, min(1.0, float(auto_x5.get("high_level_learning", 0.98)))))
+        st.session_state["ctl_techniques"] = [str(t) for t in x5_preset.get("techniques", st.session_state.get("ctl_techniques", []))]
+        st.success("Ultimate ML X5 type + brain setup applied.")
+        st.rerun()
 
 study_areas = st.multiselect(
     "Study Areas",
@@ -1495,6 +1527,14 @@ technique_profile["swarm_strategy"] = str(mode_cfg.get("swarm", technique_profil
 technique_profile["micro_agents"] = int(max(16, min(256, int(technique_profile.get("micro_agents", 160)) + int(mode_cfg.get("agents_delta", 0)))))
 technique_profile["gaussian_pressure"] = float(max(0.40, min(1.00, float(technique_profile.get("gaussian_pressure", 0.80)) + float(mode_cfg.get("gaussian_delta", 0.0)))))
 technique_profile["high_level_learning"] = float(max(0.0, min(1.0, float(technique_profile.get("high_level_learning", 0.72)) + float(mode_cfg.get("learning_delta", 0.0)))))
+if bool(st.session_state.get("ctl_x5_brain_pack", False)):
+    technique_profile["micro_agents"] = int(max(16, min(256, int(technique_profile.get("micro_agents", 160)) + 40)))
+    technique_profile["gaussian_pressure"] = float(max(0.40, min(1.00, float(technique_profile.get("gaussian_pressure", 0.80)) + 0.06)))
+    technique_profile["high_level_learning"] = float(max(0.0, min(1.0, float(technique_profile.get("high_level_learning", 0.72)) + 0.14)))
+    extra_techniques = list(technique_profile.get("techniques", []))
+    if "X5 brain fusion pipeline" not in extra_techniques:
+        extra_techniques.append("X5 brain fusion pipeline")
+    technique_profile["techniques"] = extra_techniques[:8]
 st.caption(
     "Active upgrades: "
     f"{', '.join(technique_profile['techniques']) if technique_profile['techniques'] else 'standard'} | "
