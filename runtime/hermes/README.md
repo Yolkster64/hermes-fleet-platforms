@@ -109,6 +109,7 @@ This runtime enables:
   - SQL intelligence now includes deep compression + 3D overlap metrics and auto-generated benefits/ideas for next training moves
   - SQL layer is now performance-hardened with indexes + automatic retention pruning (`HERMES_SQL_MAX_CYCLE_ROWS`, `HERMES_SQL_MAX_AGENT_ROWS`, `HERMES_SQL_MAX_GITHUB_ROWS`, `HERMES_SQL_MAX_PROFILE_ROWS`) plus cadence controls (`HERMES_SQL_INTEL_LOOKBACK`, `HERMES_SQL_PRUNE_EVERY`, `HERMES_SQL_OPTIMIZE_EVERY`, `HERMES_SQL_PROFILE_SNAPSHOT_EVERY`, `HERMES_SQL_GITHUB_INGEST_EVERY`)
   - Trainer now emits an `auto_trainer.ultimate_super_plan` signal that adapts pulse steps/candidates and sql/llm/stability weights from SQL health pressure + watch stability + retention
+  - Trainer now emits `auto_trainer.aihub_brain_learning` to close the loop between SQL/watch/optimizer learning quality and AIHub routing/bonus logic
   - AIHub optimizer now blends watch telemetry (`watch_signal`) with SQL/art/bridge signals for smarter model routing and bonus shaping
   - Hermes trainer now applies a max-upgrade planner per cycle (`auto_trainer.max_upgrade_plan`) that scales steps/candidates/signals from SQL trend + watch efficiency complexity
   - Learning brain now includes an action-brain policy layer (aggression/safety/rollout) for stronger decide+act optimization in training loops

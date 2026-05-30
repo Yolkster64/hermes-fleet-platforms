@@ -1131,6 +1131,29 @@ def run_cycle() -> None:
                 },
                 timeout=30,
             )
+            aihub_brain_learning = _clamp01(
+                (float(sql_intel.get("pattern_score", 0.5)) * 0.34)
+                + (max(0.0, float(sql_intel.get("trend", 0.0))) * 0.16)
+                + (float(training_variables.get("watch_efficiency", 0.5)) * 0.20)
+                + (float(training_variables.get("signal_stability", 0.5)) * 0.18)
+                + (_clamp01(float(super_plan.get("optimizer_force", 0.5))) * 0.12)
+            )
+            _emit_signal(
+                "auto_trainer.aihub_brain_learning",
+                aihub_brain_learning,
+                {
+                    "cycle": _cycle,
+                    "specialty": dynamic_specialty,
+                    "aihub_brain_learning": aihub_brain_learning,
+                    "pattern_score": float(sql_intel.get("pattern_score", 0.5)),
+                    "trend": float(sql_intel.get("trend", 0.0)),
+                    "watch_efficiency": float(training_variables.get("watch_efficiency", 0.5)),
+                    "signal_stability": float(training_variables.get("signal_stability", 0.5)),
+                    "optimizer_force": float(super_plan.get("optimizer_force", 0.5)),
+                    "training_variables": training_variables,
+                },
+                timeout=30,
+            )
         except Exception as sql_exc:
             print(f"[auto-trainer] sql intel failed: {sql_exc}")
     weighted_reward = max(0.0, min(1.0, (learned_reward * 0.75) + (brain_value["value"] * 0.25)))
