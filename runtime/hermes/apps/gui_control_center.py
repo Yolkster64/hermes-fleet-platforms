@@ -662,6 +662,8 @@ with st.expander("Super Detailed Guide + Recommendations Table", expanded=False)
 if st.session_state["agents"]:
     display_rows: list[dict] = []
     for a in st.session_state["agents"]:
+        xp_val = int(a.get("xp_boost", 0))
+        level_val = max(1, min(10, (xp_val // 10) + 1))
         display_rows.append(
             {
                 "name": a.get("name"),
@@ -669,8 +671,9 @@ if st.session_state["agents"]:
                 "type": a.get("type", ""),
                 "tier": a.get("tier", ""),
                 "profile": a.get("profile", ""),
-                "fleet_mode": a.get("fleet_mode", "working"),
-                "xp": int(a.get("xp_boost", 0)),
+                "fleet_mode": a.get("fleet_mode", "adaptive"),
+                "xp": xp_val,
+                "level": level_val,
                 "speed": int(a.get("speed", 0)),
                 "intelligence": int(a.get("intelligence", 0)),
                 "stability": int(a.get("stability", 0)),
@@ -679,6 +682,27 @@ if st.session_state["agents"]:
                 "deployed": bool(a.get("deployed", False)),
             }
         )
+    total_agents = len(display_rows)
+    hermes_count = len([r for r in display_rows if str(r["family"]) == "Hermes"])
+    x_count = len([r for r in display_rows if str(r["family"]) == "X"])
+    deployed_count = len([r for r in display_rows if bool(r["deployed"])])
+    mix_ratio = min(hermes_count, x_count) / max(1, total_agents)
+    fleet_synergy_bonus = min(35, int(10 + (mix_ratio * 40) + (deployed_count / max(1, total_agents)) * 10))
+    aihub_lm_bonus = min(40, int(12 + (len(llm_mesh) * 2) + (x_count / max(1, total_agents)) * 12))
+    avg_level = round(sum(int(r["level"]) for r in display_rows) / max(1, total_agents), 2)
+    avg_xp = round(sum(int(r["xp"]) for r in display_rows) / max(1, total_agents), 1)
+
+    st.subheader("Big XP / Fleet / Level Dashboard")
+    dm1, dm2, dm3, dm4 = st.columns(4)
+    with dm1:
+        st.metric("Average XP", avg_xp)
+    with dm2:
+        st.metric("Average Level", avg_level)
+    with dm3:
+        st.metric("Fleet Synergy Bonus", f"+{fleet_synergy_bonus}%")
+    with dm4:
+        st.metric("AIHub/LLM Bonus", f"+{aihub_lm_bonus}%")
+
     st.subheader("Agent Board")
     st.dataframe(pd.DataFrame(display_rows), use_container_width=True, hide_index=True)
     st.subheader("Detailed Graph (team averages)")
@@ -687,11 +711,19 @@ if st.session_state["agents"]:
     st.subheader("XP + Stats by Agent")
     for row in display_rows[:20]:
         state_icon = "🟢" if row["deployed"] else "⚪"
-        st.markdown(f"{state_icon} **{row['name']}** ({row['family']} / {row['type']}) - fleet: `{row['fleet_mode']}`")
+        row_fleet_bonus = fleet_synergy_bonus + (5 if row["deployed"] else 0)
+        row_aihub_bonus = aihub_lm_bonus + (3 if row["family"] == "X" else 0)
+        st.markdown(
+            f"{state_icon} **{row['name']}** ({row['family']} / {row['type']}) - "
+            f"fleet: `{row['fleet_mode']}` | **LEVEL {row['level']}** | "
+            f"Fleet Bonus **+{row_fleet_bonus}%** | AIHub/LLM Bonus **+{row_aihub_bonus}%**"
+        )
         col_a, col_b, col_c = st.columns(3)
         with col_a:
             st.caption(f"XP {row['xp']}")
             st.progress(row["xp"] / 100.0)
+            st.caption(f"Level {row['level']}/10")
+            st.progress(row["level"] / 10.0)
             st.caption(f"Speed {row['speed']}")
             st.progress(row["speed"] / 100.0)
         with col_b:
