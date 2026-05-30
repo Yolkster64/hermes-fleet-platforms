@@ -273,77 +273,51 @@ hermes_four = ["Hermes Core", "Hermes Builder", "Hermes Analyst", "Hermes Guardi
 ultimate_three = ["X (auto)", "X Core", "X5", "X6"]
 hermes_variant = st.selectbox("Step 2A: Hermes Type (4 options)", options=hermes_four, index=0, disabled=(family_pick != "Hermes"))
 ultimate_variant = st.selectbox("Step 2B: X Selection (4 options)", options=ultimate_three, index=0, disabled=(family_pick != "X"))
-profile = st.selectbox("Step 3: Mission Profile", options=["balanced", "deep-analysis", "rapid-deploy", "safe-production"], index=0)
-variable_set_one = st.selectbox(
-    "Variable Set 1 (required)",
-    options=["adaptive-routing", "precision-mode", "burst-mode", "safe-guarded"],
+second_pick = st.selectbox(
+    "Step 3: Second Pick (adaptive mode)",
+    options=["auto-balance", "auto-depth", "auto-speed", "auto-safe"],
     index=0,
 )
-variable_set_two = st.selectbox(
-    "Variable Set 2 (required)",
-    options=["sql-focus", "code-focus", "ops-focus", "research-focus"],
-    index=0,
-)
-subagent_count = st.slider("Step 4: Subagent Number", 1, 10, 4)
+second_to_profile = {
+    "auto-balance": "balanced",
+    "auto-depth": "deep-analysis",
+    "auto-speed": "rapid-deploy",
+    "auto-safe": "safe-production",
+}
+profile = second_to_profile[second_pick]
+
+# Everything else is automatic and adaptive.
 recommended_subagents = {
     "balanced": ["planner", "coder", "deployer", "observer"],
     "deep-analysis": ["planner", "researcher", "sql-engineer", "observer"],
     "rapid-deploy": ["planner", "coder", "deployer", "guardian"],
     "safe-production": ["planner", "guardian", "deployer", "observer"],
 }
-subagents = st.multiselect(
-    "Step 5: Subagent Roles",
-    options=["planner", "researcher", "coder", "sql-engineer", "deployer", "guardian", "observer"],
-    default=recommended_subagents[profile][:subagent_count],
-)
-fleet_mode = st.selectbox(
-    "Fleet Assignment",
-    options=["working", "training", "working+training"],
-    index=0,
-)
-if len(subagents) > subagent_count:
-    st.warning(f"You selected {len(subagents)} roles. Recommended max for this run: {subagent_count}.")
+subagents = recommended_subagents[profile]
+subagent_count = len(subagents)
+fleet_mode = "adaptive"
 
 attribute_defaults = {
-    ("Hermes", "balanced"): {"speed": 78, "intelligence": 76, "stability": 84, "memory": 82, "power": 80},
-    ("Hermes", "deep-analysis"): {"speed": 72, "intelligence": 90, "stability": 86, "memory": 92, "power": 82},
-    ("Hermes", "rapid-deploy"): {"speed": 90, "intelligence": 74, "stability": 78, "memory": 76, "power": 88},
-    ("Hermes", "safe-production"): {"speed": 74, "intelligence": 82, "stability": 94, "memory": 88, "power": 80},
-    ("X", "balanced"): {"speed": 88, "intelligence": 90, "stability": 90, "memory": 90, "power": 92},
-    ("X", "deep-analysis"): {"speed": 84, "intelligence": 98, "stability": 92, "memory": 98, "power": 94},
-    ("X", "rapid-deploy"): {"speed": 98, "intelligence": 86, "stability": 86, "memory": 88, "power": 96},
-    ("X", "safe-production"): {"speed": 86, "intelligence": 92, "stability": 99, "memory": 94, "power": 90},
+    ("Hermes", "Hermes Core"): {"speed": 78, "intelligence": 76, "stability": 84, "memory": 82, "power": 80},
+    ("Hermes", "Hermes Builder"): {"speed": 92, "intelligence": 74, "stability": 80, "memory": 78, "power": 90},
+    ("Hermes", "Hermes Analyst"): {"speed": 74, "intelligence": 94, "stability": 86, "memory": 94, "power": 82},
+    ("Hermes", "Hermes Guardian"): {"speed": 72, "intelligence": 84, "stability": 98, "memory": 90, "power": 80},
+    ("X", "X (auto)"): {"speed": 90, "intelligence": 92, "stability": 92, "memory": 92, "power": 94},
+    ("X", "X Core"): {"speed": 88, "intelligence": 90, "stability": 90, "memory": 90, "power": 92},
+    ("X", "X5"): {"speed": 98, "intelligence": 86, "stability": 88, "memory": 88, "power": 97},
+    ("X", "X6"): {"speed": 90, "intelligence": 99, "stability": 96, "memory": 99, "power": 95},
 }
-defaults = attribute_defaults[(family_pick, profile)]
-if st.button("Apply Recommended 5 Attributes", use_container_width=True):
-    st.session_state["attr_speed"] = defaults["speed"]
-    st.session_state["attr_intelligence"] = defaults["intelligence"]
-    st.session_state["attr_stability"] = defaults["stability"]
-    st.session_state["attr_memory"] = defaults["memory"]
-    st.session_state["attr_power"] = defaults["power"]
-if "attr_speed" not in st.session_state:
-    st.session_state["attr_speed"] = defaults["speed"]
-if "attr_intelligence" not in st.session_state:
-    st.session_state["attr_intelligence"] = defaults["intelligence"]
-if "attr_stability" not in st.session_state:
-    st.session_state["attr_stability"] = defaults["stability"]
-if "attr_memory" not in st.session_state:
-    st.session_state["attr_memory"] = defaults["memory"]
-if "attr_power" not in st.session_state:
-    st.session_state["attr_power"] = defaults["power"]
-
-st.markdown("**Step 6: 5 Attributes (recommended for your selected type)**")
-c1, c2, c3, c4, c5 = st.columns(5)
-with c1:
-    speed_attr = st.slider("Speed", 50, 100, int(st.session_state["attr_speed"]), key="attr_speed")
-with c2:
-    intelligence_attr = st.slider("Intelligence", 50, 100, int(st.session_state["attr_intelligence"]), key="attr_intelligence")
-with c3:
-    stability_attr = st.slider("Stability", 50, 100, int(st.session_state["attr_stability"]), key="attr_stability")
-with c4:
-    memory_attr = st.slider("Memory", 50, 100, int(st.session_state["attr_memory"]), key="attr_memory")
-with c5:
-    power_attr = st.slider("Power", 50, 100, int(st.session_state["attr_power"]), key="attr_power")
+selected_type_for_defaults = ultimate_variant if family_pick == "X" else hermes_variant
+defaults = attribute_defaults[(family_pick, selected_type_for_defaults)]
+speed_attr = defaults["speed"]
+intelligence_attr = defaults["intelligence"]
+stability_attr = defaults["stability"]
+memory_attr = defaults["memory"]
+power_attr = defaults["power"]
+st.caption(
+    "Attributes are automatic and adaptive from your Hermes/X type and second pick "
+    f"-> Speed {speed_attr}, Intelligence {intelligence_attr}, Stability {stability_attr}, Memory {memory_attr}, Power {power_attr}"
+)
 
 if family_pick == "X":
     if ultimate_variant == "X5":
@@ -408,8 +382,6 @@ def _build_agent(name: str, family: str, type_name: str) -> dict:
         "type": type_name,
         "tier": x_tier,
         "profile": profile,
-        "variable_set_one": variable_set_one,
-        "variable_set_two": variable_set_two,
         "subagents": subagents[:subagent_count] if subagents else recommended_subagents[profile][:subagent_count],
         "subagent_count": subagent_count,
         "fleet_mode": fleet_mode,
@@ -457,6 +429,16 @@ with b4:
         st.success("Saved selected build.")
 
 saved_agent_names = [str(a.get("name", "")).strip() for a in st.session_state["agents"] if str(a.get("name", "")).strip()]
+max_agents_allowed = 500
+current_agents = len(saved_agent_names)
+remaining_agents = max(0, max_agents_allowed - current_agents)
+m1, m2, m3 = st.columns(3)
+with m1:
+    st.metric("Agents You Have", current_agents)
+with m2:
+    st.metric("Agents You Can Have", max_agents_allowed)
+with m3:
+    st.metric("Open Slots", remaining_agents)
 deploy_selected = st.multiselect("Deploy these saved agents", options=saved_agent_names, default=saved_agent_names[:1])
 d1, d2, d3, d4 = st.columns(4)
 with d1:
@@ -592,10 +574,9 @@ with st.expander("Super Detailed Guide + Recommendations Table", expanded=False)
         "1. Pick `Hermes` or `X`.\n"
         "2. If Hermes: choose one of 4 types.\n"
         "3. If X: choose one of 4 (`X auto`, `X Core`, `X5`, `X6`).\n"
-        "4. Pick both required variable sets (4 options each).\n"
-        "5. Set subagent number, then roles.\n"
-        "6. Apply recommended 5 attributes, then fine-tune.\n"
-        "7. Buy/save builds, then deploy selected or deploy all.\n\n"
+        "4. Pick your second adaptive mode.\n"
+        "5. Everything else auto-adjusts (attributes, subagents, training/specialty logic).\n"
+        "6. Buy/save builds, then deploy selected or deploy all.\n\n"
         "**Mixing strategy**\n"
         "- Use `Buy 1 Hermes + 1 X` for mixed swarm testing.\n"
         "- Use `Buy 10 Hermes` for stable broad operations.\n"
@@ -658,9 +639,8 @@ if st.session_state["login_ok"]:
     now_ts = time.time()
     if now_ts - float(st.session_state["last_auto_upgrade_ts"]) >= 90.0:
         fleet_count = len(st.session_state["agents"])
-        working_count = len([a for a in st.session_state["agents"] if str(a.get("fleet_mode", "")) == "working"])
-        training_count = len([a for a in st.session_state["agents"] if str(a.get("fleet_mode", "")) == "training"])
-        hybrid_count = len([a for a in st.session_state["agents"] if str(a.get("fleet_mode", "")) == "working+training"])
+        adaptive_count = len([a for a in st.session_state["agents"] if str(a.get("fleet_mode", "")) == "adaptive"])
+        deployed_count = len([a for a in st.session_state["agents"] if bool(a.get("deployed", False))])
         aihub_ok, _ = _apply_aihub_upgrade(
             st.session_state["api_key"],
             specialty=f"ultimate-x-{x_tier}-auto-aihub",
@@ -684,8 +664,7 @@ if st.session_state["login_ok"]:
         jvc_ok, _ = _run_learning_sql_pulse(
             st.session_state["api_key"],
             specialty=(
-                f"jvc-learning-auto-fleets-{fleet_count}-working-{working_count}-"
-                f"training-{training_count}-hybrid-{hybrid_count}"
+                f"jvc-learning-auto-fleets-{fleet_count}-adaptive-{adaptive_count}-deployed-{deployed_count}"
             ),
             steps=520,
             candidates=max(180, min(240, 120 + (fleet_count * 4))),
