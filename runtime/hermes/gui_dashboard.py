@@ -587,6 +587,9 @@ def _initialize_session_state() -> None:
         "ctl_refresh_seconds": 20,
         "ctl_focused_layout": True,
         "ctl_show_legacy_map_ui": True,
+        "ctl_auto_enabled": False,
+        "ctl_auto_interval": 45,
+        "ctl_intelligent_shuffle": True,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -894,6 +897,13 @@ st.markdown('<div class="holo-title">Hermes Fleet Control Dashboard</div>', unsa
 st.caption("Clear control view: runtime status, SQL intelligence, and one-click fleet actions.")
 
 _initialize_session_state()
+if "stability_bootstrap_done" not in st.session_state:
+    # One-time guard to neutralize stale browser session values that can cause UI churn.
+    st.session_state["ctl_live_refresh"] = False
+    st.session_state["ctl_auto_enabled"] = False
+    st.session_state["ctl_refresh_seconds"] = int(st.session_state.get("ctl_refresh_seconds", 20))
+    st.session_state["ctl_auto_interval"] = int(st.session_state.get("ctl_auto_interval", 45))
+    st.session_state["stability_bootstrap_done"] = True
 
 with st.sidebar:
     st.subheader("Connection")
@@ -938,7 +948,7 @@ with st.sidebar:
         else:
             st.success("Stay Logged In + Data Saver profile applied and connection is active.")
         st.rerun()
-    st.checkbox("Enable legacy strategy Hermes types", value=True, key="ctl_enable_algorithmic_types")
+    st.checkbox("Enable legacy strategy Hermes types", key="ctl_enable_algorithmic_types")
     st.selectbox("Hermes species", options=["Hybrid", "Normal", "Mesh"], key="ctl_hermes_species")
     _sidebar_mode_current = str(st.session_state.get("ctl_operation_mode", "Programming + C++"))
     _sidebar_mode_index = list(OPERATION_MODES.keys()).index(_sidebar_mode_current) if _sidebar_mode_current in OPERATION_MODES else 0
@@ -1426,7 +1436,6 @@ if focused_layout:
         st.caption(f"Live refresh active: updating every {refresh_seconds}s")
         time.sleep(refresh_seconds)
         st.rerun()
-    st.stop()
 
 st.subheader("Training Compliance + Always-On Status")
 ts1, ts2, ts3, ts4, ts5 = st.columns(5)
@@ -2435,9 +2444,9 @@ st.subheader("Automatic Learning Zone")
 st.markdown(
     "Use this section for the easiest always-on training path: enable auto learning, keep intelligent shuffle on, and use 35-60s interval for stable growth."
 )
-auto_enabled = st.checkbox("Always run automatic smart learning", value=True)
-auto_interval = st.slider("Auto interval (seconds)", min_value=20, max_value=300, value=45, step=5)
-intelligent_shuffle = st.checkbox("Intelligent shuffle + adaptive profile each cycle", value=True)
+auto_enabled = st.checkbox("Always run automatic smart learning", key="ctl_auto_enabled")
+auto_interval = st.slider("Auto interval (seconds)", min_value=20, max_value=300, step=5, key="ctl_auto_interval")
+intelligent_shuffle = st.checkbox("Intelligent shuffle + adaptive profile each cycle", key="ctl_intelligent_shuffle")
 if st.button("Apply Easy Auto Training Profile", use_container_width=True):
     st.session_state["ctl_operation_mode"] = "Learning Depth"
     st.session_state["ctl_x5_brain_pack"] = True
