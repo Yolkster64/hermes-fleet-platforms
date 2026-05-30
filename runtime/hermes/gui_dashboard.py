@@ -73,41 +73,41 @@ SIZE_MODE_DETAILS = {
     "large-deep": "Full Hermes: deeper reasoning and long-horizon adaptation.",
 }
 HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
-    "vanguard-guardian": {
-        "title": "Balanced Thinker",
-        "swarm_strategy": "mesh",
-        "micro_agents": 176,
-        "gaussian_pressure": 0.84,
-        "high_level_learning": 0.74,
+    "hybrid-core": {
+        "title": "Hybrid",
+        "swarm_strategy": "hybrid",
+        "micro_agents": 188,
+        "gaussian_pressure": 0.83,
+        "high_level_learning": 0.73,
         "techniques": ["KNAA/QNAA reasoning", "Cross-agent communication mesh", "Natural pressure adaptation"],
-        "specialty_tag": "guardian",
+        "specialty_tag": "hybrid",
     },
-    "sql-oracle": {
-        "title": "Deep Thinker",
+    "mesh-swarm": {
+        "title": "Mesh",
+        "swarm_strategy": "mesh",
+        "micro_agents": 210,
+        "gaussian_pressure": 0.85,
+        "high_level_learning": 0.77,
+        "techniques": ["Cross-agent communication mesh", "GNAA adaptive memory", "Multi-parallel swarm"],
+        "specialty_tag": "mesh",
+    },
+    "normal-steady": {
+        "title": "Normal",
         "swarm_strategy": "specialist-mix",
-        "micro_agents": 208,
-        "gaussian_pressure": 0.88,
-        "high_level_learning": 0.79,
-        "techniques": ["Gaussian 3D evidence", "GNAA adaptive memory", "Quantized compression"],
-        "specialty_tag": "sql-oracle",
+        "micro_agents": 164,
+        "gaussian_pressure": 0.78,
+        "high_level_learning": 0.68,
+        "techniques": ["Natural pressure adaptation", "Quantized compression", "KNAA/QNAA reasoning"],
+        "specialty_tag": "normal",
     },
-    "cpp-striker": {
-        "title": "Quick Thinker",
-        "swarm_strategy": "swarm",
-        "micro_agents": 224,
-        "gaussian_pressure": 0.82,
-        "high_level_learning": 0.66,
-        "techniques": ["C++ neural kernel boost", "Multi-parallel swarm", "Quantized compression"],
-        "specialty_tag": "cpp-striker",
-    },
-    "aibox-architect": {
-        "title": "Creative Thinker",
+    "deep-thinker": {
+        "title": "Deep Thinker",
         "swarm_strategy": "multipolar",
-        "micro_agents": 192,
+        "micro_agents": 228,
         "gaussian_pressure": 0.90,
         "high_level_learning": 0.86,
-        "techniques": ["Multipolar ensemble", "GNAA adaptive memory", "Cross-agent communication mesh"],
-        "specialty_tag": "aibox-architect",
+        "techniques": ["Gaussian 3D evidence", "Multipolar ensemble", "GNAA adaptive memory"],
+        "specialty_tag": "deep-thinker",
     },
 }
 MODEL_OPTIONS = [
@@ -179,8 +179,15 @@ def _effective_internet_signal(raw_signal: float, low_cap: bool = False) -> floa
 
 
 def _selected_hermes_type_key() -> str:
-    key = str(st.session_state.get("ctl_hermes_type", "vanguard-guardian"))
-    return key if key in HERMES_TYPE_PRESETS else "vanguard-guardian"
+    key = str(st.session_state.get("ctl_hermes_type", "hybrid-core"))
+    legacy_map = {
+        "vanguard-guardian": "hybrid-core",
+        "sql-oracle": "deep-thinker",
+        "cpp-striker": "mesh-swarm",
+        "aibox-architect": "normal-steady",
+    }
+    mapped = legacy_map.get(key, key)
+    return mapped if mapped in HERMES_TYPE_PRESETS else "hybrid-core"
 
 
 def _selected_model_override() -> str:
@@ -232,7 +239,7 @@ def _initialize_session_state() -> None:
         "ctl_gaussian_pressure": 0.88,
         "ctl_permanent_intelligence": True,
         "ctl_high_level_learning": 0.72,
-        "ctl_hermes_type": "vanguard-guardian",
+        "ctl_hermes_type": "hybrid-core",
         "ctl_model_override": "hermes-fleet-latest",
     }
     for key, value in defaults.items():
@@ -459,7 +466,7 @@ with st.sidebar:
     live_refresh = st.checkbox("Live fleet auto-refresh", value=True)
     refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, value=20, step=5)
     focused_layout = st.checkbox("Focused layout (clean view)", value=True)
-    show_giant_diagram = st.checkbox("Show giant center diagram", value=False)
+    show_legacy_map_ui = st.checkbox("Show legacy AIHub map panels", value=False)
     st.markdown("### Hermes Type + Model")
     hermes_type_labels = {k: str(v.get("title", k)) for k, v in HERMES_TYPE_PRESETS.items()}
     hermes_type_keys = list(hermes_type_labels.keys())
@@ -640,7 +647,7 @@ if LOW_BANDWIDTH_MODE:
     st.caption("Low-bandwidth mode: local-first routing with minimized internet-signal weight for faster, lighter cycles.")
 if USER_ROUTED_INTERNET and not OFFLINE_ONLY_MODE:
     st.caption("Internet mode: routed through your controlled path only (capped low internet-signal).")
-st.subheader("Ultimate Entrance Command Deck")
+st.subheader("Hermes Stability + Entrance")
 ue = ultimate_entrance if isinstance(ultimate_entrance, dict) else {}
 decision_integration = float(growth_data.get("integration_index", 0.0)) if isinstance(growth_data, dict) else 0.0
 decision_adaptive = float(growth_data.get("avg_adaptive_brain", 0.0)) if isinstance(growth_data, dict) else 0.0
@@ -690,51 +697,58 @@ if not focused_layout:
         training_status=training_status if isinstance(training_status, dict) else {},
         cpp_kernel=cpp_kernel if isinstance(cpp_kernel, dict) else {},
     )
-    render_next_level_control_center(
-        sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
-        growth_data=growth_data if isinstance(growth_data, dict) else {},
-        training_status=training_status if isinstance(training_status, dict) else {},
-        watch_payload=watch_payload if isinstance(watch_payload, dict) else {},
-        unified=unified if isinstance(unified, dict) else {},
-        cpp_kernel=cpp_kernel if isinstance(cpp_kernel, dict) else {},
-        ultimate_entrance=ultimate_entrance if isinstance(ultimate_entrance, dict) else {},
-        volume_root=live_volume_root,
-        run_logged_post_action=run_logged_post_action,
-        show_center_nexus=show_giant_diagram,
-    )
-    watch_plan = render_aihub_watch_panels(
-        unified=unified if isinstance(unified, dict) else {},
-        watch_payload=watch_payload if isinstance(watch_payload, dict) else {},
-        gateway_status=gateway_watch if isinstance(gateway_watch, dict) else {},
-        sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
-        training_status=training_status if isinstance(training_status, dict) else {},
-        growth_data=growth_data if isinstance(growth_data, dict) else {},
-        optimizer_state=st.session_state.get("last_chat_optimizer", {}),
-    )
-    if gateway_watch_err:
-        st.caption(f"Gateway watch telemetry pending: {gateway_watch_err}")
-    if st.button("Auto-Design AIHub Plan for Complex Situations", use_container_width=True):
-        payload = watch_plan.get("recommended_payload", {}) if isinstance(watch_plan, dict) else {}
-        run_logged_post_action(
-            label="aihub-max-upgrade",
-            path="/aihub-max-upgrade",
-            payload=payload,
-            success_message="AIHub max-upgrade plan triggered.",
-            error_prefix="AIHub max-upgrade failed",
-            timeout=160,
+    if show_legacy_map_ui:
+        render_next_level_control_center(
+            sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
+            growth_data=growth_data if isinstance(growth_data, dict) else {},
+            training_status=training_status if isinstance(training_status, dict) else {},
+            watch_payload=watch_payload if isinstance(watch_payload, dict) else {},
+            unified=unified if isinstance(unified, dict) else {},
+            cpp_kernel=cpp_kernel if isinstance(cpp_kernel, dict) else {},
+            ultimate_entrance=ultimate_entrance if isinstance(ultimate_entrance, dict) else {},
+            volume_root=live_volume_root,
+            run_logged_post_action=run_logged_post_action,
+            show_center_nexus=False,
         )
+        watch_plan = render_aihub_watch_panels(
+            unified=unified if isinstance(unified, dict) else {},
+            watch_payload=watch_payload if isinstance(watch_payload, dict) else {},
+            gateway_status=gateway_watch if isinstance(gateway_watch, dict) else {},
+            sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
+            training_status=training_status if isinstance(training_status, dict) else {},
+            growth_data=growth_data if isinstance(growth_data, dict) else {},
+            optimizer_state=st.session_state.get("last_chat_optimizer", {}),
+        )
+        if gateway_watch_err:
+            st.caption(f"Gateway watch telemetry pending: {gateway_watch_err}")
+        if st.button("Auto-Design AIHub Plan for Complex Situations", use_container_width=True):
+            payload = watch_plan.get("recommended_payload", {}) if isinstance(watch_plan, dict) else {}
+            run_logged_post_action(
+                label="aihub-max-upgrade",
+                path="/aihub-max-upgrade",
+                payload=payload,
+                success_message="AIHub max-upgrade plan triggered.",
+                error_prefix="AIHub max-upgrade failed",
+                timeout=160,
+            )
 else:
-    st.caption("Focused mode hides diagram-heavy legacy panels for a cleaner UI.")
+    st.caption("Focused mode hides legacy diagram/map sections for a cleaner UI.")
 
 if focused_layout:
-    st.subheader("Focused SQL + Upgrade Center")
+    st.subheader("Focused Hermes Center")
+    render_fleet_showcase_panels(
+        sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
+        growth_data=growth_data if isinstance(growth_data, dict) else {},
+        training_status=training_status if isinstance(training_status, dict) else {},
+        cpp_kernel=cpp_kernel if isinstance(cpp_kernel, dict) else {},
+    )
     render_sql_intelligence_panels(
         sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
         render_xp_bar=render_xp_bar,
         run_logged_post_action=run_logged_post_action,
         high_level_learning=float(st.session_state.get("ctl_high_level_learning", 0.72)),
     )
-    st.caption("Focused layout is ON: advanced legacy sections are hidden to keep the UI clean and centered.")
+    st.caption("Focused layout is ON: legacy map UI is hidden so Hermes + SQL stay clean and stable.")
     if live_refresh:
         st.caption(f"Live refresh active: updating every {refresh_seconds}s")
         time.sleep(refresh_seconds)

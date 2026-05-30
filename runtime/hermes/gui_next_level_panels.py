@@ -116,7 +116,7 @@ def render_next_level_control_center(
     st.markdown("### Next-Level AIHub + SQL Command Center")
     st.markdown('<div class="hermes-glow"><span class="recommended-pill">RECOMMENDED</span> <span class="cool-title">Lighter visual mode + richer data controls + instant reports</span></div>', unsafe_allow_html=True)
 
-    tabs = st.tabs(["SQL Center", "AIHub Lab", "Fleet Map", "Evidence Advisor", "Security + Benchmark", "Clock + Style"])
+    tabs = st.tabs(["SQL Center", "AIHub Lab", "Fleet Table", "Evidence Advisor", "Security + Benchmark", "Clock + Style"])
     sql_health = sql_intel.get("sql_health", {}) if isinstance(sql_intel, dict) else {}
     if not isinstance(sql_health, dict):
         sql_health = {}

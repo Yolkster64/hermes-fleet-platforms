@@ -77,22 +77,22 @@ def _sort_cards(cards: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     )
 
 
-def _god_style_name(specialty: str, level: int) -> str:
+def _profile_style_name(specialty: str, level: int) -> str:
     s = specialty.lower()
     if "security" in s:
-        base = "Aegis Sentinel"
+        base = "Guardian"
     elif "data" in s or "sql" in s:
-        base = "Oracle Weaver"
+        base = "Data Pilot"
     elif "gui" in s or "ux" in s:
-        base = "Nova Artisan"
+        base = "Designer"
     elif "training" in s or "learning" in s:
-        base = "Chronicle Sage"
+        base = "Trainer"
     elif "fleet" in s or "orchestration" in s:
-        base = "Celestial Marshal"
+        base = "Coordinator"
     else:
-        base = "Prism Architect"
-    rank = "I" if level < 20 else ("II" if level < 45 else ("III" if level < 80 else "IV"))
-    return f"{base} {rank}"
+        base = "Builder"
+    tier = "T1" if level < 20 else ("T2" if level < 45 else ("T3" if level < 80 else "T4"))
+    return f"{base} {tier}"
 
 
 def _tool_subset(row: Dict[str, Any], fallback_index: int) -> str:
@@ -117,7 +117,7 @@ def _render_cosmic_scroll(cards: List[Dict[str, Any]]) -> None:
         xp = int(float(row.get("experience_xp", 0.0)))
         avatar = _tiny_avatar(i, size_mode)
         role = _role_for_specialty(specialty)
-        god_name = _god_style_name(specialty, level)
+        profile_name = _profile_style_name(specialty, level)
         tools = _tool_subset(row, i)
         speed = float(row.get("speed_bonus", 0.0)) * 100.0
         token = float(row.get("token_power_gain", 0.0)) * 100.0
@@ -129,7 +129,7 @@ def _render_cosmic_scroll(cards: List[Dict[str, Any]]) -> None:
             (
                 f"<div class='hf-card'>"
                 f"<div class='hf-head'><span class='hf-avatar'>{html.escape(avatar)}</span><span>{html.escape(bot_name)}</span></div>"
-                f"<div class='hf-god'>{html.escape(god_name)}</div>"
+                f"<div class='hf-god'>{html.escape(profile_name)}</div>"
                 f"<div class='hf-meta'>{html.escape(role)} • {html.escape(specialty)}</div>"
                 f"<div class='hf-meta'>Tools: {html.escape(tools)}</div>"
                 f"<div class='hf-bar'><span style='width:{xp_pct:.1f}%'></span></div><div class='hf-txt'>XP {xp}</div>"
@@ -143,13 +143,13 @@ def _render_cosmic_scroll(cards: List[Dict[str, Any]]) -> None:
         """
 <style>
 .hf-scroll {display:flex; gap:10px; overflow-x:auto; padding-bottom:8px;}
-.hf-card {min-width:240px; max-width:240px; border:1px solid rgba(121,210,255,0.30); border-radius:12px; padding:10px; background:linear-gradient(145deg, rgba(18,28,52,0.85), rgba(27,20,45,0.85)); box-shadow:0 0 14px rgba(74,172,255,0.18);}
+.hf-card {min-width:240px; max-width:240px; border:1px solid rgba(145,160,190,0.35); border-radius:12px; padding:10px; background:linear-gradient(145deg, rgba(18,22,34,0.90), rgba(16,18,28,0.90)); box-shadow:none;}
 .hf-head {display:flex; align-items:center; gap:8px; font-weight:700; color:#e6f5ff; margin-bottom:2px;}
 .hf-avatar {font-size:1rem;}
-.hf-god {font-size:0.82rem; color:#98f4ff; margin-bottom:2px;}
+.hf-god {font-size:0.82rem; color:#b9d5ff; margin-bottom:2px;}
 .hf-meta {font-size:0.76rem; color:#c9d8ee; margin-top:2px;}
 .hf-bar {height:6px; border-radius:8px; background:rgba(255,255,255,0.12); margin-top:6px; overflow:hidden;}
-.hf-bar span {display:block; height:100%; border-radius:8px; background:linear-gradient(90deg, #46ddff, #9f8eff);}
+.hf-bar span {display:block; height:100%; border-radius:8px; background:linear-gradient(90deg, #5ac7ff, #7f9bff);}
 .hf-txt {font-size:0.72rem; color:#b8cff0;}
 </style>
 """,
@@ -164,7 +164,7 @@ def render_fleet_showcase_panels(
     training_status: Dict[str, Any],
     cpp_kernel: Dict[str, Any],
 ) -> None:
-    st.subheader("Ultimate Fleet Arena")
+    st.subheader("Hermes Fleet Overview")
     profiles = sql_intel.get("recent_hermes_profiles", []) if isinstance(sql_intel, dict) else []
     if not isinstance(profiles, list):
         profiles = []
@@ -190,7 +190,7 @@ def render_fleet_showcase_panels(
     st.progress(min(1.0, maturity), text=f"Fleet maturity {maturity * 100:.1f}%")
     st.progress(min(1.0, integration), text=f"Fleet integration {integration * 100:.1f}%")
 
-    st.markdown("#### Setup + Upgrade Guide (Who / What / Big Area)")
+    st.markdown("#### Setup Guide (Who / What / Area)")
     guide = {
         "Who": "Guardian, Builder, Designer, Data Pilot, Coordinator bots collaborate in parallel.",
         "What": "Focus upgrades on watch efficiency, SQL pattern quality, action/adaptive decision stability, and AIHub routing quality.",
@@ -224,9 +224,9 @@ def render_fleet_showcase_panels(
         st.caption("No saved Hermes profiles yet — run training to populate the fleet arena cards.")
         return
 
-    st.markdown("#### Cosmic Hermes Row (scroll each guardian)")
+    st.markdown("#### Hermes Row")
     _render_cosmic_scroll(cards)
-    st.markdown("#### Bot Designs, Names, Tiny Pics, Bars, Accessories")
+    st.markdown("#### Bot Cards")
     for chunk_start in range(0, len(cards), 4):
         cols = st.columns(4)
         for idx, (col, row) in enumerate(zip(cols, cards[chunk_start : chunk_start + 4])):
