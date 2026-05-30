@@ -977,6 +977,55 @@ def _ultimate_super_plan(
     }
 
 
+def _major_training_campaign(
+    *,
+    steps: int,
+    candidates: int,
+    sql_signal: float,
+    llm_signal: float,
+    stability_bias: float,
+    training_variables: dict[str, float],
+    super_plan: dict[str, float],
+    sql_intel: dict[str, object],
+) -> dict[str, float]:
+    pattern_score = float(sql_intel.get("pattern_score", 0.5)) if isinstance(sql_intel, dict) else 0.5
+    trend = float(sql_intel.get("trend", 0.0)) if isinstance(sql_intel, dict) else 0.0
+    evidence = sql_intel.get("evidence", {}) if isinstance(sql_intel, dict) else {}
+    evidence_score = float(evidence.get("score", 0.0)) if isinstance(evidence, dict) else 0.0
+    watch_eff = float(training_variables.get("watch_efficiency", 0.5))
+    conscious_eff = float(training_variables.get("conscious_efficiency", 0.5))
+    composite_eff = float(training_variables.get("composite_efficiency", 0.5))
+    confidence = float(training_variables.get("efficiency_confidence", 0.5))
+    optimizer_force = float(super_plan.get("optimizer_force", 0.5))
+    pressure = _clamp01(
+        (max(0.0, -trend) * 0.28)
+        + ((1.0 - pattern_score) * 0.20)
+        + ((1.0 - evidence_score) * 0.20)
+        + ((1.0 - watch_eff) * 0.14)
+        + ((1.0 - composite_eff) * 0.10)
+        + ((1.0 - confidence) * 0.08)
+    )
+    campaign_boost = _clamp01(
+        (pressure * 0.46)
+        + (optimizer_force * 0.24)
+        + ((1.0 - conscious_eff) * 0.12)
+        + ((1.0 - confidence) * 0.10)
+        + (max(0.0, trend) * 0.08)
+    )
+    scale = 1.0 + (campaign_boost * 0.32) - (max(0.0, trend) * 0.06)
+    return {
+        "steps": float(min(1280, max(220, int(steps * scale)))),
+        "candidates": float(min(760, max(120, int(candidates * (0.96 + (campaign_boost * 0.48)))))),
+        "sql_signal": float(_clamp01(max(0.60, min(0.997, sql_signal + (campaign_boost * 0.08) + (pressure * 0.04))))),
+        "llm_signal": float(_clamp01(max(0.64, min(0.997, llm_signal + (campaign_boost * 0.09))))),
+        "stability_bias": float(_clamp01(max(0.58, min(0.997, stability_bias + ((1.0 - pressure) * 0.05) + (confidence * 0.04))))),
+        "training_pressure": float(pressure),
+        "campaign_boost": float(campaign_boost),
+        "scale": float(scale),
+        "evidence_score": float(evidence_score),
+    }
+
+
 def _brain_fusion_scores(
     *,
     weighted_reward: float,
@@ -1159,6 +1208,21 @@ def run_cycle() -> None:
     sql_signal = float(super_plan["sql_signal"])
     llm_signal = float(super_plan["llm_signal"])
     stability_bias = float(super_plan["stability_bias"])
+    major_campaign = _major_training_campaign(
+        steps=pulse_steps,
+        candidates=pulse_candidates,
+        sql_signal=sql_signal,
+        llm_signal=llm_signal,
+        stability_bias=stability_bias,
+        training_variables=training_variables,
+        super_plan=super_plan,
+        sql_intel=_last_sql_intel if isinstance(_last_sql_intel, dict) else {},
+    )
+    pulse_steps = int(major_campaign["steps"])
+    pulse_candidates = int(major_campaign["candidates"])
+    sql_signal = float(major_campaign["sql_signal"])
+    llm_signal = float(major_campaign["llm_signal"])
+    stability_bias = float(major_campaign["stability_bias"])
     _emit_signal(
         "auto_trainer.max_upgrade_plan",
         float(max_plan["uplift"]),
@@ -1188,6 +1252,36 @@ def run_cycle() -> None:
             "sql_signal": sql_signal,
             "llm_signal": llm_signal,
             "stability_bias": stability_bias,
+        },
+        timeout=30,
+    )
+    _emit_signal(
+        "auto_trainer.major_training_campaign",
+        float(major_campaign["campaign_boost"]),
+        {
+            "cycle": _cycle,
+            "training_pressure": float(major_campaign["training_pressure"]),
+            "campaign_boost": float(major_campaign["campaign_boost"]),
+            "scale": float(major_campaign["scale"]),
+            "evidence_score": float(major_campaign["evidence_score"]),
+            "steps": pulse_steps,
+            "candidates": pulse_candidates,
+            "sql_signal": sql_signal,
+            "llm_signal": llm_signal,
+            "stability_bias": stability_bias,
+            "training_variables": training_variables,
+        },
+        timeout=30,
+    )
+    _emit_signal(
+        "auto_trainer.aihub_training_pressure",
+        float(major_campaign["training_pressure"]),
+        {
+            "cycle": _cycle,
+            "training_pressure": float(major_campaign["training_pressure"]),
+            "campaign_boost": float(major_campaign["campaign_boost"]),
+            "evidence_score": float(major_campaign["evidence_score"]),
+            "training_variables": training_variables,
         },
         timeout=30,
     )
