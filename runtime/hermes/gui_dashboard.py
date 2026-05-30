@@ -170,6 +170,68 @@ HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
         "specialty_tag": "official-creative",
     },
 }
+ALGORITHMIC_HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
+    "algo-knaa-qnaa": {
+        "title": "Algorithmic KNAA/QNAA",
+        "group": "Original Algorithmic",
+        "personality": "High-precision formal reasoner for structured decision trees.",
+        "description": "Optimized for deep logic paths, strict decomposition, and robust correctness checks.",
+        "swarm_strategy": "specialist-mix",
+        "micro_agents": 240,
+        "gaussian_pressure": 0.89,
+        "high_level_learning": 0.84,
+        "techniques": ["KNAA/QNAA reasoning", "Quantized compression", "Cross-agent communication mesh"],
+        "specialty_tag": "algo-knaa-qnaa",
+    },
+    "algo-gnaa-memory": {
+        "title": "Algorithmic GNAA Memory",
+        "group": "Original Algorithmic",
+        "personality": "Long-memory optimizer focused on retention quality and historical coherence.",
+        "description": "Best for memory-heavy training with persistent improvement loops.",
+        "swarm_strategy": "mesh",
+        "micro_agents": 224,
+        "gaussian_pressure": 0.86,
+        "high_level_learning": 0.88,
+        "techniques": ["GNAA adaptive memory", "Cross-agent communication mesh", "Natural pressure adaptation"],
+        "specialty_tag": "algo-gnaa-memory",
+    },
+    "algo-gaussian-3d": {
+        "title": "Algorithmic Gaussian 3D",
+        "group": "Original Algorithmic",
+        "personality": "Signal-shape analyst that emphasizes probabilistic stability and anomaly sensing.",
+        "description": "Great for SQL trend quality and training health optimization.",
+        "swarm_strategy": "multipolar",
+        "micro_agents": 232,
+        "gaussian_pressure": 0.93,
+        "high_level_learning": 0.87,
+        "techniques": ["Gaussian 3D evidence", "GNAA adaptive memory", "Quantized compression"],
+        "specialty_tag": "algo-gaussian-3d",
+    },
+    "algo-multipolar-ensemble": {
+        "title": "Algorithmic Multipolar Ensemble",
+        "group": "Original Algorithmic",
+        "personality": "Diverse parallel planner that compares multiple reasoning poles in real time.",
+        "description": "Good for strategy diversity and resilient fallback choices.",
+        "swarm_strategy": "multipolar",
+        "micro_agents": 248,
+        "gaussian_pressure": 0.91,
+        "high_level_learning": 0.86,
+        "techniques": ["Multipolar ensemble", "Multi-parallel swarm", "Cross-agent communication mesh"],
+        "specialty_tag": "algo-multipolar",
+    },
+    "algo-chaos-trials": {
+        "title": "Algorithmic Chaos Trials",
+        "group": "Original Algorithmic",
+        "personality": "Exploration-first variant that stress-tests edges and unusual paths.",
+        "description": "Use for aggressive search and unconventional optimization runs.",
+        "swarm_strategy": "swarm",
+        "micro_agents": 256,
+        "gaussian_pressure": 0.95,
+        "high_level_learning": 0.80,
+        "techniques": ["Chaos engine trials", "Multi-parallel swarm", "GNAA adaptive memory"],
+        "specialty_tag": "algo-chaos",
+    },
+}
 MODEL_OPTIONS = [
     "hermes-fleet-latest",
     "hermes-fleet-mini",
@@ -238,6 +300,16 @@ def _effective_internet_signal(raw_signal: float, low_cap: bool = False) -> floa
     return raw_signal
 
 
+def _use_algorithmic_presets() -> bool:
+    return bool(st.session_state.get("ctl_enable_algorithmic_types", False))
+
+
+def _active_hermes_presets() -> Dict[str, Dict[str, Any]]:
+    if _use_algorithmic_presets():
+        return {**HERMES_TYPE_PRESETS, **ALGORITHMIC_HERMES_TYPE_PRESETS}
+    return dict(HERMES_TYPE_PRESETS)
+
+
 def _selected_hermes_type_key() -> str:
     key = str(st.session_state.get("ctl_hermes_type", "hybrid-core"))
     legacy_map = {
@@ -247,7 +319,8 @@ def _selected_hermes_type_key() -> str:
         "aibox-architect": "normal-steady",
     }
     mapped = legacy_map.get(key, key)
-    return mapped if mapped in HERMES_TYPE_PRESETS else "hybrid-core"
+    presets = _active_hermes_presets()
+    return mapped if mapped in presets else "hybrid-core"
 
 
 def _selected_model_override() -> str:
@@ -256,7 +329,7 @@ def _selected_model_override() -> str:
 
 def _specialty_base() -> str:
     type_key = _selected_hermes_type_key()
-    tag = str(HERMES_TYPE_PRESETS.get(type_key, {}).get("specialty_tag", type_key))
+    tag = str(_active_hermes_presets().get(type_key, {}).get("specialty_tag", type_key))
     return f"fleet:{tag}"
 
 
@@ -300,6 +373,7 @@ def _initialize_session_state() -> None:
         "ctl_permanent_intelligence": True,
         "ctl_high_level_learning": 0.72,
         "ctl_hermes_type": "hybrid-core",
+        "ctl_enable_algorithmic_types": False,
         "ctl_model_override": "hermes-fleet-latest",
     }
     for key, value in defaults.items():
@@ -530,8 +604,10 @@ with st.sidebar:
     refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, value=20, step=5)
     focused_layout = st.checkbox("Focused layout (clean view)", value=True)
     show_legacy_map_ui = st.checkbox("Show AIHub Hub + Map panels", value=True)
+    st.checkbox("Enable original algorithmic Hermes types", value=False, key="ctl_enable_algorithmic_types")
     st.markdown("### Hermes Type + Model")
-    hermes_type_labels = {k: str(v.get("title", k)) for k, v in HERMES_TYPE_PRESETS.items()}
+    active_type_presets = _active_hermes_presets()
+    hermes_type_labels = {k: str(v.get("title", k)) for k, v in active_type_presets.items()}
     hermes_type_keys = list(hermes_type_labels.keys())
     current_type = _selected_hermes_type_key()
     hermes_type_index = hermes_type_keys.index(current_type) if current_type in hermes_type_keys else 0
@@ -542,7 +618,7 @@ with st.sidebar:
         format_func=lambda key: hermes_type_labels.get(key, key),
         key="ctl_hermes_type",
     )
-    selected_preset = HERMES_TYPE_PRESETS.get(selected_hermes_type, {})
+    selected_preset = active_type_presets.get(selected_hermes_type, {})
     st.caption(
         f"{selected_preset.get('group', 'Custom')} • "
         f"{selected_preset.get('personality', 'Adaptive Hermes profile.')}"
@@ -557,7 +633,7 @@ with st.sidebar:
     s1, s2 = st.columns(2)
     with s1:
         if st.button("Apply Type Preset", use_container_width=True):
-            preset = HERMES_TYPE_PRESETS.get(selected_hermes_type, {})
+            preset = active_type_presets.get(selected_hermes_type, {})
             st.session_state["ctl_swarm_strategy"] = str(preset.get("swarm_strategy", st.session_state.get("ctl_swarm_strategy", "hybrid")))
             st.session_state["ctl_micro_agents"] = int(preset.get("micro_agents", st.session_state.get("ctl_micro_agents", 160)))
             st.session_state["ctl_gaussian_pressure"] = float(preset.get("gaussian_pressure", st.session_state.get("ctl_gaussian_pressure", 0.8)))
@@ -692,6 +768,7 @@ st.caption(
     f"auto_setup={int(float(bond_signals.get('auto_setup', 0.0)))} | sql_load(db/wal)={float(bond.get('db_mb', 0.0)):.1f}/{float(bond.get('wal_mb', 0.0)):.1f}MB"
 )
 with st.expander("Hermes Type Catalog + Optimization Tips", expanded=False):
+    catalog_presets = _active_hermes_presets()
     st.dataframe(
         [
             {
@@ -704,12 +781,14 @@ with st.expander("Hermes Type Catalog + Optimization Tips", expanded=False):
                 "gaussian": float(preset.get("gaussian_pressure", 0.0)),
                 "learning": float(preset.get("high_level_learning", 0.0)),
             }
-            for key, preset in HERMES_TYPE_PRESETS.items()
+            for key, preset in catalog_presets.items()
             if isinstance(preset, dict)
         ],
         use_container_width=True,
         hide_index=True,
     )
+    if not _use_algorithmic_presets():
+        st.caption("Turn on 'Enable original algorithmic Hermes types' in the sidebar to load the full legacy ML algorithm catalog.")
     st.markdown(
         "- **Optimization tip:** use Quick/Hybrid for deployment speed, Mesh/Creative for collaboration breadth, and Deep modes for harder reasoning.\n"
         "- **Stability tip:** keep gaussian pressure in 0.78-0.90 for consistent SQL growth quality.\n"
