@@ -503,6 +503,65 @@ if st.button("Auto Buy Mix +40 (50% Hermes Core / 50% X Core)", use_container_wi
         _save_agent_state()
         st.success(f"Added {to_add} optimized agents (Hermes Core: {hermes_add}, X Core: {x_add}).")
 
+if st.button("Train Fleet 500 + Improve Everything", use_container_width=True):
+    current_total = len(st.session_state["agents"])
+    open_slots = max(0, MAX_AGENTS_ALLOWED - current_total)
+    if open_slots > 0:
+        hermes_add = open_slots // 2
+        x_add = open_slots - hermes_add
+        hermes_existing = [a for a in st.session_state["agents"] if str(a.get("name", "")).startswith("hermes-auto-")]
+        x_existing = [a for a in st.session_state["agents"] if str(a.get("name", "")).startswith("xcore-auto-")]
+        next_h = len(hermes_existing) + 1
+        next_x = len(x_existing) + 1
+        for i in range(hermes_add):
+            _upsert_agent(_build_auto_mix_agent(f"hermes-auto-{next_h + i:03d}", "Hermes"))
+        for i in range(x_add):
+            _upsert_agent(_build_auto_mix_agent(f"xcore-auto-{next_x + i:03d}", "X"))
+    for agent in st.session_state["agents"]:
+        agent["fleet_mode"] = "adaptive"
+        agent["training_active"] = True
+        agent["deployed"] = True
+        agent["deployed_utc"] = datetime.now(timezone.utc).isoformat()
+    st.session_state["auto_full_fleet_improve"] = True
+    st.session_state["improvement_roles"] = [
+        "analyzer",
+        "optimizer",
+        "planner",
+        "feature-architect",
+        "gui-designer",
+        "builder",
+        "tester",
+        "reviewer",
+        "performance-tuner",
+        "sql-comprehension",
+    ]
+    _save_agent_state()
+    if st.session_state["login_ok"]:
+        roles_tag = "-".join(st.session_state["improvement_roles"][:8])
+        _apply_aihub_upgrade(
+            st.session_state["api_key"],
+            specialty=f"fleet500-improve-everything-aihub-{roles_tag}",
+            steps=560,
+            candidates=240,
+            sql_signal=0.98,
+            internet_signal=0.90,
+            llm_signal=max(0.90, llm_signal),
+            stability_bias=0.96,
+        )
+        _run_learning_sql_pulse(
+            st.session_state["api_key"],
+            specialty=f"fleet500-improve-everything-learning-{roles_tag}",
+            steps=560,
+            candidates=240,
+            sql_signal=0.98,
+            internet_signal=0.90,
+            llm_signal=max(0.90, llm_signal),
+            stability_bias=0.95,
+        )
+        st.success("Fleet 500 training and improvement run started.")
+    else:
+        st.info("Fleet prepared for 500 training. Log in to start backend improvement runs.")
+
 saved_agent_names = [str(a.get("name", "")).strip() for a in st.session_state["agents"] if str(a.get("name", "")).strip()]
 max_agents_allowed = MAX_AGENTS_ALLOWED
 current_agents = len(saved_agent_names)
@@ -702,6 +761,9 @@ if st.session_state["agents"]:
         st.metric("Fleet Synergy Bonus", f"+{fleet_synergy_bonus}%")
     with dm4:
         st.metric("AIHub/LLM Bonus", f"+{aihub_lm_bonus}%")
+    if bool(st.session_state.get("auto_full_fleet_improve", False)):
+        active_roles = st.session_state.get("improvement_roles", [])
+        st.caption(f"Fleet 500 improve-everything mode active: {', '.join([str(r) for r in active_roles])}")
 
     st.subheader("Agent Board")
     st.dataframe(pd.DataFrame(display_rows), use_container_width=True, hide_index=True)
@@ -780,8 +842,25 @@ if st.session_state["login_ok"]:
             llm_signal=llm_signal,
             stability_bias=0.94,
         )
+        full_improve_ok = True
+        if bool(st.session_state.get("auto_full_fleet_improve", False)) and fleet_count >= 500:
+            roles = st.session_state.get(
+                "improvement_roles",
+                ["analyzer", "optimizer", "planner", "gui-designer", "builder", "tester"],
+            )
+            roles_tag = "-".join([str(r) for r in roles[:8]])
+            full_improve_ok, _ = _run_learning_sql_pulse(
+                st.session_state["api_key"],
+                specialty=f"fleet500-full-auto-improve-{roles_tag}",
+                steps=560,
+                candidates=240,
+                sql_signal=0.99,
+                internet_signal=0.92,
+                llm_signal=max(0.92, llm_signal),
+                stability_bias=0.97,
+            )
         st.session_state["last_auto_upgrade_ts"] = now_ts
-        if aihub_ok and learn_ok and jvc_ok:
+        if aihub_ok and learn_ok and jvc_ok and full_improve_ok:
             st.success("Automatic backend upgrades completed (including JVC learning).")
 
 st.divider()
