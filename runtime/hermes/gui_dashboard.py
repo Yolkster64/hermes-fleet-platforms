@@ -371,6 +371,28 @@ OPERATION_MODES: Dict[str, Dict[str, Any]] = {
         "learning_delta": 0.10,
     },
 }
+SMART_TOOL_CATALOG: Dict[str, Dict[str, str]] = {
+    "code-analysis": {"focus": "C++ Coding", "desc": "Static + semantic analysis for correctness and refactor safety.", "llm_bonus": "Boosts reasoning prompts with code-structure context.", "split": "Splits by module and dependency graph."},
+    "sql-pattern-mining": {"focus": "Efficiency", "desc": "Extracts SQL patterns and storage signals for training optimization.", "llm_bonus": "Feeds query shape and trend context to LLM routing.", "split": "Splits by table/metric families."},
+    "fleet-deploy-ops": {"focus": "Deploy/Return", "desc": "Coordinates deploy and bring-back cycles with safe orchestration.", "llm_bonus": "Adds orchestration state for command planning.", "split": "Splits by unit cohorts and batch size."},
+    "chaos-engine-lab": {"focus": "Resilience", "desc": "Runs controlled chaos trials to harden strategy under variance.", "llm_bonus": "Supplies adversarial edge cases for robustness tuning.", "split": "Splits by chaos scenario class."},
+    "multi-parallel-orchestrator": {"focus": "Throughput", "desc": "Expands multi-parallel execution with adaptive lane balancing.", "llm_bonus": "Enriches token budget by parallel result synthesis.", "split": "Splits by parallel lanes + merge policy."},
+    "idealist-policy-guard": {"focus": "Security AI", "desc": "Applies policy guardrails and high-integrity constraints.", "llm_bonus": "Improves safety-aware model routing.", "split": "Splits by policy tier and risk class."},
+    "aihub-routing-optimizer": {"focus": "LLM Bonus", "desc": "Optimizes model selection for speed/cost/quality balance.", "llm_bonus": "Directly increases routing bonus quality.", "split": "Splits by provider and task class."},
+    "brain-fusion-monitor": {"focus": "Brain Integration", "desc": "Monitors learning/decision/conscious fusion quality.", "llm_bonus": "Improves prompt grounding with brain metrics.", "split": "Splits by brain channel."},
+    "cpp-compile-advisor": {"focus": "C++ Coding", "desc": "Targets compile-time bottlenecks and build stability.", "llm_bonus": "Adds compile diagnostics to coding prompts.", "split": "Splits by target and compiler profile."},
+    "ui-polish-engine": {"focus": "UI/UX", "desc": "Improves clarity, spacing, and interaction flow.", "llm_bonus": "Provides UX heuristics for generation quality.", "split": "Splits by panel and interaction type."},
+    "security-threat-modeler": {"focus": "Security AI", "desc": "Models threat paths and hardens decision policies.", "llm_bonus": "Adds threat context for safer completions.", "split": "Splits by attack surface."},
+    "efficiency-tuner": {"focus": "Efficiency", "desc": "Balances latency, throughput, and stability for sustained load.", "llm_bonus": "Improves high-efficiency response plans.", "split": "Splits by resource pool."},
+    "llm-bonus-bridge": {"focus": "LLM Bonus", "desc": "Bridges internal metrics to external LLM bonus shaping.", "llm_bonus": "Direct bonus amplification path.", "split": "Splits by bonus channel."},
+    "split-merge-planner": {"focus": "Splitting", "desc": "Plans split/merge trees for complex tasks and recovery.", "llm_bonus": "Improves decomposition prompts and re-aggregation.", "split": "Splits by objective tree depth."},
+    "toolchain-skill-mapper": {"focus": "Tools", "desc": "Maps smart tools to workload types automatically.", "llm_bonus": "Raises tool-aware plan quality.", "split": "Splits by workload profile."},
+    "adaptive-memory-weaver": {"focus": "Learning", "desc": "Weaves memory traces for stronger long-horizon retention.", "llm_bonus": "Adds richer historical context to prompts.", "split": "Splits by memory epoch."},
+    "truth-shield-guardian": {"focus": "Security AI", "desc": "Protects truth/safety channels under adversarial pressure.", "llm_bonus": "Improves trust-calibrated model choice.", "split": "Splits by trust zone."},
+    "network-signal-fuser": {"focus": "Integration", "desc": "Fuses SQL/internet/LLM signals for unified guidance.", "llm_bonus": "Strengthens multi-signal context blending.", "split": "Splits by signal source."},
+    "agent-skill-amplifier": {"focus": "Fleets", "desc": "Amplifies 3-skill role packs per Hermes unit.", "llm_bonus": "Improves role-specialized generation quality.", "split": "Splits by role class."},
+    "x6-learning-extender": {"focus": "X6 Learning", "desc": "Extends X5 training with deeper X6 learning pressure.", "llm_bonus": "Increases long-form reasoning gain.", "split": "Splits by stage (X1..X6)."},
+}
 MODEL_OPTIONS = [
     "hermes-fleet-latest",
     "hermes-fleet-mini",
@@ -546,7 +568,7 @@ def _initialize_session_state() -> None:
         "last_chat": "",
         "ctl_study_areas": ["Optimization", "AIHub", "Truth & Safety", "Fleet Topology"],
         "ctl_techniques": ["KNAA/QNAA reasoning", "Quantized compression", "Multi-parallel swarm", "Multipolar ensemble", "Natural pressure adaptation"],
-        "ctl_smart_tools": ["code-analysis", "sql-pattern-mining", "fleet-deploy-ops"],
+        "ctl_smart_tools": ["code-analysis", "sql-pattern-mining", "fleet-deploy-ops", "x6-learning-extender"],
         "ctl_swarm_strategy": "hybrid",
         "ctl_micro_agents": 200,
         "ctl_gaussian_pressure": 0.88,
@@ -557,6 +579,7 @@ def _initialize_session_state() -> None:
         "ctl_enable_algorithmic_types": True,
         "ctl_operation_mode": "Programming + C++",
         "ctl_x5_brain_pack": False,
+        "ctl_x6_learning_pack": True,
         "ctl_auto_x10_setup": True,
         "ctl_both_sides_training": True,
         "ctl_model_override": "hermes-fleet-latest",
@@ -1298,8 +1321,15 @@ ts5.metric("GitHub Knowledge Sync", "Active" if github_sync else "Pending")
 if not is_training_active:
     st.warning("Training appears idle. Use 'Force Training Pulse Now' to restart immediate learning.")
 if st.button("Force Training Pulse Now", use_container_width=True):
-    pulse_steps = 1100 if bool(st.session_state.get("ctl_x5_brain_pack", False)) else 220
-    pulse_candidates = 700 if bool(st.session_state.get("ctl_x5_brain_pack", False)) else 140
+    if bool(st.session_state.get("ctl_x6_learning_pack", True)):
+        pulse_steps = 1320
+        pulse_candidates = 840
+    elif bool(st.session_state.get("ctl_x5_brain_pack", False)):
+        pulse_steps = 1100
+        pulse_candidates = 700
+    else:
+        pulse_steps = 220
+        pulse_candidates = 140
     run_logged_post_action(
         label="force-training-pulse",
         path="/learning-pulse",
@@ -1395,6 +1425,7 @@ mode = st.radio("Training Mode (4 modes)", list(OPERATION_MODES.keys()), horizon
 mode_cfg = OPERATION_MODES.get(mode, {})
 max_mode = mode in ("Intensive Throughput", "Learning Depth")
 x5_brain_pack = st.checkbox("Enable Ultimate Brain X5 Pack", key="ctl_x5_brain_pack")
+x6_learning_pack = st.checkbox("Enable Hermes X6 Learning Plus", key="ctl_x6_learning_pack")
 auto_x10_setup = st.checkbox("Auto setup X10 (training + brain + SQL)", key="ctl_auto_x10_setup")
 both_sides_training = st.checkbox("Both-sides training active", key="ctl_both_sides_training")
 st.caption("Hermes sizes: mini units focus speed; full-size units focus deep reasoning and retention.")
@@ -1424,6 +1455,8 @@ if x5_brain_pack:
         st.session_state["ctl_techniques"] = [str(t) for t in x5_preset.get("techniques", st.session_state.get("ctl_techniques", []))]
         st.success("Ultimate ML X5 type + brain setup applied.")
         st.rerun()
+if x6_learning_pack:
+    st.caption("X6 Learning Plus is ON: inherits Hermes/X5 stack and adds deeper long-horizon learning extension.")
 if auto_x10_setup:
     st.caption("Auto X10 setup keeps training, brain, and SQL optimization pipelines warm automatically.")
 if both_sides_training:
@@ -1472,16 +1505,7 @@ with st.expander("Advanced Intelligence Techniques"):
 st.markdown("#### Smart Skills + Tools")
 smart_tools = st.multiselect(
     "Enable smart operational tools",
-    [
-        "code-analysis",
-        "sql-pattern-mining",
-        "fleet-deploy-ops",
-        "chaos-engine-lab",
-        "multi-parallel-orchestrator",
-        "idealist-policy-guard",
-        "aihub-routing-optimizer",
-        "brain-fusion-monitor",
-    ],
+    list(SMART_TOOL_CATALOG.keys()),
     key="ctl_smart_tools",
 )
 st.caption(
@@ -1489,6 +1513,25 @@ st.caption(
     f"{', '.join(smart_tools) if smart_tools else 'none'} | "
     "Recommended for max setup: chaos-engine-lab + multi-parallel-orchestrator + brain-fusion-monitor."
 )
+st.markdown(
+    "<div style='font-family:Segoe UI, Inter, Arial; font-size:1.05rem; font-weight:700; color:#dff3ff;'>"
+    "Smart Tool Architecture (20 integrated tools)</div>",
+    unsafe_allow_html=True,
+)
+tool_rows: List[Dict[str, str]] = []
+for tool_key in list(SMART_TOOL_CATALOG.keys()):
+    meta = SMART_TOOL_CATALOG.get(tool_key, {})
+    tool_rows.append(
+        {
+            "Tool": tool_key,
+            "Ideal for": str(meta.get("focus", "")),
+            "Description": str(meta.get("desc", "")),
+            "LLM bonus connection": str(meta.get("llm_bonus", "")),
+            "How splitting works": str(meta.get("split", "")),
+            "Enabled": "Yes" if tool_key in smart_tools else "No",
+        }
+    )
+st.dataframe(tool_rows, use_container_width=True, hide_index=True)
 
 st.subheader("Activity Goal Profile (Fast User Controls)")
 entry_defaults = default_user_entry_profile()
@@ -1546,6 +1589,7 @@ activity_profile = {
     "solo_preference": solo_preference,
     "dynamic_response": dynamic_response,
     "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)),
+    "x6_learning_pack": bool(st.session_state.get("ctl_x6_learning_pack", True)),
     "smart_tools": list(st.session_state.get("ctl_smart_tools", [])),
 }
 if st.button("Apply Activity Profile Now", use_container_width=True):
@@ -1584,6 +1628,14 @@ if bool(st.session_state.get("ctl_x5_brain_pack", False)):
     if "X5 brain fusion pipeline" not in extra_techniques:
         extra_techniques.append("X5 brain fusion pipeline")
     technique_profile["techniques"] = extra_techniques[:8]
+if bool(st.session_state.get("ctl_x6_learning_pack", True)):
+    technique_profile["micro_agents"] = int(max(16, min(256, int(technique_profile.get("micro_agents", 160)) + 24)))
+    technique_profile["gaussian_pressure"] = float(max(0.40, min(1.00, float(technique_profile.get("gaussian_pressure", 0.80)) + 0.03)))
+    technique_profile["high_level_learning"] = float(max(0.0, min(1.0, float(technique_profile.get("high_level_learning", 0.72)) + 0.08)))
+    extra_techniques = list(technique_profile.get("techniques", []))
+    if "X6 learning extension" not in extra_techniques:
+        extra_techniques.append("X6 learning extension")
+    technique_profile["techniques"] = extra_techniques[:10]
 if bool(st.session_state.get("ctl_auto_x10_setup", True)):
     if "auto_x10_setup_done" not in st.session_state:
         st.session_state["auto_x10_setup_done"] = False
@@ -1595,6 +1647,7 @@ if bool(st.session_state.get("ctl_auto_x10_setup", True)):
                 "steps": 680,
                 "candidates": 380,
                 "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)),
+                "x6_learning_pack": bool(st.session_state.get("ctl_x6_learning_pack", True)),
                 "sql_signal": 0.97,
                 "internet_signal": 0.06 if not OFFLINE_ONLY_MODE else 0.0,
                 "llm_signal": 0.95,
@@ -1633,6 +1686,7 @@ with sync1:
                 "techniques": technique_profile["techniques"],
                 "study_areas": study_areas,
                 "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)),
+                "x6_learning_pack": bool(st.session_state.get("ctl_x6_learning_pack", True)),
                 "smart_tools": list(st.session_state.get("ctl_smart_tools", [])),
             },
         }
@@ -1704,6 +1758,7 @@ with io3:
                 "gaussian_pressure": float(technique_profile.get("gaussian_pressure", 0.8)),
                 "high_level_learning": float(technique_profile.get("high_level_learning", 0.72)),
                 "x5_brain_pack": bool(st.session_state.get("ctl_x5_brain_pack", False)),
+                "x6_learning_pack": bool(st.session_state.get("ctl_x6_learning_pack", True)),
                 "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)),
                 "smart_tools": list(st.session_state.get("ctl_smart_tools", [])),
             },
@@ -1717,12 +1772,12 @@ with io4:
     if st.button("Send Deploy + Return Cycle", use_container_width=True):
         deploy_result, deploy_err = safe_post(
             "/runtime-orchestrate/deploy",
-            {"mode": "deploy", "scope": "batch", "batch_size": 12, "specialty": _specialty_base(), "steps": 260, "candidates": 180, "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True))},
+            {"mode": "deploy", "scope": "batch", "batch_size": 12, "specialty": _specialty_base(), "steps": 260, "candidates": 180, "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)), "x6_learning_pack": bool(st.session_state.get("ctl_x6_learning_pack", True))},
             timeout=120,
         )
         return_result, return_err = safe_post(
             "/runtime-orchestrate/return",
-            {"mode": "return", "units": 12, "specialty": _specialty_base(), "reason": "gui-data-io-cycle", "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True))},
+            {"mode": "return", "units": 12, "specialty": _specialty_base(), "reason": "gui-data-io-cycle", "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)), "x6_learning_pack": bool(st.session_state.get("ctl_x6_learning_pack", True))},
             timeout=120,
         )
         if deploy_err or return_err:
@@ -2209,6 +2264,7 @@ if not st.session_state["auto_boot_done"]:
             "steps": 260,
             "candidates": 180,
             "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)),
+            "x6_learning_pack": bool(st.session_state.get("ctl_x6_learning_pack", True)),
         },
         timeout=90,
     )

@@ -158,6 +158,8 @@ This runtime enables:
   - GUI now shows per-Hermes level/XP/speed bonus/token gain bars, GitHub CLI connection panel, and fleet lock/unlock controls for hard-problem mode
   - Data I/O command center now separates **Get data** (read runtime state) vs **Send data** (push signals/commands) with deploy+return cycle controls
   - Both-sides training control is now first-class in GUI and propagated to training/setup/deploy signals
+  - Smart architecture panel now includes 20 integrated tool types with descriptions, LLM bonus connections, and split/merge behavior guidance
+  - X6 Learning Plus extends Hermes/X5 learning depth and is integrated across training/setup payloads
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
   - Deep Auto Learning Zone (`♾️`) with study-area targeting and multi-round comparison
   - Advanced intelligence controls: KNAA/QNAA, quantization, multi-parallel swarm, multipolar strategy, gaussian pressure, permanent memory mode
