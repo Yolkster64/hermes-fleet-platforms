@@ -123,6 +123,7 @@ _HTTP_SESSION = requests.Session()
 _HTTP_SESSION.mount("http://", HTTPAdapter(pool_connections=24, pool_maxsize=24, max_retries=0))
 _HTTP_SESSION.mount("https://", HTTPAdapter(pool_connections=12, pool_maxsize=12, max_retries=0))
 _cpp_status_cache: dict[str, object] = {"cycle": 0, "payload": {"available": False}}
+_last_sql_intel: dict[str, object] = {"rows": 0, "pattern_score": 0.0, "trend": 0.0, "variable_means": {}}
 
 STRATEGY_ALGOS: dict[str, dict[str, float]] = {
     "nano-swarm": {"sql_boost": 0.05, "internet_boost": 0.09, "llm_boost": 0.06, "stability_boost": -0.02, "step_mult": 0.82, "candidate_mult": 1.35},
@@ -779,8 +780,35 @@ def _emit_knowledge_sync(
     )
 
 
+def _max_upgrade_training_plan(
+    pulse_steps: int,
+    pulse_candidates: int,
+    sql_signal: float,
+    llm_signal: float,
+    stability_bias: float,
+    training_variables: dict[str, float],
+    previous_sql_intel: dict[str, object],
+    chaos_rate: float,
+) -> dict[str, float]:
+    pattern_score = float(previous_sql_intel.get("pattern_score", 0.5)) if isinstance(previous_sql_intel, dict) else 0.5
+    trend = float(previous_sql_intel.get("trend", 0.0)) if isinstance(previous_sql_intel, dict) else 0.0
+    watch_eff = float(training_variables.get("watch_efficiency", 0.5))
+    retention = float(training_variables.get("retention_strength", 0.5))
+    complexity = _clamp01((max(0.0, -trend) * 0.40) + ((1.0 - pattern_score) * 0.35) + ((1.0 - watch_eff) * 0.25))
+    uplift = 1.0 + (complexity * 0.40) + (chaos_rate * 0.10) + (0.12 if MAX_MODE else 0.05)
+    return {
+        "steps": float(min(980, max(160, int(pulse_steps * uplift)))),
+        "candidates": float(min(620, max(80, int(pulse_candidates * (0.96 + (complexity * 0.38)))))),
+        "sql_signal": float(_clamp01(max(0.55, min(0.99, sql_signal + (complexity * 0.08) + ((1.0 - retention) * 0.04))))),
+        "llm_signal": float(_clamp01(max(0.60, min(0.99, llm_signal + (complexity * 0.07) + ((1.0 - watch_eff) * 0.05))))),
+        "stability_bias": float(_clamp01(max(0.55, min(0.99, stability_bias + (complexity * 0.06) + (retention * 0.03))))),
+        "complexity": float(complexity),
+        "uplift": float(uplift),
+    }
+
+
 def run_cycle() -> None:
-    global _cycle, _volume_root
+    global _cycle, _volume_root, _last_sql_intel
     _cycle += 1
     active_specialty = _active_specialty(_cycle)
     skill_pack = _selected_skills(_cycle)
@@ -861,6 +889,37 @@ def run_cycle() -> None:
         else min(500, max(FLEET_CANDIDATES, 240) + int(dynamic_micro_agents * 0.2))
     )
     pulse_candidates = min(520, max(48, int(pulse_candidates * algo_profile["candidate_mult"] * factors["ratio_candidates"])))
+    max_plan = _max_upgrade_training_plan(
+        pulse_steps=pulse_steps,
+        pulse_candidates=pulse_candidates,
+        sql_signal=sql_signal,
+        llm_signal=llm_signal,
+        stability_bias=stability_bias,
+        training_variables=training_variables,
+        previous_sql_intel=_last_sql_intel,
+        chaos_rate=chaos_rate,
+    )
+    pulse_steps = int(max_plan["steps"])
+    pulse_candidates = int(max_plan["candidates"])
+    sql_signal = float(max_plan["sql_signal"])
+    llm_signal = float(max_plan["llm_signal"])
+    stability_bias = float(max_plan["stability_bias"])
+    _emit_signal(
+        "auto_trainer.max_upgrade_plan",
+        float(max_plan["uplift"]),
+        {
+            "cycle": _cycle,
+            "complexity": float(max_plan["complexity"]),
+            "uplift": float(max_plan["uplift"]),
+            "steps": pulse_steps,
+            "candidates": pulse_candidates,
+            "sql_signal": sql_signal,
+            "llm_signal": llm_signal,
+            "stability_bias": stability_bias,
+            "training_variables": training_variables,
+        },
+        timeout=30,
+    )
     if _cycle % 3 == 0 or MAX_MODE:
         _comparison_upgrade_pass(occasion, focus, _cycle, pulse_steps, pulse_candidates)
     pulse_out = {}
@@ -931,6 +990,7 @@ def run_cycle() -> None:
                     {"cycle": _cycle, "prune_stats": prune_stats},
                     timeout=20,
                 )
+            _last_sql_intel = sql_intel if isinstance(sql_intel, dict) else _last_sql_intel
             _emit_signal(
                 "auto_trainer.sql_pattern",
                 float(sql_intel.get("pattern_score", signal_score)),
