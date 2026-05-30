@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHttpClient("hermes", client =>
@@ -32,6 +33,7 @@ var offlineOnlyMode = ReadBoolEnv("HERMES_OFFLINE_ONLY", false);
 var userRoutedInternet = ReadBoolEnv("HERMES_USER_ROUTED_INTERNET", true);
 var sessionTtlHours = Math.Max(1, int.TryParse(Environment.GetEnvironmentVariable("HERMES_SESSION_TTL_HOURS"), out var ttl) ? ttl : 12);
 var authSessions = new ConcurrentDictionary<string, DateTimeOffset>();
+var gatewayStats = new ConcurrentDictionary<string, GatewayRouteStats>();
 
 string NewSessionToken()
 {
@@ -128,6 +130,16 @@ async Task<IResult> ProxyPostJson(
     return Results.Content(body, "application/json", statusCode: (int)response.StatusCode);
 }
 
+app.Use(async (context, next) =>
+{
+    var sw = Stopwatch.StartNew();
+    await next();
+    sw.Stop();
+    var key = $"{context.Request.Method} {context.Request.Path.Value ?? "/"}";
+    var stat = gatewayStats.GetOrAdd(key, _ => new GatewayRouteStats());
+    stat.Record(sw.Elapsed.TotalMilliseconds, context.Response.StatusCode >= 400);
+});
+
 app.MapGet("/", () =>
     Results.Json(new
     {
@@ -138,6 +150,8 @@ app.MapGet("/", () =>
             "/auth/login",
             "/health",
             "/system-watch",
+            "/gateway-max-status",
+            "/aihub-max-upgrade",
             "/snapshot",
             "/learning-growth",
             "/training-status",
@@ -280,6 +294,90 @@ app.MapGet("/system-watch", async (IHttpClientFactory factory, HttpContext conte
         cpp_kernel_status = cppTask.Result,
         aihub_bonus = bonusTask.Result,
         knowledge_mesh = meshTask.Result
+    });
+});
+
+app.MapGet("/gateway-max-status", (HttpContext context) =>
+{
+    if (!Authorized(context))
+        return Results.Unauthorized();
+    var topRoutes = gatewayStats
+        .OrderByDescending(kvp => kvp.Value.Requests)
+        .Take(24)
+        .Select(kvp => new
+        {
+            route = kvp.Key,
+            requests = kvp.Value.Requests,
+            errors = kvp.Value.Errors,
+            avg_ms = kvp.Value.AverageMs,
+            max_ms = kvp.Value.MaxMs
+        })
+        .ToArray();
+    return Results.Json(new
+    {
+        timestamp_utc = DateTimeOffset.UtcNow,
+        gateway = new
+        {
+            service = "hermes-gateway",
+            routes_tracked = gatewayStats.Count,
+            low_bandwidth_mode = lowBandwidthMode,
+            offline_only_mode = offlineOnlyMode,
+            user_routed_internet = userRoutedInternet
+        },
+        routes = topRoutes
+    });
+});
+
+app.MapPost("/aihub-max-upgrade", async (IHttpClientFactory factory, GatewayMaxUpgradeRequest request, HttpContext context) =>
+{
+    if (!Authorized(context))
+        return Results.Unauthorized();
+    using var client = factory.CreateClient("hermes");
+    AttachBackendKey(client);
+    var specialty = string.IsNullOrWhiteSpace(request.Specialty) ? "fleet:max-upgrade" : request.Specialty;
+    using var curateResp = await client.PostAsJsonAsync(
+        $"{backendUrl}/curate-learning",
+        new
+        {
+            sql_signal = Math.Clamp(request.SqlSignal, 0.55, 0.99),
+            internet_signal = Math.Clamp(request.InternetSignal, 0.0, 0.30),
+            llm_signal = Math.Clamp(request.LlmSignal, 0.60, 0.99),
+            stability_bias = Math.Clamp(request.StabilityBias, 0.60, 0.99)
+        },
+        context.RequestAborted
+    );
+    using var pulseResp = await client.PostAsJsonAsync(
+        $"{backendUrl}/learning-pulse",
+        new
+        {
+            specialty,
+            steps = Math.Clamp(request.Steps, 120, 1400),
+            candidates = Math.Clamp(request.Candidates, 80, 500),
+            sql_signal = Math.Clamp(request.SqlSignal, 0.55, 0.99),
+            internet_signal = Math.Clamp(request.InternetSignal, 0.0, 0.30),
+            llm_signal = Math.Clamp(request.LlmSignal, 0.60, 0.99),
+            stability_bias = Math.Clamp(request.StabilityBias, 0.60, 0.99)
+        },
+        context.RequestAborted
+    );
+    var curateBody = await curateResp.Content.ReadAsStringAsync(context.RequestAborted);
+    var pulseBody = await pulseResp.Content.ReadAsStringAsync(context.RequestAborted);
+    return Results.Json(new
+    {
+        ok = curateResp.IsSuccessStatusCode && pulseResp.IsSuccessStatusCode,
+        mode = "aihub-max-upgrade",
+        request = new
+        {
+            specialty,
+            steps = Math.Clamp(request.Steps, 120, 1400),
+            candidates = Math.Clamp(request.Candidates, 80, 500),
+            sql_signal = Math.Clamp(request.SqlSignal, 0.55, 0.99),
+            internet_signal = Math.Clamp(request.InternetSignal, 0.0, 0.30),
+            llm_signal = Math.Clamp(request.LlmSignal, 0.60, 0.99),
+            stability_bias = Math.Clamp(request.StabilityBias, 0.60, 0.99)
+        },
+        curate = new { status = (int)curateResp.StatusCode, body = curateBody },
+        learning_pulse = new { status = (int)pulseResp.StatusCode, body = pulseBody }
     });
 });
 
@@ -559,3 +657,38 @@ public sealed record RuntimeBridgeTransferRequest(
     string DeploymentScope = "all",
     double Reliability = 0.8);
 public sealed record DedupeRequest(string[] Roots, int MaxFileMb = 8);
+public sealed record GatewayMaxUpgradeRequest(
+    string Specialty = "fleet:max-upgrade",
+    int Steps = 520,
+    int Candidates = 240,
+    double SqlSignal = 0.90,
+    double InternetSignal = 0.12,
+    double LlmSignal = 0.94,
+    double StabilityBias = 0.84);
+
+public sealed class GatewayRouteStats
+{
+    private long _requests;
+    private long _errors;
+    private double _totalMs;
+    private double _maxMs;
+    private readonly object _sync = new();
+
+    public long Requests => Interlocked.Read(ref _requests);
+    public long Errors => Interlocked.Read(ref _errors);
+    public double AverageMs => Requests <= 0 ? 0.0 : (_totalMs / Requests);
+    public double MaxMs => _maxMs;
+
+    public void Record(double elapsedMs, bool isError)
+    {
+        Interlocked.Increment(ref _requests);
+        if (isError)
+            Interlocked.Increment(ref _errors);
+        lock (_sync)
+        {
+            _totalMs += elapsedMs;
+            if (elapsedMs > _maxMs)
+                _maxMs = elapsedMs;
+        }
+    }
+}

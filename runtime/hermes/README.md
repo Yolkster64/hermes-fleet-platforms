@@ -61,6 +61,8 @@ This runtime enables:
 - C# orchestration control-plane endpoints:
   - `POST /auth/login` (session token for gateway auth)
   - `GET /system-watch` (aggregated watch endpoint: health + snapshot + training + cpp + SQL/AIHub-linked signals)
+  - `GET /gateway-max-status` (high-visibility gateway telemetry: route counts/errors/latency)
+  - `POST /aihub-max-upgrade` (one-shot max AIHub curation + learning-pulse upgrade path)
   - `POST /runtime-orchestrate/deploy` (C#-dispatched learning pulse + optimize deploy flow, supports batch deploy sizing)
   - `POST /runtime-orchestrate/return` (return Hermes units signal path for controlled pullback)
   - `POST /runtime-orchestrate/restore` (restore/swap orchestration signal path)

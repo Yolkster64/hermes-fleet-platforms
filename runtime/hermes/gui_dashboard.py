@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Tuple
 
 import streamlit as st
 from gui_api_client import API_BASE, log_text, run_logged_post_action, safe_get, safe_post
+from gui_evolution_panels import render_evolution_centerpiece, render_learning_graphs
 from gui_insights import fleet_score_history, latest_learned_profile, render_learning_diagram, render_xp_bar
 from gui_sql_panels import render_sql_intelligence_panels
 from gui_volume_tools import (
@@ -358,6 +359,8 @@ configured_hermes = int(st.session_state.get("ctl_micro_agents", 0))
 total_hermes = runtime_hermes if runtime_hermes > 0 else configured_hermes
 active_hermes = len([a for a in agent_rows if a["active"]])
 avg_progress = (sum(a["progress"] for a in agent_rows) / total_hermes) if total_hermes else 0.0
+live_volume_root = resolve_volume_root()
+live_sql_intel = read_sql_training_intelligence(live_volume_root)
 
 c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("System", "Online" if not unified_err else "Offline")
@@ -391,6 +394,13 @@ if LOW_BANDWIDTH_MODE:
 if USER_ROUTED_INTERNET and not OFFLINE_ONLY_MODE:
     st.caption("Internet mode: routed through your controlled path only (capped low internet-signal).")
 render_learning_diagram()
+render_evolution_centerpiece(
+    agent_rows=agent_rows,
+    sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
+    growth_data=growth_data if isinstance(growth_data, dict) else {},
+    training_status=training_status if isinstance(training_status, dict) else {},
+)
+render_learning_graphs(live_sql_intel if isinstance(live_sql_intel, dict) else {})
 
 st.subheader("Training Compliance + Always-On Status")
 ts1, ts2, ts3, ts4, ts5 = st.columns(5)

@@ -434,6 +434,7 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
     rewards = [float(r[2]) for r in rows]
     truths = [float(r[3]) for r in rows]
     shapes = [float(r[4]) for r in rows]
+    tail_n = min(64, len(rows))
     var_buckets: Dict[str, List[float]] = {}
     for r in rows:
         payload = json.loads(r[5]) if isinstance(r[5], str) and r[5] else {}
@@ -482,6 +483,10 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
         "reward_avg": float(sum(rewards) / len(rewards)),
         "truth_avg": float(sum(truths) / len(truths)),
         "shape_avg": float(sum(shapes) / len(shapes)),
+        "signal_series": signals[-tail_n:],
+        "reward_series": rewards[-tail_n:],
+        "truth_series": truths[-tail_n:],
+        "shape_series": shapes[-tail_n:],
         "variable_means": variable_means,
         "art_pattern": art_pattern,
         "latest_github": github_payload,
