@@ -599,6 +599,17 @@ def inject_majestic_theme() -> None:
 .stApp::after {background: conic-gradient(from 180deg at 50% 50%, rgba(130,190,255,0.00) 0deg, rgba(130,190,255,0.12) 55deg, rgba(116,145,255,0.00) 120deg, rgba(116,145,255,0.10) 220deg, rgba(130,190,255,0.00) 360deg); opacity:0.22; transform-origin:50% 50%; animation: monadoSpin 46s linear infinite;}
 @keyframes monadoDrift {0% {transform: translate3d(-2%, -1%, 0) scale(1.0);} 100% {transform: translate3d(2%, 1.5%, 0) scale(1.05);}}
 @keyframes monadoSpin {from {transform: rotate(0deg) scale(1.08);} to {transform: rotate(360deg) scale(1.08);}}
+.block-container {position: relative; z-index: 2;}
+.holo-title {font-size: 2.3rem; font-weight: 800; letter-spacing: 0.4px; margin: 0 0 0.2rem 0; background: linear-gradient(90deg, #d8f5ff 0%, #86d8ff 36%, #b695ff 68%, #8affdf 100%); -webkit-background-clip: text; background-clip: text; color: transparent; animation: holoShift 8s linear infinite;}
+.holo-laser-layer {position: fixed; inset: 0; pointer-events: none; z-index: 1; mix-blend-mode: screen;}
+.holo-laser {position: absolute; left: -20%; width: 140%; height: 2px; opacity: 0.34; background: linear-gradient(90deg, rgba(0,0,0,0), rgba(99,255,240,0.88), rgba(172,121,255,0.78), rgba(0,0,0,0)); filter: blur(0.2px);}
+.holo-laser-a {top: 24%; animation: laserSweepA 8.5s linear infinite;}
+.holo-laser-b {top: 66%; animation: laserSweepB 11.5s linear infinite;}
+.holo-kanji {position: fixed; right: 18px; bottom: 16px; z-index: 1; pointer-events: none; color: rgba(168, 219, 255, 0.26); font-size: 1.18rem; letter-spacing: 0.22rem; font-family: 'Yu Gothic UI', 'MS Gothic', 'Segoe UI', sans-serif; text-shadow: 0 0 8px rgba(133, 204, 255, 0.30); animation: kanjiFloat 6.8s ease-in-out infinite;}
+@keyframes holoShift {0% {filter: hue-rotate(0deg);} 100% {filter: hue-rotate(360deg);}}
+@keyframes laserSweepA {0% {transform: translateY(-8px) scaleX(0.9); opacity: 0.05;} 15% {opacity: 0.48;} 50% {transform: translateY(14px) scaleX(1.05); opacity: 0.18;} 100% {transform: translateY(-8px) scaleX(0.9); opacity: 0.05;}}
+@keyframes laserSweepB {0% {transform: translateY(10px) scaleX(0.92); opacity: 0.04;} 22% {opacity: 0.42;} 50% {transform: translateY(-12px) scaleX(1.04); opacity: 0.20;} 100% {transform: translateY(10px) scaleX(0.92); opacity: 0.04;}}
+@keyframes kanjiFloat {0%,100% {transform: translateY(0);} 50% {transform: translateY(-5px);}}
 .block-container {max-width: 1650px; padding-top: 1.4rem; padding-bottom: 2.2rem;}
 [data-testid="stMetricValue"] {color: #e9f4ff;}
 [data-testid="stSidebar"] {background: linear-gradient(180deg, rgba(12,16,32,0.98), rgba(10,13,26,0.95));}
@@ -829,7 +840,9 @@ def deep_auto_learning_zone(max_mode: bool, study_areas: List[str], rounds: int,
 
 st.set_page_config(page_title="Hermes Control Dashboard", page_icon="🧠", layout="wide")
 inject_majestic_theme()
-st.title("Hermes Fleet Control Dashboard")
+st.markdown('<div class="holo-laser-layer"><div class="holo-laser holo-laser-a"></div><div class="holo-laser holo-laser-b"></div></div>', unsafe_allow_html=True)
+st.markdown('<div class="holo-kanji">斬 盾 学 光 神 機</div>', unsafe_allow_html=True)
+st.markdown('<div class="holo-title">Hermes Fleet Control Dashboard</div>', unsafe_allow_html=True)
 st.caption("Clear control view: runtime status, SQL intelligence, and one-click fleet actions.")
 
 _initialize_session_state()
