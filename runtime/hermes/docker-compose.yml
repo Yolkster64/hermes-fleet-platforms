@@ -1,5 +1,6 @@
 services:
   hermes-api:
+    image: "${HERMES_RUNTIME_IMAGE:-docker.io/yolkster1/dev_workflow:latest}"
     build:
       context: ../..
       dockerfile: runtime/hermes/Dockerfile
@@ -70,6 +71,7 @@ services:
               capabilities: [gpu]
 
   hermes-gui:
+    image: "${HERMES_RUNTIME_IMAGE:-docker.io/yolkster1/dev_workflow:latest}"
     build:
       context: ../..
       dockerfile: runtime/hermes/Dockerfile
@@ -114,6 +116,7 @@ services:
       start_period: 25s
 
   hermes-trainer:
+    image: "${HERMES_RUNTIME_IMAGE:-docker.io/yolkster1/dev_workflow:latest}"
     build:
       context: ../..
       dockerfile: runtime/hermes/Dockerfile
@@ -164,6 +167,7 @@ services:
           memory: 8G
 
   hermes-gateway:
+    image: "${HERMES_GATEWAY_IMAGE:-docker.io/yolkster1/dev_workflow:latest}"
     build:
       context: ../..
       dockerfile: runtime/hermes/Dockerfile.gateway
