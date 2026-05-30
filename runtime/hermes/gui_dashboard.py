@@ -583,6 +583,10 @@ def _initialize_session_state() -> None:
         "ctl_auto_x10_setup": True,
         "ctl_both_sides_training": True,
         "ctl_model_override": "hermes-fleet-latest",
+        "ctl_live_refresh": False,
+        "ctl_refresh_seconds": 20,
+        "ctl_focused_layout": True,
+        "ctl_show_legacy_map_ui": True,
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -873,10 +877,23 @@ with st.sidebar:
     st.caption("Quick login uses local Hermes keys and reconnect checks.")
     st.markdown("### How it works")
     st.caption("1. Send prompt or click auto action\n2. Hermes fleet simulates + learns\n3. Bonus and XP improve")
-    live_refresh = st.checkbox("Live fleet auto-refresh", value=False)
-    refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, value=20, step=5)
-    focused_layout = st.checkbox("Focused layout (clean view)", value=True)
-    show_legacy_map_ui = st.checkbox("Show AIHub Hub + Map panels", value=True)
+    live_refresh = st.checkbox("Live fleet auto-refresh", key="ctl_live_refresh")
+    refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, step=5, key="ctl_refresh_seconds")
+    focused_layout = st.checkbox("Focused layout (clean view)", key="ctl_focused_layout")
+    show_legacy_map_ui = st.checkbox("Show AIHub Hub + Map panels", key="ctl_show_legacy_map_ui")
+    if st.button("Stay Logged In + Data Saver", use_container_width=True):
+        if not str(st.session_state.get("api_key", "")).strip():
+            st.session_state["api_key"] = "local-hermes-ui-key"
+        st.session_state["ctl_live_refresh"] = False
+        st.session_state["ctl_refresh_seconds"] = 60
+        st.session_state["ctl_focused_layout"] = True
+        st.session_state["ctl_show_legacy_map_ui"] = False
+        ping, ping_err = safe_get("/system-watch", timeout=12)
+        if ping_err:
+            st.warning("Data Saver profile applied. Reconnect may still be needed once.")
+        else:
+            st.success("Stay Logged In + Data Saver profile applied and connection is active.")
+        st.rerun()
     st.checkbox("Enable legacy strategy Hermes types", value=True, key="ctl_enable_algorithmic_types")
     st.selectbox("Hermes species", options=["Hybrid", "Normal", "Mesh"], key="ctl_hermes_species")
     _sidebar_mode_current = str(st.session_state.get("ctl_operation_mode", "Programming + C++"))
