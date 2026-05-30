@@ -1313,19 +1313,21 @@ class HermesSuperOrchestrator:
         ultimate_super_signal = _clamp(float(self.store.recent_external_signal_score_by_source("ultimate_super_plan", lookback=120)))
         entrance_signal = _clamp(float(self.store.recent_external_signal_score_by_source("ultimate_entrance", lookback=120)))
         decision_train_signal = _clamp(float(self.store.recent_external_signal_score_by_source("decision_train_brain", lookback=120)))
+        conscious_signal = _clamp(float(self.store.recent_external_signal_score_by_source("conscious_brain", lookback=120)))
         confidence_signal = _clamp(
-            (evidence_ratio * 0.48)
-            + (truth_score * 0.18)
+            (evidence_ratio * 0.44)
+            + (truth_score * 0.16)
             + ((1.0 - chaos_control) * 0.08)
             + (hard_fact_signal * 0.10)
             + (ultimate_super_signal * 0.08)
             + (entrance_signal * 0.04)
             + (decision_train_signal * 0.04)
+            + (conscious_signal * 0.06)
         )
         modifier_gain = _clamp(0.55 + (confidence_signal ** 2.2), 0.35, 1.95)
         caution_level = _clamp(1.0 - confidence_signal)
-        pivot_bias = _clamp((pivot_ratio * 0.46) + (exploration_pressure * 0.21) + (chaos_control * 0.17) + ((1.0 - confidence_signal) * 0.08) + ((1.0 - ultimate_super_signal) * 0.04) + ((1.0 - decision_train_signal) * 0.04))
-        risk_damping = _clamp((stability_signal * 0.45) + (hard_fact_signal * 0.35) + (evidence_ratio * 0.20))
+        pivot_bias = _clamp((pivot_ratio * 0.44) + (exploration_pressure * 0.21) + (chaos_control * 0.16) + ((1.0 - confidence_signal) * 0.08) + ((1.0 - ultimate_super_signal) * 0.04) + ((1.0 - decision_train_signal) * 0.04) + ((1.0 - conscious_signal) * 0.03))
+        risk_damping = _clamp((stability_signal * 0.42) + (hard_fact_signal * 0.30) + (evidence_ratio * 0.16) + (conscious_signal * 0.12))
         range_low = _clamp(center - spread)
         range_high = _clamp(center + spread)
 
@@ -1375,6 +1377,7 @@ class HermesSuperOrchestrator:
             "ultimate_super_signal": ultimate_super_signal,
             "entrance_signal": entrance_signal,
             "decision_train_signal": decision_train_signal,
+            "conscious_signal": conscious_signal,
         }
         self.algorithm_state["adaptive_dynamic_modifiers"] = decision["dynamic_context"]
         mem = self.algorithm_state["adaptive_brain_memory"]
@@ -1442,18 +1445,20 @@ class HermesSuperOrchestrator:
         yield_eff = max(0.0, min(1.0, float(efficiency_profile.get("yield_efficiency", 0.5))))
         dynamic_ctx = adaptive_decision.get("dynamic_context", {}) if isinstance(adaptive_decision, dict) else {}
         decision_train_signal = max(0.0, min(1.0, float(dynamic_ctx.get("decision_train_signal", 0.5))))
+        conscious_signal = max(0.0, min(1.0, float(dynamic_ctx.get("conscious_signal", training_variables.get("conscious_efficiency", 0.5)))))
         confidence_to_pivot = float(big_decision_plan.get("confidence_to_pivot", 0.0)) if isinstance(big_decision_plan, dict) else 0.0
         aggression = max(
             0.0,
             min(
                 1.0,
-                (proactive * 0.30)
-                + (adaptation * 0.18)
-                + (yield_eff * 0.18)
+                (proactive * 0.27)
+                + (adaptation * 0.17)
+                + (yield_eff * 0.16)
                 + (watch_eff * 0.12)
                 + (confidence_to_pivot * 0.10)
-                + ((1.0 - workload_complexity) * 0.07)
+                + ((1.0 - workload_complexity) * 0.06)
                 + (decision_train_signal * 0.05),
+                + (conscious_signal * 0.07),
             ),
         )
         safety_guard = max(
@@ -1465,7 +1470,8 @@ class HermesSuperOrchestrator:
                 + ((1.0 - watch_eff) * 0.16)
                 + (workload_complexity * 0.18)
                 + (0.08 if bool(hard_fact.get("locked", False)) else 0.0)
-                + ((1.0 - decision_train_signal) * 0.04),
+                + ((1.0 - decision_train_signal) * 0.04)
+                + ((1.0 - conscious_signal) * 0.04),
             ),
         )
         rollout_scale = max(0.2, min(1.4, 0.72 + (aggression * 0.56) - (safety_guard * 0.34)))
@@ -1478,6 +1484,7 @@ class HermesSuperOrchestrator:
             "policy_score": policy_score,
             "action_mode": action_mode,
             "decision_train_signal": decision_train_signal,
+            "conscious_signal": conscious_signal,
         }
 
     def _natural_selection(self) -> None:
@@ -2252,6 +2259,7 @@ class HermesSuperOrchestrator:
         signal_stability = max(0.0, min(1.0, float(training_variables.get("signal_stability", 0.5))))
         watch_coverage = max(0.0, min(1.0, float(training_variables.get("watch_coverage", 0.5))))
         watch_efficiency = max(0.0, min(1.0, float(training_variables.get("watch_efficiency", 0.5))))
+        conscious_efficiency = max(0.0, min(1.0, float(training_variables.get("conscious_efficiency", 0.5))))
         action_tail = self.algorithm_state.get("action_brain_memory", [])[-80:]
         action_brain_signal = (sum(action_tail) / len(action_tail)) if action_tail else 0.5
         bonus_tail = self.algorithm_state.get("aihub_bonus_memory", [])[-80:]
@@ -2263,6 +2271,7 @@ class HermesSuperOrchestrator:
         watch_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("watch_signal", lookback=120))))
         aihub_brain_learning_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("aihub_brain_learning", lookback=120))))
         evidence_sql_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("evidence_sql", lookback=120))))
+        conscious_brain_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("conscious_brain", lookback=120))))
         speed_priority = clamp01(speed_priority)
         energy_saver = clamp01(energy_saver)
 
@@ -2297,10 +2306,12 @@ class HermesSuperOrchestrator:
                 + (signal_stability * speed_score * 0.05)
                 + (watch_coverage * cost_score * 0.04)
                 + (watch_efficiency * power_score * 0.06)
+                + (conscious_efficiency * power_score * 0.05)
                 + (action_brain_signal * power_score * 0.07)
                 + (bonus_signal * power_score * 0.05)
                 + (aihub_brain_learning_signal * power_score * 0.08)
                 + (evidence_sql_signal * power_score * 0.06)
+                + (conscious_brain_signal * power_score * 0.07)
             )
             scored.append((blend, p, speed_score, cost_score, power_score))
 
@@ -2326,6 +2337,7 @@ class HermesSuperOrchestrator:
                 "signal_stability": signal_stability,
                 "watch_coverage": watch_coverage,
                 "watch_efficiency": watch_efficiency,
+                "conscious_efficiency": conscious_efficiency,
                 "action_brain_signal": action_brain_signal,
                 "bonus_signal": bonus_signal,
                 "sql_pattern_signal": sql_pattern_signal,
@@ -2335,6 +2347,7 @@ class HermesSuperOrchestrator:
                 "watch_signal": watch_signal,
                 "aihub_brain_learning_signal": aihub_brain_learning_signal,
                 "evidence_sql_signal": evidence_sql_signal,
+                "conscious_brain_signal": conscious_brain_signal,
             },
             "candidates": [
                 {
@@ -2358,6 +2371,7 @@ class HermesSuperOrchestrator:
         watch_signal = self.store.recent_external_signal_score_by_source("watch_signal")
         aihub_brain_learning_signal = self.store.recent_external_signal_score_by_source("aihub_brain_learning")
         evidence_sql_signal = self.store.recent_external_signal_score_by_source("evidence_sql")
+        conscious_brain_signal = self.store.recent_external_signal_score_by_source("conscious_brain")
         movie_mesh_signal = self.store.knowledge_mesh_task_signal("movie")
         media_mesh_signal = self.store.knowledge_mesh_task_signal("media")
         movie_domain_signal = max(0.0, min(1.0, (movie_signal * 0.4) + (media_signal * 0.2) + (movie_mesh_signal * 0.25) + (media_mesh_signal * 0.15)))
@@ -2387,7 +2401,8 @@ class HermesSuperOrchestrator:
                 + (aihub_bridge_signal * 0.05)
                 + (watch_signal * 0.10)
                 + (aihub_brain_learning_signal * 0.08)
-                + (evidence_sql_signal * 0.06),
+                + (evidence_sql_signal * 0.05)
+                + (conscious_brain_signal * 0.06),
             ),
         )
         if persist:

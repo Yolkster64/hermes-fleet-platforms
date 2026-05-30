@@ -115,6 +115,8 @@ This runtime enables:
   - Trainer now emits an `auto_trainer.ultimate_super_plan` signal that adapts pulse steps/candidates and sql/llm/stability weights from SQL health pressure + watch stability + retention
   - Trainer now emits `auto_trainer.aihub_brain_learning` to close the loop between SQL/watch/optimizer learning quality and AIHub routing/bonus logic
   - Trainer now emits `auto_trainer.decision_train_brain` and decision/action brain now consume it for tighter train→decide→act coupling
+  - Trainer now emits `auto_trainer.learning_brain` + `auto_trainer.brain_fusion` to publish merged learning/decision/conscious brain state per cycle
+  - Trainer conscious variables (`conscious_clarity`, `conscious_alignment`, `conscious_resilience`, `conscious_focus`) now feed `conscious_efficiency`, max/super plan scaling, and AIHub learning blend
   - AIHub optimizer now blends watch telemetry (`watch_signal`) with SQL/art/bridge signals for smarter model routing and bonus shaping
   - Hermes trainer now applies a max-upgrade planner per cycle (`auto_trainer.max_upgrade_plan`) that scales steps/candidates/signals from SQL trend + watch efficiency complexity
   - Learning brain now includes an action-brain policy layer (aggression/safety/rollout) for stronger decide+act optimization in training loops

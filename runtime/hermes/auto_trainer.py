@@ -37,17 +37,33 @@ except Exception:  # pragma: no cover
         signal_stability = clamp01(training_variables.get("signal_stability", 0.5))
         anomaly_resistance = clamp01(training_variables.get("anomaly_resistance", 0.5))
         drift_control = clamp01(training_variables.get("drift_control", 0.5))
+        conscious_clarity = clamp01(training_variables.get("conscious_clarity", 0.5))
+        conscious_alignment = clamp01(training_variables.get("conscious_alignment", 0.5))
+        conscious_resilience = clamp01(training_variables.get("conscious_resilience", 0.5))
+        conscious_focus = clamp01(training_variables.get("conscious_focus", 0.5))
         watch_efficiency = clamp01((watch_coverage * 0.35) + (signal_stability * 0.25) + (anomaly_resistance * 0.20) + (drift_control * 0.20))
+        conscious_efficiency = clamp01(
+            (conscious_clarity * 0.30)
+            + (conscious_alignment * 0.30)
+            + (conscious_resilience * 0.22)
+            + (conscious_focus * 0.18)
+        )
         energy_efficiency = clamp01(
-            (success_signal * 0.32) + (monitor * 0.20) + (maturity * 0.16) + ((1.0 - wrongness_signal) * 0.17) + (watch_efficiency * 0.15)
+            (success_signal * 0.30)
+            + (monitor * 0.18)
+            + (maturity * 0.16)
+            + ((1.0 - wrongness_signal) * 0.16)
+            + (watch_efficiency * 0.12)
+            + (conscious_efficiency * 0.08)
         )
         speed_efficiency = clamp01((position_score * 0.36) + (success_signal * 0.25) + (size_factor * 0.19) + (monitor * 0.10) + (signal_stability * 0.10))
-        yield_efficiency = clamp01((energy_efficiency * 0.40) + (speed_efficiency * 0.30) + (maturity * 0.18) + (watch_efficiency * 0.12))
+        yield_efficiency = clamp01((energy_efficiency * 0.36) + (speed_efficiency * 0.30) + (maturity * 0.16) + (watch_efficiency * 0.10) + (conscious_efficiency * 0.08))
         return {
             "energy_efficiency": energy_efficiency,
             "speed_efficiency": speed_efficiency,
             "yield_efficiency": yield_efficiency,
             "watch_efficiency": watch_efficiency,
+            "conscious_efficiency": conscious_efficiency,
         }
 
 
@@ -502,6 +518,10 @@ def _training_factor_profile(data: dict, horizon_profile: dict[str, float]) -> d
     watch_coverage = _clamp01((active_agents / total_agents) * 0.60 + (quality_score * 0.40))
     anomaly_resistance = _clamp01(((1.0 - wrongness_signal) * 0.55) + (signal_stability * 0.25) + (retention_strength * 0.20))
     drift_control = _clamp01((monitor_comparison * 0.45) + (retention_strength * 0.30) + (maturity_signal * 0.25))
+    conscious_clarity = _clamp01((truth_score * 0.40) + (signal_stability * 0.30) + ((1.0 - wrongness_signal) * 0.30))
+    conscious_alignment = _clamp01((monitor_comparison * 0.34) + (maturity_signal * 0.33) + (shape_score * 0.33))
+    conscious_resilience = _clamp01((retention_strength * 0.36) + (anomaly_resistance * 0.34) + (drift_control * 0.30))
+    conscious_focus = _clamp01((float(horizon_profile.get("softening_factor", 0.5)) * 0.38) + (position_score * 0.32) + (knowledge_transfer * 0.30))
     profile = {
         "size_factor": size_factor,
         "position_score": position_score,
@@ -524,6 +544,10 @@ def _training_factor_profile(data: dict, horizon_profile: dict[str, float]) -> d
         "watch_coverage": watch_coverage,
         "anomaly_resistance": anomaly_resistance,
         "drift_control": drift_control,
+        "conscious_clarity": conscious_clarity,
+        "conscious_alignment": conscious_alignment,
+        "conscious_resilience": conscious_resilience,
+        "conscious_focus": conscious_focus,
     }
     profile.update(compute_efficiency_profile(profile))
     return profile
@@ -802,8 +826,9 @@ def _max_upgrade_training_plan(
     pattern_score = float(previous_sql_intel.get("pattern_score", 0.5)) if isinstance(previous_sql_intel, dict) else 0.5
     trend = float(previous_sql_intel.get("trend", 0.0)) if isinstance(previous_sql_intel, dict) else 0.0
     watch_eff = float(training_variables.get("watch_efficiency", 0.5))
+    conscious_eff = float(training_variables.get("conscious_efficiency", 0.5))
     retention = float(training_variables.get("retention_strength", 0.5))
-    complexity = _clamp01((max(0.0, -trend) * 0.40) + ((1.0 - pattern_score) * 0.35) + ((1.0 - watch_eff) * 0.25))
+    complexity = _clamp01((max(0.0, -trend) * 0.38) + ((1.0 - pattern_score) * 0.33) + ((1.0 - watch_eff) * 0.19) + ((1.0 - conscious_eff) * 0.10))
     uplift = 1.0 + (complexity * 0.40) + (chaos_rate * 0.10) + (0.12 if MAX_MODE else 0.05)
     return {
         "steps": float(min(980, max(160, int(pulse_steps * uplift)))),
@@ -833,11 +858,12 @@ def _ultimate_super_plan(
     db_mb = float(sql_health.get("db_mb", 0.0))
     total_cycles = float(sql_health.get("total_cycles", 0.0))
     watch_eff = float(training_variables.get("watch_efficiency", 0.5))
+    conscious_eff = float(training_variables.get("conscious_efficiency", 0.5))
     signal_stability = float(training_variables.get("signal_stability", 0.5))
     retention = float(training_variables.get("retention_strength", 0.5))
     complexity = float(max_plan.get("complexity", 0.5))
     storage_pressure = _clamp01((db_mb / 1024.0) * 0.45 + (total_cycles / 10000.0) * 0.55)
-    optimizer_force = _clamp01((complexity * 0.45) + ((1.0 - watch_eff) * 0.20) + ((1.0 - signal_stability) * 0.20) + ((1.0 - retention) * 0.15))
+    optimizer_force = _clamp01((complexity * 0.42) + ((1.0 - watch_eff) * 0.18) + ((1.0 - signal_stability) * 0.17) + ((1.0 - retention) * 0.13) + ((1.0 - conscious_eff) * 0.10))
     scale = 1.0 + (optimizer_force * 0.28) - (storage_pressure * 0.12)
     return {
         "steps": float(min(1100, max(180, int(steps * scale)))),
@@ -848,6 +874,61 @@ def _ultimate_super_plan(
         "optimizer_force": float(optimizer_force),
         "storage_pressure": float(storage_pressure),
         "scale": float(scale),
+        "conscious_efficiency": float(conscious_eff),
+    }
+
+
+def _brain_fusion_scores(
+    *,
+    weighted_reward: float,
+    learned_truth: float,
+    learned_shape: float,
+    brain_value: dict[str, float],
+    training_variables: dict[str, float],
+    max_plan: dict[str, float],
+    super_plan: dict[str, float],
+    sql_intel: dict[str, object],
+) -> dict[str, float]:
+    pattern_score = float(sql_intel.get("pattern_score", 0.5)) if isinstance(sql_intel, dict) else 0.5
+    trend = _clamp01(max(0.0, float(sql_intel.get("trend", 0.0)))) if isinstance(sql_intel, dict) else 0.0
+    watch_eff = _clamp01(float(training_variables.get("watch_efficiency", 0.5)))
+    conscious_eff = _clamp01(float(training_variables.get("conscious_efficiency", 0.5)))
+    stability = _clamp01(float(training_variables.get("signal_stability", 0.5)))
+    resilience = _clamp01(float(training_variables.get("conscious_resilience", 0.5)))
+    learning_brain = _clamp01(
+        (weighted_reward * 0.26)
+        + (learned_truth * 0.20)
+        + (learned_shape * 0.14)
+        + (_clamp01(float(brain_value.get("value", 0.5))) * 0.16)
+        + (pattern_score * 0.12)
+        + (watch_eff * 0.07)
+        + (stability * 0.05)
+    )
+    decision_brain = _clamp01(
+        (weighted_reward * 0.30)
+        + (learned_truth * 0.22)
+        + (learned_shape * 0.16)
+        + (_clamp01(float(brain_value.get("value", 0.5))) * 0.14)
+        + (_clamp01(float(max_plan.get("uplift", 1.0)) / 2.0) * 0.06)
+        + (conscious_eff * 0.06)
+        + (resilience * 0.06)
+    )
+    conscious_brain = _clamp01(
+        (conscious_eff * 0.34)
+        + (resilience * 0.18)
+        + (stability * 0.15)
+        + (watch_eff * 0.13)
+        + (_clamp01(float(super_plan.get("optimizer_force", 0.5))) * 0.10)
+        + (trend * 0.10)
+    )
+    fusion = _clamp01(
+        (learning_brain * 0.40) + (decision_brain * 0.34) + (conscious_brain * 0.26)
+    )
+    return {
+        "learning_brain": float(learning_brain),
+        "decision_brain": float(decision_brain),
+        "conscious_brain": float(conscious_brain),
+        "fusion_score": float(fusion),
     }
 
 
@@ -879,7 +960,7 @@ def run_cycle() -> None:
     training_variables = _training_factor_profile(data, horizon_profile)
     if VARIABLE_CATALOG:
         ordered: dict[str, float] = {}
-        for section in ("short", "mid", "long", "optimization"):
+        for section in ("short", "mid", "long", "watch", "conscious", "optimization"):
             entries = VARIABLE_CATALOG.get(section, {})
             if isinstance(entries, dict):
                 for key in entries.keys():
@@ -908,8 +989,24 @@ def run_cycle() -> None:
             "chaotic_factor_pack": factors,
             "value_brain": brain_value,
             "horizon_profile": horizon_profile,
+            "training_variables": training_variables,
             "chaos_3d_vector": {"x": x, "y": y, "z": z, "chaos_rate": chaos_rate},
             "cpp_kernel": cpp_kernel,
+        },
+        timeout=30,
+    )
+    _emit_signal(
+        "auto_trainer.conscious_brain",
+        float(training_variables.get("conscious_efficiency", signal_score)),
+        {
+            "cycle": _cycle,
+            "specialty": dynamic_specialty,
+            "conscious_efficiency": float(training_variables.get("conscious_efficiency", 0.5)),
+            "conscious_clarity": float(training_variables.get("conscious_clarity", 0.5)),
+            "conscious_alignment": float(training_variables.get("conscious_alignment", 0.5)),
+            "conscious_resilience": float(training_variables.get("conscious_resilience", 0.5)),
+            "conscious_focus": float(training_variables.get("conscious_focus", 0.5)),
+            "training_variables": training_variables,
         },
         timeout=30,
     )
@@ -1162,11 +1259,13 @@ def run_cycle() -> None:
                 timeout=30,
             )
             aihub_brain_learning = _clamp01(
-                (float(sql_intel.get("pattern_score", 0.5)) * 0.34)
-                + (max(0.0, float(sql_intel.get("trend", 0.0))) * 0.16)
-                + (float(training_variables.get("watch_efficiency", 0.5)) * 0.20)
-                + (float(training_variables.get("signal_stability", 0.5)) * 0.18)
-                + (_clamp01(float(super_plan.get("optimizer_force", 0.5))) * 0.12)
+                (float(sql_intel.get("pattern_score", 0.5)) * 0.30)
+                + (max(0.0, float(sql_intel.get("trend", 0.0))) * 0.14)
+                + (float(training_variables.get("watch_efficiency", 0.5)) * 0.18)
+                + (float(training_variables.get("signal_stability", 0.5)) * 0.14)
+                + (float(training_variables.get("conscious_efficiency", 0.5)) * 0.12)
+                + (float(training_variables.get("conscious_resilience", 0.5)) * 0.06)
+                + (_clamp01(float(super_plan.get("optimizer_force", 0.5))) * 0.06)
             )
             _emit_signal(
                 "auto_trainer.aihub_brain_learning",
@@ -1179,6 +1278,8 @@ def run_cycle() -> None:
                     "trend": float(sql_intel.get("trend", 0.0)),
                     "watch_efficiency": float(training_variables.get("watch_efficiency", 0.5)),
                     "signal_stability": float(training_variables.get("signal_stability", 0.5)),
+                    "conscious_efficiency": float(training_variables.get("conscious_efficiency", 0.5)),
+                    "conscious_resilience": float(training_variables.get("conscious_resilience", 0.5)),
                     "optimizer_force": float(super_plan.get("optimizer_force", 0.5)),
                     "training_variables": training_variables,
                 },
@@ -1241,12 +1342,46 @@ def run_cycle() -> None:
         training_variables=training_variables,
         chaos=(x, y, z, chaos_rate),
     )
-    decision_train_brain = _clamp01(
-        (weighted_reward * 0.34)
-        + (learned_truth * 0.24)
-        + (learned_shape * 0.18)
-        + (_clamp01(float(brain_value.get("value", 0.5))) * 0.16)
-        + (_clamp01(float(max_plan.get("uplift", 1.0)) / 2.0) * 0.08)
+    fusion_scores = _brain_fusion_scores(
+        weighted_reward=weighted_reward,
+        learned_truth=learned_truth,
+        learned_shape=learned_shape,
+        brain_value=brain_value,
+        training_variables=training_variables,
+        max_plan=max_plan,
+        super_plan=super_plan,
+        sql_intel=sql_intel if isinstance(sql_intel, dict) else {},
+    )
+    decision_train_brain = float(fusion_scores.get("decision_brain", 0.5))
+    _emit_signal(
+        "auto_trainer.learning_brain",
+        float(fusion_scores.get("learning_brain", decision_train_brain)),
+        {
+            "cycle": _cycle,
+            "specialty": dynamic_specialty,
+            "learning_brain": float(fusion_scores.get("learning_brain", 0.5)),
+            "fusion_score": float(fusion_scores.get("fusion_score", 0.5)),
+            "weighted_reward": weighted_reward,
+            "truth_score": learned_truth,
+            "shape_score": learned_shape,
+            "pattern_score": float(sql_intel.get("pattern_score", 0.5)) if isinstance(sql_intel, dict) else 0.5,
+            "training_variables": training_variables,
+        },
+        timeout=30,
+    )
+    _emit_signal(
+        "auto_trainer.brain_fusion",
+        float(fusion_scores.get("fusion_score", decision_train_brain)),
+        {
+            "cycle": _cycle,
+            "specialty": dynamic_specialty,
+            "learning_brain": float(fusion_scores.get("learning_brain", 0.5)),
+            "decision_brain": float(fusion_scores.get("decision_brain", 0.5)),
+            "conscious_brain": float(fusion_scores.get("conscious_brain", 0.5)),
+            "fusion_score": float(fusion_scores.get("fusion_score", 0.5)),
+            "training_variables": training_variables,
+        },
+        timeout=30,
     )
     _emit_signal(
         "auto_trainer.decision_train_brain",
@@ -1260,6 +1395,9 @@ def run_cycle() -> None:
             "shape_score": learned_shape,
             "brain_value": float(brain_value.get("value", 0.5)),
             "max_uplift": float(max_plan.get("uplift", 1.0)),
+            "fusion_score": float(fusion_scores.get("fusion_score", 0.5)),
+            "learning_brain": float(fusion_scores.get("learning_brain", 0.5)),
+            "conscious_brain": float(fusion_scores.get("conscious_brain", 0.5)),
             "training_variables": training_variables,
         },
         timeout=30,

@@ -31,6 +31,12 @@ VARIABLE_CATALOG: Dict[str, Dict[str, str]] = {
         "anomaly_resistance": "Resistance to noisy/anomalous signal spikes.",
         "drift_control": "Control strength against long-horizon drift.",
     },
+    "conscious": {
+        "conscious_clarity": "How clearly the system distinguishes truth from noise in current context.",
+        "conscious_alignment": "Alignment between goals, actions, and measured outcomes.",
+        "conscious_resilience": "Ability to preserve decision quality during stress/chaos.",
+        "conscious_focus": "Sustained focus on high-value trajectories over time.",
+    },
     "optimization": {
         "size_factor": "Fleet size utilization ratio.",
         "position_score": "Agent/fleet ranking position quality.",
@@ -70,15 +76,31 @@ def compute_efficiency_profile(training_variables: Dict[str, float]) -> Dict[str
     signal_stability = clamp01(training_variables.get("signal_stability", 0.5))
     anomaly_resistance = clamp01(training_variables.get("anomaly_resistance", 0.5))
     drift_control = clamp01(training_variables.get("drift_control", 0.5))
+    conscious_clarity = clamp01(training_variables.get("conscious_clarity", 0.5))
+    conscious_alignment = clamp01(training_variables.get("conscious_alignment", 0.5))
+    conscious_resilience = clamp01(training_variables.get("conscious_resilience", 0.5))
+    conscious_focus = clamp01(training_variables.get("conscious_focus", 0.5))
     watch_efficiency = clamp01((watch_coverage * 0.35) + (signal_stability * 0.25) + (anomaly_resistance * 0.20) + (drift_control * 0.20))
+    conscious_efficiency = clamp01(
+        (conscious_clarity * 0.30)
+        + (conscious_alignment * 0.30)
+        + (conscious_resilience * 0.22)
+        + (conscious_focus * 0.18)
+    )
     energy_efficiency = clamp01(
-        (success_signal * 0.32) + (monitor * 0.20) + (maturity * 0.16) + ((1.0 - wrongness_signal) * 0.17) + (watch_efficiency * 0.15)
+        (success_signal * 0.30)
+        + (monitor * 0.18)
+        + (maturity * 0.16)
+        + ((1.0 - wrongness_signal) * 0.16)
+        + (watch_efficiency * 0.12)
+        + (conscious_efficiency * 0.08)
     )
     speed_efficiency = clamp01((position_score * 0.36) + (success_signal * 0.25) + (size_factor * 0.19) + (monitor * 0.10) + (signal_stability * 0.10))
-    yield_efficiency = clamp01((energy_efficiency * 0.40) + (speed_efficiency * 0.30) + (maturity * 0.18) + (watch_efficiency * 0.12))
+    yield_efficiency = clamp01((energy_efficiency * 0.36) + (speed_efficiency * 0.30) + (maturity * 0.16) + (watch_efficiency * 0.10) + (conscious_efficiency * 0.08))
     return {
         "energy_efficiency": energy_efficiency,
         "speed_efficiency": speed_efficiency,
         "yield_efficiency": yield_efficiency,
         "watch_efficiency": watch_efficiency,
+        "conscious_efficiency": conscious_efficiency,
     }
