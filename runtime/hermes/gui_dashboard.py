@@ -1933,6 +1933,103 @@ with sync3:
     else:
         st.caption("Carryover ready: run an auto cycle to generate learned profile signals.")
 
+st.subheader("Monado Training + Deployment Control Deck")
+st.caption("One-click controls for manual training, automatic training, chaos training, and optimal top-level mind selection.")
+tm1, tm2 = st.columns([1.8, 1.2])
+with tm1:
+    top_mind_pick = st.selectbox(
+        "Top-level mind",
+        ["Optimal Balanced Mind", "C++ Performance Mind", "Security Fortress Mind", "Learning Hyper Mind"],
+        key="ctl_top_mind_pick_dashboard",
+    )
+    st.caption(
+        "Suggestions: C++ projects -> C++ Performance Mind | secure deployment -> Security Fortress Mind | "
+        "deep adaptive learning -> Learning Hyper Mind | mixed projects -> Optimal Balanced Mind."
+    )
+with tm2:
+    if st.button("Apply Top-Level Mind", use_container_width=True):
+        _, tm_err = safe_post(
+            "/ingest-signal",
+            {
+                "source": "gui_top_level_mind_deck",
+                "signal_score": max(0.0, min(1.0, 0.62 + (technique_profile["high_level_learning"] * 0.28))),
+                "payload": {
+                    "top_mind": top_mind_pick,
+                    "mode": str(st.session_state.get("ctl_operation_mode", "Programming + C++")),
+                    "smart_tools": list(st.session_state.get("ctl_smart_tools", [])),
+                    "x5_brain_pack": bool(st.session_state.get("ctl_x5_brain_pack", False)),
+                    "x6_learning_pack": bool(st.session_state.get("ctl_x6_learning_pack", True)),
+                },
+            },
+            timeout=60,
+        )
+        if tm_err:
+            st.error(f"Top-level mind apply failed: {tm_err}")
+        else:
+            st.success("Top-level mind profile applied.")
+
+tr1, tr2, tr3 = st.columns(3)
+with tr1:
+    if st.button("Manual Training Pulse", use_container_width=True):
+        run_logged_post_action(
+            label="manual-training-pulse",
+            path="/learning-pulse",
+            payload={
+                "specialty": "fleet:manual-training",
+                "steps": 220,
+                "candidates": 140,
+                "sql_signal": technique_profile["sql_signal"],
+                "internet_signal": 0.0 if OFFLINE_ONLY_MODE else technique_profile["internet_signal"],
+                "llm_signal": technique_profile["llm_signal"],
+                "stability_bias": technique_profile["stability_bias"],
+            },
+            success_message="Manual training pulse started.",
+            error_prefix="Manual training failed",
+            timeout=120,
+        )
+with tr2:
+    if st.button("Automatic Training Loop", use_container_width=True):
+        run_logged_post_action(
+            label="automatic-training-loop",
+            path="/learning-pulse",
+            payload={
+                "specialty": "fleet:auto-training",
+                "steps": 620,
+                "candidates": 360,
+                "x5_brain_pack": bool(st.session_state.get("ctl_x5_brain_pack", False)),
+                "x6_learning_pack": bool(st.session_state.get("ctl_x6_learning_pack", True)),
+                "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)),
+                "sql_signal": min(0.99, technique_profile["sql_signal"] + 0.04),
+                "internet_signal": 0.0 if OFFLINE_ONLY_MODE else technique_profile["internet_signal"],
+                "llm_signal": min(0.99, technique_profile["llm_signal"] + 0.03),
+                "stability_bias": min(0.99, technique_profile["stability_bias"] + 0.03),
+            },
+            success_message="Automatic training loop started.",
+            error_prefix="Automatic training failed",
+            timeout=150,
+        )
+with tr3:
+    if st.button("Chaos Training Burst", use_container_width=True):
+        run_logged_post_action(
+            label="chaos-training-burst",
+            path="/learning-pulse",
+            payload={
+                "specialty": "fleet:chaos-training",
+                "steps": 920,
+                "candidates": 480,
+                "x5_brain_pack": bool(st.session_state.get("ctl_x5_brain_pack", False)),
+                "x6_learning_pack": bool(st.session_state.get("ctl_x6_learning_pack", True)),
+                "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)),
+                "sql_signal": min(0.99, technique_profile["sql_signal"] + 0.06),
+                "internet_signal": 0.0 if OFFLINE_ONLY_MODE else min(0.20, technique_profile["internet_signal"] + 0.02),
+                "llm_signal": min(0.99, technique_profile["llm_signal"] + 0.06),
+                "stability_bias": min(0.99, technique_profile["stability_bias"] + 0.01),
+            },
+            success_message="Chaos training burst started.",
+            error_prefix="Chaos training failed",
+            timeout=180,
+        )
+
 st.subheader("Data I/O + Fleet Command Center")
 st.markdown(
     "- **Get data** = read-only pull from runtime (snapshot/training/brain status) so you can inspect current state.\n"

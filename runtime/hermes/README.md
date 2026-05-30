@@ -44,6 +44,12 @@
   - `Apply Web Security Shield`
   - `Apply Web + Fleet Optimization`
 
+### Monado interactive UX upgrades
+- Standalone **AIHub Scroll Zone** now appears below tabs (not only in tab layout).
+- Center SQL area includes **shape studio** (Monado ring / hex / pulse) with interactive intensity bars.
+- Fleet showcase includes **Move Studio** for bot position planning (X/Y/Z).
+- Added one-click **Manual Training Pulse**, **Automatic Training Loop**, and **Chaos Training Burst** controls plus **Top-Level Mind** selector with recommendations.
+
 ## X-Everything Smart Guide (best mix by project)
 
 Use these mixes as baseline presets:

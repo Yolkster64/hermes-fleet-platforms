@@ -325,6 +325,20 @@ def render_fleet_showcase_panels(
     if thought_rows:
         st.caption("Robot thinking/specialization table")
         st.dataframe(thought_rows, use_container_width=True, hide_index=True)
+    st.markdown("#### Fleet Arena Move Studio")
+    st.caption("Move bots around the arena map for planning and presentation.")
+    if cards:
+        bot_names = [_stable_bot_name(i, row) for i, row in enumerate(cards[:20])]
+        pick_name = st.selectbox("Choose bot", bot_names, key="fleet_move_pick")
+        px, py, pz = st.columns(3)
+        x_pos = px.slider("X position", min_value=0, max_value=100, value=50, key="fleet_move_x")
+        y_pos = py.slider("Y position", min_value=0, max_value=100, value=50, key="fleet_move_y")
+        depth = pz.slider("Depth", min_value=0, max_value=100, value=40, key="fleet_move_depth")
+        st.markdown(
+            f"<div style='padding:10px; border-radius:10px; border:1px solid rgba(120,220,255,0.35); background:rgba(20,28,44,0.60);'>"
+            f"<b>{html.escape(pick_name)}</b> position -> X:{x_pos} - Y:{y_pos} - Z:{depth}</div>",
+            unsafe_allow_html=True,
+        )
 
     if not cards:
         st.caption("No saved Hermes profiles yet — run training to populate the fleet arena cards.")

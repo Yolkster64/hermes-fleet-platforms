@@ -17,6 +17,7 @@ def _inject_next_level_theme() -> None:
     st.markdown(
         """
 <style>
+.stApp, .stApp * {font-family: "Segoe UI Variable Text", "Segoe UI", Inter, Arial, sans-serif;}
 .hermes-glow {border: 1px solid rgba(0, 230, 255, 0.45); border-radius: 14px; padding: 12px; background: linear-gradient(120deg, rgba(10,20,40,0.8), rgba(25,25,45,0.65)); box-shadow: 0 0 16px rgba(0, 210, 255, 0.25);}
 .recommended-pill {display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; color: #00101a; background: linear-gradient(90deg, #00f0ff, #7dffb3); font-weight: 700; box-shadow: 0 0 12px rgba(0, 240, 255, 0.45);}
 .cool-title {font-size: 1.1rem; font-weight: 700; letter-spacing: 0.3px;}
@@ -29,6 +30,8 @@ def _inject_next_level_theme() -> None:
 .holo-scan {height: 4px; border-radius: 999px; background: linear-gradient(90deg, rgba(0,0,0,0), rgba(117,246,255,0.9), rgba(186,120,255,0.8), rgba(0,0,0,0)); opacity: 0.66; animation: scanSweep 6.6s linear infinite;}
 .clock-wrap {display:flex; justify-content:center; align-items:center; height:96px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); background: radial-gradient(circle at 50% 20%, rgba(0,255,220,0.15), rgba(20,20,40,0.65));}
 .clock-glow {animation: pulseGlow 1.8s ease-in-out infinite; font-family: 'Segoe UI', Inter, Arial;}
+div.stButton > button {border-radius: 12px; border: 1px solid rgba(117, 216, 255, 0.45); background: linear-gradient(135deg, rgba(31,50,86,0.9), rgba(18,26,48,0.95)); color: #eaf7ff; box-shadow: 0 0 10px rgba(112, 198, 255, 0.28);}
+div.stButton > button:hover {border-color: rgba(145, 233, 255, 0.82); box-shadow: 0 0 14px rgba(112, 198, 255, 0.42);}
 @keyframes pulseGlow {0% {transform: scale(1.0); text-shadow: 0 0 8px rgba(120,220,255,0.35);} 50% {transform: scale(1.03); text-shadow: 0 0 16px rgba(120,220,255,0.75);} 100% {transform: scale(1.0); text-shadow: 0 0 8px rgba(120,220,255,0.35);}}
 @keyframes monadoPulse {0% {transform: scaleX(0.94); opacity: 0.30;} 50% {transform: scaleX(1.06); opacity: 0.85;} 100% {transform: scaleX(0.94); opacity: 0.30;}}
 @keyframes monadoSpinLite {from {transform: rotate(0deg);} to {transform: rotate(360deg);}}
@@ -177,6 +180,16 @@ def render_next_level_control_center(
         st.progress(_clamp01(float(sql_health.get("db_mb", 0.0)) / 1024.0), text="SQL Design Bar • Storage")
         st.progress(_clamp01(float(sql_health.get("wal_mb", 0.0)) / 256.0), text="SQL Design Bar • Write Flow")
         st.progress(_clamp01(float(evidence.get("score", 0.0))), text="SQL Design Bar • Pattern Confidence")
+        st.markdown("#### Center Data Shape Studio")
+        shape = st.selectbox("Shape style", ["Monado Ring", "Hex Grid", "Pulse Sphere"], key="ctl_center_shape_style")
+        shape_intensity = st.slider("Shape intensity", min_value=0.10, max_value=1.00, value=0.68, step=0.01, key="ctl_center_shape_intensity")
+        shape_glow = int(10 + (shape_intensity * 26))
+        shape_symbol = "(O)" if shape == "Monado Ring" else ("[#]" if shape == "Hex Grid" else "(*)")
+        st.markdown(
+            f"<div style='text-align:center; font-size:2.2rem; color:rgba(182,233,255,0.9); text-shadow:0 0 {shape_glow}px rgba(117,228,255,0.75);'>{shape_symbol} {shape_symbol} {shape_symbol}</div>",
+            unsafe_allow_html=True,
+        )
+        st.progress(_clamp01(shape_intensity * 0.92), text=f"{shape} energy")
 
         report_scope = st.selectbox("Instant report scope", ["overview", "sql-health", "evidence", "github-context", "aihub"])
         report_payload = {
@@ -560,3 +573,59 @@ def render_next_level_control_center(
         hhmmss = time.strftime("%H:%M:%S", now_struct)
         st.markdown('<div class="clock-wrap"><h2 class="clock-glow" style="margin:0;">⏱️ ' + hhmmss + "</h2></div>", unsafe_allow_html=True)
         st.caption("Animated Level 5 clock pulse tracks live training watch mode.")
+
+    st.markdown("---")
+    st.markdown("### AIHub Scroll Zone (standalone)")
+    st.caption("Independent AIHub section below the tabs for scrolling workflow.")
+    ah1, ah2, ah3 = st.columns(3)
+    aihub_depth = ah1.slider("Top-level mind depth", min_value=0.10, max_value=1.00, value=0.86, step=0.01, key="ctl_aihub_scroll_depth")
+    aihub_speed = ah2.slider("AIHub response speed", min_value=0.10, max_value=1.00, value=0.74, step=0.01, key="ctl_aihub_scroll_speed")
+    aihub_safe = ah3.slider("AIHub safety bias", min_value=0.10, max_value=1.00, value=0.90, step=0.01, key="ctl_aihub_scroll_safety")
+    top_mind = st.selectbox("Top-level mind selector", ["Optimal Balanced Mind", "C++ Performance Mind", "Security Fortress Mind", "Learning Hyper Mind"], key="ctl_top_mind_selector")
+    st.dataframe(
+        [
+            {"Suggestion": "For C++ + throughput projects", "Best mind": "C++ Performance Mind", "Why": "Higher speed + compile loop efficiency"},
+            {"Suggestion": "For stable production", "Best mind": "Security Fortress Mind", "Why": "Stronger guardrails + safer actions"},
+            {"Suggestion": "For long training cycles", "Best mind": "Learning Hyper Mind", "Why": "Deeper retention + adaptation quality"},
+            {"Suggestion": "For mixed workloads", "Best mind": "Optimal Balanced Mind", "Why": "Best all-around blend"},
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    if st.button("Apply Top-Level Mind Optimally", use_container_width=True):
+        run_logged_post_action(
+            label="top-level-mind-apply",
+            path="/ingest-signal",
+            payload={
+                "source": "gui_top_level_mind",
+                "signal_score": _clamp01((aihub_depth * 0.42) + (aihub_speed * 0.24) + (aihub_safe * 0.34)),
+                "payload": {
+                    "top_mind": top_mind,
+                    "aihub_depth": aihub_depth,
+                    "aihub_speed": aihub_speed,
+                    "aihub_safety": aihub_safe,
+                    "x5_brain_pack": x5_brain_pack,
+                    "x6_learning_pack": x6_learning_pack,
+                    "smart_tools": smart_tools,
+                },
+            },
+            success_message="Top-level mind profile applied.",
+            error_prefix="Top-level mind apply failed",
+            timeout=60,
+        )
+    if st.button("Run AIHub Scroll Upgrade", use_container_width=True):
+        run_logged_post_action(
+            label="aihub-scroll-upgrade",
+            path="/aihub-max-upgrade",
+            payload={
+                "specialty": "fleet:aihub-scroll-zone",
+                "steps": int(740 + (aihub_depth * 260)),
+                "candidates": int(280 + (aihub_speed * 200)),
+                "stability_bias": min(0.99, 0.80 + (aihub_safe * 0.16)),
+                "x5_brain_pack": x5_brain_pack,
+                "x6_learning_pack": x6_learning_pack,
+            },
+            success_message="AIHub scroll-zone upgrade started.",
+            error_prefix="AIHub scroll-zone upgrade failed",
+            timeout=180,
+        )
