@@ -271,6 +271,7 @@ ultimate_x_tier = st.selectbox("Ultimate X Tier", options=["ultimate-x5", "ultim
 
 st.subheader("Global Hermes Learning Core")
 earlier_ultimate_bundle = st.toggle("Everything from earlier or better (Ultimate X bundle)", value=True)
+universal_apply_all = st.toggle("Universal apply: Hermes -> X -> AIHub -> all LLMs", value=True)
 carry_learning_all_agents = st.toggle("Carry learning to all agents", value=True)
 hermes_learning_mode = st.selectbox("Hermes Learning Mode", options=["standard", "advanced", "ultimate"], index=2)
 ai_mind_mode = st.selectbox("AI Mind + Brain Core", options=["balanced", "deep-mind", "ultimate-brain"], index=2)
@@ -466,6 +467,11 @@ with a2:
                 active_xp = max(95, active_xp)
                 active_saber = max(95, active_saber)
 
+            if universal_apply_all:
+                active_learning_share = True
+                active_aihub = "max"
+                active_llm_mesh = ["openai", "anthropic", "gemini", "mistral", "grok", "deepseek", "llama", "qwen"]
+
             pack_count = len(active_packs) if isinstance(active_packs, list) else len(selected_packs)
             if earlier_ultimate_bundle:
                 pack_count = 30
@@ -475,6 +481,8 @@ with a2:
             micro_suffix = f"m{active_micro_count}-{'auto' if active_micro_auto else 'manual'}"
             specialty = f"{agent_type}-{active_brain}-{active_aihub}-{active_learning_mode}-{share_suffix}-{mesh_suffix}-{micro_suffix}"
             specialty = f"{specialty}-{ai_mind_mode}"
+            if universal_apply_all:
+                specialty = f"{specialty}-universal"
             steps = max(60, int(active_training))
             candidates = max(40, min(240, max(pack_count * 8, active_micro_count * 4)))
             sql_signal = max(0.4, min(1.0, active_cpu / 100.0))
@@ -571,6 +579,9 @@ if st.button("Apply Ultimate AIHub for All Agents", use_container_width=True):
             aihub_steps = max(300, training_intensity)
             aihub_candidates = max(120, len(selected_packs) * 12)
             aihub_specialty = f"global-aihub-{hermes_learning_mode}"
+        if universal_apply_all:
+            llm_factor = 0.99
+            aihub_specialty = f"{aihub_specialty}-universal-all"
         ok, err = _apply_aihub_upgrade(
             st.session_state["api_key"],
             specialty=aihub_specialty,
@@ -596,6 +607,8 @@ if st.button("Run Ultimate Learning + AIHub + LLMs", use_container_width=True):
         if earlier_ultimate_bundle:
             llm_factor = 0.99
         flow_specialty = f"ultimate-learning-aihub-llms-{ultimate_x_tier}-{ai_mind_mode}"
+        if universal_apply_all:
+            flow_specialty = f"{flow_specialty}-universal-all"
         aihub_ok, aihub_err = _apply_aihub_upgrade(
             st.session_state["api_key"],
             specialty=f"{flow_specialty}-aihub",
@@ -631,6 +644,8 @@ if st.button("Run Brain Ultimate AI Upgrading", use_container_width=True):
         st.error("Log in first, then run brain upgrade.")
     else:
         brain_upgrade_specialty = f"brain-ultimate-{ultimate_x_tier}-{ai_mind_mode}"
+        if universal_apply_all:
+            brain_upgrade_specialty = f"{brain_upgrade_specialty}-universal-all"
         aihub_ok, aihub_err = _apply_aihub_upgrade(
             st.session_state["api_key"],
             specialty=f"{brain_upgrade_specialty}-aihub",
@@ -672,7 +687,7 @@ if st.button("Run Ultimate Learning + SQL Pulse", use_container_width=True):
             llm_factor = 0.99
         ok, err = _run_learning_sql_pulse(
             st.session_state["api_key"],
-            specialty=f"ultimate-learning-sql-{ai_mind_mode}",
+            specialty=f"ultimate-learning-sql-{ai_mind_mode}{'-universal-all' if universal_apply_all else ''}",
             steps=max(280, training_intensity),
             candidates=max(120, len(selected_packs) * 10),
             sql_signal=sql_signal,
@@ -693,6 +708,8 @@ if st.button("Run Ultimate Everything Now", use_container_width=True):
         st.error("Log in first, then run Ultimate Everything.")
     else:
         backend_specialty = f"ultimate-everything-{ultimate_x_tier}-{ai_mind_mode}"
+        if universal_apply_all:
+            backend_specialty = f"{backend_specialty}-universal-all"
         aihub_ok, aihub_err = _apply_aihub_upgrade(
             st.session_state["api_key"],
             specialty=f"{backend_specialty}-aihub",
