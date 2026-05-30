@@ -331,6 +331,7 @@ with st.sidebar:
 
 watch_payload, watch_err = safe_get("/system-watch", timeout=25)
 gateway_watch, gateway_watch_err = safe_get("/gateway-max-status", timeout=20)
+ultimate_entrance, ultimate_entrance_err = safe_get("/ultimate-entrance-status", timeout=20)
 if not watch_err and isinstance(watch_payload, dict):
     unified = watch_payload.get("unified_config", {}) if isinstance(watch_payload.get("unified_config"), dict) else {}
     bonus_data = watch_payload.get("aihub_bonus", {}) if isinstance(watch_payload.get("aihub_bonus"), dict) else {}
@@ -395,6 +396,33 @@ if LOW_BANDWIDTH_MODE:
     st.caption("Low-bandwidth mode: local-first routing with minimized internet-signal weight for faster, lighter cycles.")
 if USER_ROUTED_INTERNET and not OFFLINE_ONLY_MODE:
     st.caption("Internet mode: routed through your controlled path only (capped low internet-signal).")
+st.subheader("Ultimate Entrance Command Deck")
+ue = ultimate_entrance if isinstance(ultimate_entrance, dict) else {}
+u1, u2, u3, u4, u5 = st.columns(5)
+u1.metric("Entrance Integration", f"{float(ue.get('integration_score', 0.0)) * 100:.1f}%")
+u2.metric("Gateway Reliability", f"{float(ue.get('reliability', 0.0)) * 100:.1f}%")
+u3.metric("Gateway Response", f"{float(ue.get('responsiveness', 0.0)) * 100:.1f}%")
+u4.metric("Route Diversity", f"{float(ue.get('route_diversity', 0.0)) * 100:.1f}%")
+u5.metric("Gateway Errors", str(int(ue.get('errors', 0))))
+if ultimate_entrance_err:
+    st.caption(f"Ultimate entrance telemetry pending: {ultimate_entrance_err}")
+if st.button("Run Ultimate Entrance Upgrade", use_container_width=True):
+    run_logged_post_action(
+        label="ultimate-entrance-upgrade",
+        path="/aihub-max-upgrade",
+        payload={
+            "specialty": "fleet:ultimate-entrance",
+            "steps": 860,
+            "candidates": 340,
+            "sql_signal": 0.95,
+            "internet_signal": 0.08,
+            "llm_signal": 0.97,
+            "stability_bias": 0.90,
+        },
+        success_message="Ultimate entrance upgrade triggered.",
+        error_prefix="Ultimate entrance upgrade failed",
+        timeout=180,
+    )
 render_learning_diagram()
 render_evolution_centerpiece(
     agent_rows=agent_rows,

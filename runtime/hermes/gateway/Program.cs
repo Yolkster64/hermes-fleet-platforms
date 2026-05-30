@@ -151,6 +151,7 @@ app.MapGet("/", () =>
             "/health",
             "/system-watch",
             "/gateway-max-status",
+            "/ultimate-entrance-status",
             "/aihub-max-upgrade",
             "/snapshot",
             "/learning-growth",
@@ -325,6 +326,39 @@ app.MapGet("/gateway-max-status", (HttpContext context) =>
             user_routed_internet = userRoutedInternet
         },
         routes = topRoutes
+    });
+});
+
+app.MapGet("/ultimate-entrance-status", (HttpContext context) =>
+{
+    if (!Authorized(context))
+        return Results.Unauthorized();
+    var totalRequests = gatewayStats.Sum(kvp => kvp.Value.Requests);
+    var totalErrors = gatewayStats.Sum(kvp => kvp.Value.Errors);
+    var avgRouteMs = gatewayStats.Count > 0 ? gatewayStats.Values.Average(s => s.AverageMs) : 0.0;
+    var maxRouteMs = gatewayStats.Count > 0 ? gatewayStats.Values.Max(s => s.MaxMs) : 0.0;
+    var errorRate = totalRequests > 0 ? (double)totalErrors / totalRequests : 0.0;
+    var routeDiversity = Math.Min(1.0, gatewayStats.Count / 48.0);
+    var responsiveness = Math.Clamp(1.0 - (avgRouteMs / 1800.0), 0.0, 1.0);
+    var reliability = Math.Clamp(1.0 - (errorRate * 2.0), 0.0, 1.0);
+    var integrationScore = Math.Clamp((routeDiversity * 0.28) + (responsiveness * 0.36) + (reliability * 0.36), 0.0, 1.0);
+    return Results.Json(new
+    {
+        timestamp_utc = DateTimeOffset.UtcNow,
+        service = "hermes-gateway",
+        mode = "ultimate-entrance",
+        integration_score = integrationScore,
+        reliability,
+        responsiveness,
+        route_diversity = routeDiversity,
+        requests = totalRequests,
+        errors = totalErrors,
+        error_rate = errorRate,
+        avg_route_ms = avgRouteMs,
+        max_route_ms = maxRouteMs,
+        low_bandwidth_mode = lowBandwidthMode,
+        offline_only_mode = offlineOnlyMode,
+        user_routed_internet = userRoutedInternet
     });
 });
 

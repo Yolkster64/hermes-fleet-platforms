@@ -793,6 +793,17 @@ class HermesSuperOrchestrator:
         bonus = self.algorithm_state["aihub_bonus_memory"]
         adaptive = self.algorithm_state["adaptive_brain_memory"]
         action = self.algorithm_state.get("action_brain_memory", [])
+        integration_index = max(
+            0.0,
+            min(
+                1.0,
+                (_tail_avg(action) * 0.28)
+                + (_tail_avg(adaptive) * 0.24)
+                + (_tail_avg(bonus) * 0.22)
+                + (_tail_avg(meta) * 0.14)
+                + (_tail_avg(fleet) * 0.12),
+            ),
+        )
         total_learning_events = len(knaa) + len(fleet) + len(meta) + len(adaptive) + len(action)
         growth_index = max(
             0.0,
@@ -814,6 +825,7 @@ class HermesSuperOrchestrator:
             "avg_aihub_bonus": _tail_avg(bonus),
             "avg_adaptive_brain": _tail_avg(adaptive),
             "avg_action_brain": _tail_avg(action),
+            "integration_index": integration_index,
             "total_learning_events": total_learning_events,
             "knowledge_depth": {
                 "bandit_specialties": len(self.algorithm_state["bandit_values"]),
