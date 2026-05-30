@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Tuple
 import streamlit as st
 from gui_api_client import API_BASE, log_text, run_logged_post_action, safe_get, safe_post
 from gui_evolution_panels import render_evolution_centerpiece, render_learning_graphs
+from gui_fleet_showcase import render_fleet_showcase_panels
 from gui_insights import fleet_score_history, latest_learned_profile, render_learning_diagram, render_xp_bar
 from gui_sql_panels import render_sql_intelligence_panels
 from gui_watch_panels import render_aihub_watch_panels
@@ -439,6 +440,12 @@ render_evolution_centerpiece(
     training_status=training_status if isinstance(training_status, dict) else {},
 )
 render_learning_graphs(live_sql_intel if isinstance(live_sql_intel, dict) else {})
+render_fleet_showcase_panels(
+    sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
+    growth_data=growth_data if isinstance(growth_data, dict) else {},
+    training_status=training_status if isinstance(training_status, dict) else {},
+    cpp_kernel=cpp_kernel if isinstance(cpp_kernel, dict) else {},
+)
 watch_plan = render_aihub_watch_panels(
     unified=unified if isinstance(unified, dict) else {},
     watch_payload=watch_payload if isinstance(watch_payload, dict) else {},

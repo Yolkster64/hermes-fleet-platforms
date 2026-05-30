@@ -1,0 +1,99 @@
+from typing import Any, Dict, List
+
+import streamlit as st
+
+
+def _tiny_avatar(index: int, size_mode: str) -> str:
+    avatars = ["🤖", "🛰️", "🧠", "⚙️", "🚀", "🔬", "🛡️", "📡", "🧩", "🎯"]
+    if size_mode == "mini":
+        return "⚡"
+    if size_mode == "full":
+        return "🛡️"
+    return avatars[index % len(avatars)]
+
+
+def _design_pack(size_mode: str) -> str:
+    if size_mode == "mini":
+        return "Neon Scout • ultra-light shell"
+    if size_mode == "full":
+        return "Titan Core • reinforced reasoning"
+    return "Balanced Prism • adaptive shell"
+
+
+def _role_for_specialty(specialty: str) -> str:
+    name = specialty.lower()
+    if "security" in name or "hardening" in name:
+        return "Guardian"
+    if "gui" in name or "ux" in name:
+        return "Designer"
+    if "data" in name or "sql" in name:
+        return "Data Pilot"
+    if "orchestration" in name or "fleet" in name:
+        return "Coordinator"
+    return "Builder"
+
+
+def render_fleet_showcase_panels(
+    sql_intel: Dict[str, Any],
+    growth_data: Dict[str, Any],
+    training_status: Dict[str, Any],
+    cpp_kernel: Dict[str, Any],
+) -> None:
+    st.subheader("Ultimate Fleet Arena")
+    profiles = sql_intel.get("recent_hermes_profiles", []) if isinstance(sql_intel, dict) else []
+    if not isinstance(profiles, list):
+        profiles = []
+    cards = [p for p in profiles if isinstance(p, dict)][:12]
+
+    growth = float(growth_data.get("growth_index", 0.0)) if isinstance(growth_data, dict) else 0.0
+    maturity = float(growth_data.get("maturity_index", 0.0)) if isinstance(growth_data, dict) else 0.0
+    integration = float(growth_data.get("integration_index", 0.0)) if isinstance(growth_data, dict) else 0.0
+    active = bool(training_status.get("training_active", False)) if isinstance(training_status, dict) else False
+    recent_events = int(training_status.get("recent_learning_events", 0)) if isinstance(training_status, dict) else 0
+    cpp_ready = bool(cpp_kernel.get("cpp_ready", False)) if isinstance(cpp_kernel, dict) else False
+    cpp_boost = 1.35 if cpp_ready else 1.0
+    eta_hours = max(0.5, (8.0 * (1.0 - ((growth * 0.50) + (maturity * 0.30) + (integration * 0.20)))) / cpp_boost)
+
+    a1, a2, a3, a4, a5 = st.columns(5)
+    a1.metric("Fleet Stats", f"{len(cards)} bots")
+    a2.metric("Estimated Upgrade ETA", f"{eta_hours:.1f}h")
+    a3.metric("Learning Pulses", str(recent_events))
+    a4.metric("C++ Speed Boost", "ON" if cpp_ready else "OFF")
+    a5.metric("Training", "Active" if active else "Idle")
+
+    st.progress(min(1.0, growth), text=f"Fleet growth {growth * 100:.1f}%")
+    st.progress(min(1.0, maturity), text=f"Fleet maturity {maturity * 100:.1f}%")
+    st.progress(min(1.0, integration), text=f"Fleet integration {integration * 100:.1f}%")
+
+    st.markdown("#### Setup + Upgrade Guide (Who / What / Big Area)")
+    guide = {
+        "Who": "Guardian, Builder, Designer, Data Pilot, Coordinator bots collaborate in parallel.",
+        "What": "Focus upgrades on watch efficiency, SQL pattern quality, action/adaptive decision stability, and AIHub routing quality.",
+        "Big Area": "Control plane (gateway), AIHub brain, learning trainer, and runtime fleet telemetry all in one loop.",
+    }
+    st.json(guide, expanded=False)
+
+    if not cards:
+        st.caption("No saved Hermes profiles yet — run training to populate the fleet arena cards.")
+        return
+
+    st.markdown("#### Bot Designs, Names, Tiny Pics, Bars, Accessories")
+    for chunk_start in range(0, len(cards), 4):
+        cols = st.columns(4)
+        for idx, (col, row) in enumerate(zip(cols, cards[chunk_start : chunk_start + 4])):
+            with col:
+                size_mode = str(row.get("size_mode", "mid"))
+                specialty = str(row.get("specialty", "fleet"))
+                level = int(float(row.get("level", 1.0)))
+                xp = float(row.get("experience_xp", 0.0))
+                speed = float(row.get("speed_bonus", 0.0))
+                token = float(row.get("token_power_gain", 0.0))
+                bot_name = str(row.get("hermes_id", f"hermes-{chunk_start + idx + 1}"))
+                tiny = _tiny_avatar(chunk_start + idx, size_mode)
+                role = _role_for_specialty(specialty)
+                st.markdown(f"**{tiny} {bot_name}**")
+                st.caption(f"{role} • {specialty}")
+                st.caption(f"Design: {_design_pack(size_mode)}")
+                st.progress(min(1.0, xp / 10000.0), text=f"XP {int(xp)}")
+                st.progress(min(1.0, level / 120.0), text=f"Level {level}")
+                st.caption(f"Accessories: speed +{speed * 100:.1f}% • token +{token * 100:.1f}%")
