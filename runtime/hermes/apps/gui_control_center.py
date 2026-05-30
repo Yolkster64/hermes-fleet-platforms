@@ -275,6 +275,7 @@ universal_apply_all = st.toggle("Universal apply: Hermes -> X -> AIHub -> all LL
 carry_learning_all_agents = st.toggle("Carry learning to all agents", value=True)
 hermes_learning_mode = st.selectbox("Hermes Learning Mode", options=["standard", "advanced", "ultimate"], index=2)
 ai_mind_mode = st.selectbox("AI Mind + Brain Core", options=["balanced", "deep-mind", "ultimate-brain"], index=2)
+dynamic_brain_learning = st.toggle("Dynamic Brain + Learning System", value=True)
 llm_mesh = st.multiselect(
     "Ultimate AIHub LLM Mesh",
     options=["openai", "anthropic", "gemini", "mistral", "grok", "deepseek", "llama", "qwen"],
@@ -366,6 +367,7 @@ with bb1:
                 "brain_mode": brain_mode,
                 "aihub_mode": aihub_mode,
                 "hermes_learning_mode": hermes_learning_mode,
+                "dynamic_brain_learning": dynamic_brain_learning,
                 "carry_learning_all_agents": carry_learning_all_agents,
                 "llm_mesh": llm_mesh,
                 "xp_boost": xp_boost,
@@ -409,6 +411,7 @@ with a1:
                     "brain_mode": brain_mode,
                     "aihub_mode": aihub_mode,
                     "hermes_learning_mode": hermes_learning_mode,
+                    "dynamic_brain_learning": dynamic_brain_learning,
                     "carry_learning_all_agents": carry_learning_all_agents,
                     "llm_mesh": llm_mesh,
                     "xp_boost": xp_boost,
@@ -440,6 +443,7 @@ with a2:
             active_brain = str((backbone or {}).get("brain_mode", brain_mode))
             active_aihub = str((backbone or {}).get("aihub_mode", aihub_mode))
             active_learning_mode = str((backbone or {}).get("hermes_learning_mode", hermes_learning_mode))
+            active_dynamic = bool((backbone or {}).get("dynamic_brain_learning", dynamic_brain_learning))
             active_learning_share = bool((backbone or {}).get("carry_learning_all_agents", carry_learning_all_agents))
             active_llm_mesh = (backbone or {}).get("llm_mesh", llm_mesh)
             active_training = int((backbone or {}).get("training_intensity", training_intensity))
@@ -471,6 +475,7 @@ with a2:
                 active_learning_share = True
                 active_aihub = "max"
                 active_llm_mesh = ["openai", "anthropic", "gemini", "mistral", "grok", "deepseek", "llama", "qwen"]
+                active_dynamic = True
 
             pack_count = len(active_packs) if isinstance(active_packs, list) else len(selected_packs)
             if earlier_ultimate_bundle:
@@ -481,9 +486,13 @@ with a2:
             micro_suffix = f"m{active_micro_count}-{'auto' if active_micro_auto else 'manual'}"
             specialty = f"{agent_type}-{active_brain}-{active_aihub}-{active_learning_mode}-{share_suffix}-{mesh_suffix}-{micro_suffix}"
             specialty = f"{specialty}-{ai_mind_mode}"
+            if active_dynamic:
+                specialty = f"{specialty}-dynamic"
             if universal_apply_all:
                 specialty = f"{specialty}-universal"
             steps = max(60, int(active_training))
+            if active_dynamic:
+                steps = min(560, steps + 60)
             candidates = max(40, min(240, max(pack_count * 8, active_micro_count * 4)))
             sql_signal = max(0.4, min(1.0, active_cpu / 100.0))
             internet_signal = max(0.3, min(1.0, active_ram / 100.0))
