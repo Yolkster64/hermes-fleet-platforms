@@ -270,7 +270,7 @@ with caihub:
 ultimate_x_tier = st.selectbox("Ultimate X Tier", options=["ultimate-x5", "ultimate-x6"], index=1)
 
 st.subheader("Global Hermes Learning Core")
-earlier_ultimate_bundle = st.toggle("Everything from earlier (Ultimate X bundle)", value=True)
+earlier_ultimate_bundle = st.toggle("Everything from earlier or better (Ultimate X bundle)", value=True)
 carry_learning_all_agents = st.toggle("Carry learning to all agents", value=True)
 hermes_learning_mode = st.selectbox("Hermes Learning Mode", options=["standard", "advanced", "ultimate"], index=2)
 ai_mind_mode = st.selectbox("AI Mind + Brain Core", options=["balanced", "deep-mind", "ultimate-brain"], index=2)
@@ -558,6 +558,44 @@ if st.button("Apply Ultimate AIHub for All Agents", use_container_width=True):
             st.error(f"AIHub upgrade failed: {err}")
 
 st.divider()
+st.subheader("Ultimate Learning + Ultimate AIHub + LLMs")
+if st.button("Run Ultimate Learning + AIHub + LLMs", use_container_width=True):
+    if not st.session_state["login_ok"]:
+        st.error("Log in first, then run this ultimate flow.")
+    else:
+        llm_factor = min(0.99, max(0.75, 0.60 + (0.04 * len(llm_mesh))))
+        if earlier_ultimate_bundle:
+            llm_factor = 0.99
+        flow_specialty = f"ultimate-learning-aihub-llms-{ultimate_x_tier}-{ai_mind_mode}"
+        aihub_ok, aihub_err = _apply_aihub_upgrade(
+            st.session_state["api_key"],
+            specialty=f"{flow_specialty}-aihub",
+            steps=max(420, training_intensity),
+            candidates=max(180, len(selected_packs) * 10),
+            sql_signal=max(0.88, max_cpu / 100.0),
+            internet_signal=max(0.40, min(1.0, max_ram / 100.0)),
+            llm_signal=llm_factor,
+            stability_bias=max(0.84, ((xp_boost + saber_power) / 2) / 100.0),
+        )
+        learn_ok, learn_err = _run_learning_sql_pulse(
+            st.session_state["api_key"],
+            specialty=f"{flow_specialty}-learning",
+            steps=max(420, training_intensity),
+            candidates=max(180, len(selected_packs) * 10),
+            sql_signal=max(0.88, ultimate_sql_level / 100.0),
+            internet_signal=max(0.40, min(1.0, max_ram / 100.0)),
+            llm_signal=llm_factor,
+            stability_bias=max(0.84, ((xp_boost + saber_power) / 2) / 100.0),
+        )
+        if aihub_ok and learn_ok:
+            st.success("Ultimate learning + AIHub + LLMs completed.")
+        else:
+            if not aihub_ok:
+                st.error(f"Ultimate AIHub phase failed: {aihub_err}")
+            if not learn_ok:
+                st.error(f"Ultimate learning phase failed: {learn_err}")
+
+st.divider()
 st.subheader("Brain Ultimate AI Upgrading")
 if st.button("Run Brain Ultimate AI Upgrading", use_container_width=True):
     if not st.session_state["login_ok"]:
@@ -620,7 +658,7 @@ if st.button("Run Ultimate Learning + SQL Pulse", use_container_width=True):
 
 st.divider()
 st.subheader("Ultimate Everything (Backend Only)")
-st.caption("Runs ultimate AIHub integration + ultimate learning/sql + ultimate deployment while keeping GUI simple.")
+st.caption("Runs all earlier capabilities (or better): ultimate AIHub/LLMs + ultimate brain/learning/sql + ultimate deployment, while keeping GUI simple.")
 if st.button("Run Ultimate Everything Now", use_container_width=True):
     if not st.session_state["login_ok"]:
         st.error("Log in first, then run Ultimate Everything.")
