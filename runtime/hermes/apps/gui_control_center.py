@@ -336,20 +336,15 @@ resource_policy = st.selectbox("System Resource Policy", options=["Recommended M
 if resource_policy == "Recommended Max":
     max_cpu = 99
     max_gpu = 99
-    max_ram = 97
-    tsm = 96
-    st.caption("Recommended max system attributes applied: CPU 99, GPU 99, RAM 97, TSM 96.")
+    max_ram = 98
+    st.caption("Recommended max system attributes applied: CPU 99, GPU 99, Memory 98.")
 else:
     c_cpu, c_gpu = st.columns(2)
     with c_cpu:
         max_cpu = st.slider("Max CPU", 50, 100, 92)
     with c_gpu:
         max_gpu = st.slider("Max GPU", 50, 100, 94)
-    c_ram, c_tsm = st.columns(2)
-    with c_ram:
-        max_ram = st.slider("Max RAM", 50, 100, 90)
-    with c_tsm:
-        tsm = st.slider("TSM", 50, 100, 90)
+    max_ram = st.slider("Max Memory", 50, 100, 92)
 
 profile_map = {
     "balanced": {"xp": 78, "sql": 82, "steps": 240, "candidates": 130, "stability": 0.86},
@@ -404,7 +399,6 @@ if st.button("Save + Deploy", use_container_width=True):
                 "max_cpu": max_cpu,
                 "max_gpu": max_gpu,
                 "max_ram": max_ram,
-                "tsm": tsm,
                 "created_utc": datetime.now(timezone.utc).isoformat(),
             }
         )
@@ -423,14 +417,14 @@ if st.button("Save + Deploy", use_container_width=True):
                     f"{hermes_type.lower().replace(' ', '-')}-{hermes_variation.lower().replace(' ', '-')}-"
                     f"{x_tier}-{profile}-combo-{setup_combo.lower().replace(' ', '-').replace('+', 'plus')}"
                     f"-subs-{'-'.join(subagents[:4]) or 'default'}"
-                    f"-cpu{max_cpu}-gpu{max_gpu}-ram{max_ram}-tsm{tsm}-agent-{target}"
+                    f"-cpu{max_cpu}-gpu{max_gpu}-mem{max_ram}-agent-{target}"
                 ),
-                steps=min(560, steps + int(tsm / 8)),
+                steps=min(560, steps + int(max_ram / 8)),
                 candidates=min(240, candidates + int(max_gpu / 6)),
                 sql_signal=max(0.70, sql_level / 100.0),
                 internet_signal=max(0.60, max_ram / 100.0),
                 llm_signal=llm_signal,
-                stability_bias=min(0.99, p["stability"] + (tsm / 1000.0)),
+                stability_bias=min(0.99, p["stability"] + (max_ram / 1000.0)),
             )
             if ok:
                 ok_count += 1
@@ -494,7 +488,7 @@ with st.expander("Deep Guide: what to pick", expanded=False):
         "- `planner + researcher + sql-engineer`: analysis and data comprehension.\n"
         "- `planner + guardian + deployer`: stable production.\n\n"
         "**System attributes (few choices):**\n"
-        "- Keep `System Resource Policy = Recommended Max` for auto CPU/GPU/RAM/TSM high-performance values.\n"
+        "- Keep `System Resource Policy = Recommended Max` for auto CPU/GPU/Memory high-performance values.\n"
         "- Use `Custom` only when you need to cap resources.\n\n"
         "**Simple steps:**\n"
         "1. Pick a Setup Combo.\n"
