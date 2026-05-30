@@ -588,6 +588,8 @@ def _initialize_session_state() -> None:
         "ctl_focused_layout": True,
         "ctl_show_legacy_map_ui": True,
         "ctl_render_mode": "Full Experience",
+        "ctl_safe_mode": True,
+        "ctl_security_lock": True,
         "ctl_auto_enabled": False,
         "ctl_auto_interval": 45,
         "ctl_intelligent_shuffle": True,
@@ -928,6 +930,8 @@ if "stability_bootstrap_done" not in st.session_state:
     # One-time guard to neutralize stale browser session values that can cause UI churn.
     st.session_state["ctl_live_refresh"] = False
     st.session_state["ctl_auto_enabled"] = False
+    st.session_state["ctl_safe_mode"] = True
+    st.session_state["ctl_security_lock"] = True
     st.session_state["ctl_render_mode"] = "Full Experience"
     st.session_state["ctl_refresh_seconds"] = int(st.session_state.get("ctl_refresh_seconds", 20))
     st.session_state["ctl_auto_interval"] = int(st.session_state.get("ctl_auto_interval", 45))
@@ -979,6 +983,8 @@ with st.sidebar:
     refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, step=5, key="ctl_refresh_seconds")
     focused_layout = st.checkbox("Focused layout (clean view)", key="ctl_focused_layout")
     show_legacy_map_ui = st.checkbox("Show AIHub Hub + Map panels", key="ctl_show_legacy_map_ui")
+    safe_mode = st.checkbox("Safe mode (disable complex modules)", key="ctl_safe_mode")
+    security_lock = st.checkbox("Security lock baseline", key="ctl_security_lock")
     render_mode = st.selectbox("Render mode", options=["Lite Stable", "Full Experience"], key="ctl_render_mode")
     if st.button("Stay Logged In + Data Saver", use_container_width=True):
         if not str(st.session_state.get("api_key", "")).strip():
@@ -987,12 +993,24 @@ with st.sidebar:
         st.session_state["ctl_refresh_seconds"] = 60
         st.session_state["ctl_focused_layout"] = True
         st.session_state["ctl_show_legacy_map_ui"] = False
+        st.session_state["ctl_safe_mode"] = True
+        st.session_state["ctl_security_lock"] = True
         st.session_state["ctl_render_mode"] = "Lite Stable"
         ping, ping_err = safe_get("/system-watch", timeout=12)
         if ping_err:
             st.warning("Data Saver profile applied. Reconnect may still be needed once.")
         else:
             st.success("Stay Logged In + Data Saver profile applied and connection is active.")
+        st.rerun()
+    if st.button("Apply Safe + Secure Baseline", use_container_width=True):
+        st.session_state["ctl_live_refresh"] = False
+        st.session_state["ctl_auto_enabled"] = False
+        st.session_state["ctl_focused_layout"] = True
+        st.session_state["ctl_show_legacy_map_ui"] = False
+        st.session_state["ctl_safe_mode"] = True
+        st.session_state["ctl_security_lock"] = True
+        st.session_state["ctl_render_mode"] = "Lite Stable"
+        st.success("Safe + Secure baseline applied.")
         st.rerun()
     st.checkbox("Enable legacy strategy Hermes types", key="ctl_enable_algorithmic_types")
     st.selectbox("Hermes species", options=["Hybrid", "Normal", "Mesh"], key="ctl_hermes_species")
@@ -1092,9 +1110,15 @@ with st.sidebar:
         f"species: {st.session_state.get('ctl_hermes_species', 'Hybrid')} | model: {_selected_model_override() or 'auto'}"
     )
 
-watch_payload, watch_err = safe_get("/system-watch", timeout=25)
-gateway_watch, gateway_watch_err = safe_get("/gateway-max-status", timeout=20)
-ultimate_entrance, ultimate_entrance_err = safe_get("/ultimate-entrance-status", timeout=20)
+safe_mode_enabled = bool(st.session_state.get("ctl_safe_mode", True))
+if safe_mode_enabled:
+    watch_payload, watch_err = safe_get("/system-watch", timeout=10)
+    gateway_watch, gateway_watch_err = {}, "Safe mode"
+    ultimate_entrance, ultimate_entrance_err = {}, "Safe mode"
+else:
+    watch_payload, watch_err = safe_get("/system-watch", timeout=25)
+    gateway_watch, gateway_watch_err = safe_get("/gateway-max-status", timeout=20)
+    ultimate_entrance, ultimate_entrance_err = safe_get("/ultimate-entrance-status", timeout=20)
 if not watch_err and isinstance(watch_payload, dict):
     unified = watch_payload.get("unified_config", {}) if isinstance(watch_payload.get("unified_config"), dict) else {}
     bonus_data = watch_payload.get("aihub_bonus", {}) if isinstance(watch_payload.get("aihub_bonus"), dict) else {}
@@ -1111,13 +1135,22 @@ if not watch_err and isinstance(watch_payload, dict):
     cpp_kernel_err = ""
     mesh_err = ""
 else:
-    unified, unified_err = safe_get("/unified-config", timeout=20)
-    bonus_data, bonus_err = safe_get("/aihub-bonus", timeout=20)
-    snapshot, snapshot_err = safe_get("/snapshot", timeout=20)
-    growth_data, growth_err = safe_get("/learning-growth", timeout=20)
-    training_status, training_status_err = safe_get("/training-status", timeout=20)
-    cpp_kernel, cpp_kernel_err = safe_get("/cpp-kernel-status", timeout=20)
-    knowledge_mesh, mesh_err = safe_get("/knowledge-mesh", timeout=20)
+    if safe_mode_enabled:
+        unified, unified_err = {}, "Safe mode"
+        bonus_data, bonus_err = {}, "Safe mode"
+        snapshot, snapshot_err = {}, "Safe mode"
+        growth_data, growth_err = {}, "Safe mode"
+        training_status, training_status_err = {}, "Safe mode"
+        cpp_kernel, cpp_kernel_err = {}, "Safe mode"
+        knowledge_mesh, mesh_err = {}, "Safe mode"
+    else:
+        unified, unified_err = safe_get("/unified-config", timeout=20)
+        bonus_data, bonus_err = safe_get("/aihub-bonus", timeout=20)
+        snapshot, snapshot_err = safe_get("/snapshot", timeout=20)
+        growth_data, growth_err = safe_get("/learning-growth", timeout=20)
+        training_status, training_status_err = safe_get("/training-status", timeout=20)
+        cpp_kernel, cpp_kernel_err = safe_get("/cpp-kernel-status", timeout=20)
+        knowledge_mesh, mesh_err = safe_get("/knowledge-mesh", timeout=20)
 aihub_bonus = float(bonus_data.get("aihub_bonus", 0.0))
 agent_rows = normalize_agents(snapshot, aihub_bonus) if not snapshot_err else []
 runtime_hermes = len(agent_rows)
@@ -1126,19 +1159,23 @@ total_hermes = runtime_hermes if runtime_hermes > 0 else configured_hermes
 active_hermes = len([a for a in agent_rows if a["active"]])
 avg_progress = (sum(a["progress"] for a in agent_rows) / total_hermes) if total_hermes else 0.0
 live_volume_root = resolve_volume_root()
-if "auto_volume_bootstrap" not in st.session_state:
-    try:
-        bootstrap_root, bootstrap_manifest = initialize_volume_layout(live_volume_root)
-        scan_volume_files.clear()
-        read_sql_training_intelligence.clear()
-        st.session_state["auto_volume_bootstrap"] = {
-            "root": bootstrap_root,
-            "created_count": int(bootstrap_manifest.get("created_count", 0)) if isinstance(bootstrap_manifest, dict) else 0,
-            "ok": True,
-        }
-    except Exception as bootstrap_exc:
-        st.session_state["auto_volume_bootstrap"] = {"ok": False, "error": str(bootstrap_exc)}
-live_sql_intel = read_sql_training_intelligence(live_volume_root)
+if safe_mode_enabled:
+    st.session_state["auto_volume_bootstrap"] = {"ok": True, "root": live_volume_root, "created_count": 0}
+    live_sql_intel = {}
+else:
+    if "auto_volume_bootstrap" not in st.session_state:
+        try:
+            bootstrap_root, bootstrap_manifest = initialize_volume_layout(live_volume_root)
+            scan_volume_files.clear()
+            read_sql_training_intelligence.clear()
+            st.session_state["auto_volume_bootstrap"] = {
+                "root": bootstrap_root,
+                "created_count": int(bootstrap_manifest.get("created_count", 0)) if isinstance(bootstrap_manifest, dict) else 0,
+                "ok": True,
+            }
+        except Exception as bootstrap_exc:
+            st.session_state["auto_volume_bootstrap"] = {"ok": False, "error": str(bootstrap_exc)}
+    live_sql_intel = read_sql_training_intelligence(live_volume_root)
 
 c1, c2, c3, c4, c5 = st.columns(5)
 c1.metric("System", "Online" if not unified_err else "Offline")
@@ -1187,6 +1224,19 @@ st.caption(
     f"auto_setup={int(float(bond_signals.get('auto_setup', 0.0)))} | sql_load(db/wal)={float(bond.get('db_mb', 0.0)):.1f}/{float(bond.get('wal_mb', 0.0)):.1f}MB"
 )
 render_icon_detail_guide()
+if safe_mode_enabled:
+    st.subheader("Safe + Secure Mode")
+    st.info("Complex modules are disabled for reliability. Core login, status, and basic controls remain active.")
+    sec1, sec2, sec3 = st.columns(3)
+    sec1.metric("Security Lock", "ON" if bool(st.session_state.get("ctl_security_lock", True)) else "OFF")
+    sec2.metric("Advanced Modules", "OFF")
+    sec3.metric("Live Refresh", "OFF" if not bool(st.session_state.get("ctl_live_refresh", False)) else "ON")
+    st.caption("Security baseline: reduced auto-actions, reduced endpoint fan-out, and safer UI execution path.")
+    if live_refresh:
+        st.caption(f"Live refresh active: updating every {refresh_seconds}s")
+        time.sleep(refresh_seconds)
+        st.rerun()
+    st.stop()
 st.subheader("Hermes Type Deck (7 Active Types)")
 deck_presets = _all_hermes_presets()
 deck_keys = [key for key in CENTER_ACTIVE_TYPE_KEYS if key in deck_presets]
