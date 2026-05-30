@@ -636,6 +636,8 @@ def inject_majestic_theme() -> None:
         """
 <style>
 .stApp {position: relative; overflow-x: hidden; background: radial-gradient(circle at 10% -12%, rgba(92,126,255,0.11), rgba(12,14,24,0.96) 42%), radial-gradient(circle at 92% 0%, rgba(94,166,255,0.08), rgba(10,10,20,0.0) 50%);}
+.stApp, .stApp p, .stApp span, .stApp li, .stApp label, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {color: #eaf3ff;}
+.stApp [data-testid="stMarkdownContainer"] * {color: inherit;}
 .block-container {position: relative; z-index: 2;}
 .holo-title {font-size: 2.3rem; font-weight: 800; letter-spacing: 0.4px; margin: 0 0 0.2rem 0; background: linear-gradient(90deg, #d8f5ff 0%, #86d8ff 36%, #b695ff 68%, #8affdf 100%); -webkit-background-clip: text; background-clip: text; color: transparent; animation: holoShift 8s linear infinite;}
 .xeno-badge {display:inline-flex; align-items:center; gap:0.42rem; padding:0.18rem 0.62rem; border-radius:999px; border:1px solid rgba(125, 214, 255, 0.45); background:linear-gradient(90deg, rgba(71,110,255,0.28), rgba(109,216,255,0.16)); color:#d8efff; font-size:0.74rem; letter-spacing:0.06rem; margin-bottom:0.45rem;}
@@ -643,6 +645,9 @@ def inject_majestic_theme() -> None:
 .block-container {max-width: 1650px; padding-top: 1.4rem; padding-bottom: 2.2rem;}
 [data-testid="stMetricValue"] {color: #e9f4ff;}
 [data-testid="stSidebar"] {background: linear-gradient(180deg, rgba(12,16,32,0.98), rgba(10,13,26,0.95));}
+[data-testid="stSidebar"] * {color: #eaf3ff;}
+[data-baseweb="input"] input, [data-baseweb="textarea"] textarea {color: #ecf6ff !important;}
+[data-baseweb="select"] * {color: #ecf6ff !important;}
 div.stButton > button {border-radius: 12px; border: 1px solid rgba(120,205,255,0.45); background: linear-gradient(135deg, rgba(34,44,88,0.92), rgba(17,24,52,0.96)); box-shadow: 0 0 12px rgba(104,184,255,0.22); color: #eaf6ff; transition: all .18s ease;}
 div.stButton > button:hover {border-color: rgba(166,236,255,0.88); box-shadow: 0 0 18px rgba(104,184,255,0.44);}
 [data-testid="stHorizontalBlock"] {gap: 1rem;}
