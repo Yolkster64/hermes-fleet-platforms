@@ -562,6 +562,44 @@ if st.button("Train Fleet 500 + Improve Everything", use_container_width=True):
     else:
         st.info("Fleet prepared for 500 training. Log in to start backend improvement runs.")
 
+m10a, m10b = st.columns(2)
+with m10a:
+    if st.button("Start 10-Hour Marathon", use_container_width=True):
+        st.session_state["marathon_active"] = True
+        st.session_state["marathon_end_ts"] = time.time() + (10 * 60 * 60)
+        if st.session_state["login_ok"]:
+            _apply_aihub_upgrade(
+                st.session_state["api_key"],
+                specialty="fleet-marathon-10h-aihub-kickoff",
+                steps=560,
+                candidates=240,
+                sql_signal=0.99,
+                internet_signal=0.92,
+                llm_signal=max(0.93, llm_signal),
+                stability_bias=0.97,
+            )
+            _run_learning_sql_pulse(
+                st.session_state["api_key"],
+                specialty="fleet-marathon-10h-learning-kickoff",
+                steps=560,
+                candidates=240,
+                sql_signal=0.99,
+                internet_signal=0.92,
+                llm_signal=max(0.93, llm_signal),
+                stability_bias=0.97,
+            )
+            st.success("10-hour marathon started.")
+        else:
+            st.info("10-hour marathon armed. Log in to activate runs.")
+with m10b:
+    if st.button("Stop Marathon", use_container_width=True):
+        st.session_state["marathon_active"] = False
+        st.session_state["marathon_end_ts"] = 0.0
+        st.success("Marathon stopped.")
+if bool(st.session_state.get("marathon_active", False)):
+    remaining = max(0, int(float(st.session_state.get("marathon_end_ts", 0.0)) - time.time()))
+    st.caption(f"10-hour marathon active: {remaining // 3600}h {(remaining % 3600) // 60}m remaining")
+
 saved_agent_names = [str(a.get("name", "")).strip() for a in st.session_state["agents"] if str(a.get("name", "")).strip()]
 max_agents_allowed = MAX_AGENTS_ALLOWED
 current_agents = len(saved_agent_names)
@@ -859,8 +897,25 @@ if st.session_state["login_ok"]:
                 llm_signal=max(0.92, llm_signal),
                 stability_bias=0.97,
             )
+        marathon_ok = True
+        if bool(st.session_state.get("marathon_active", False)):
+            marathon_end = float(st.session_state.get("marathon_end_ts", 0.0))
+            if now_ts < marathon_end:
+                marathon_ok, _ = _run_learning_sql_pulse(
+                    st.session_state["api_key"],
+                    specialty="fleet-marathon-10h-cycle",
+                    steps=560,
+                    candidates=240,
+                    sql_signal=0.99,
+                    internet_signal=0.93,
+                    llm_signal=max(0.93, llm_signal),
+                    stability_bias=0.97,
+                )
+            else:
+                st.session_state["marathon_active"] = False
+                st.session_state["marathon_end_ts"] = 0.0
         st.session_state["last_auto_upgrade_ts"] = now_ts
-        if aihub_ok and learn_ok and jvc_ok and full_improve_ok:
+        if aihub_ok and learn_ok and jvc_ok and full_improve_ok and marathon_ok:
             st.success("Automatic backend upgrades completed (including JVC learning).")
 
 st.divider()
