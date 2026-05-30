@@ -2221,6 +2221,10 @@ class HermesSuperOrchestrator:
         signal_stability = max(0.0, min(1.0, float(training_variables.get("signal_stability", 0.5))))
         watch_coverage = max(0.0, min(1.0, float(training_variables.get("watch_coverage", 0.5))))
         watch_efficiency = max(0.0, min(1.0, float(training_variables.get("watch_efficiency", 0.5))))
+        action_tail = self.algorithm_state.get("action_brain_memory", [])[-80:]
+        action_brain_signal = (sum(action_tail) / len(action_tail)) if action_tail else 0.5
+        bonus_tail = self.algorithm_state.get("aihub_bonus_memory", [])[-80:]
+        bonus_signal = (sum(bonus_tail) / len(bonus_tail)) if bonus_tail else bonus_amp
         sql_pattern_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("sql_pattern", lookback=120))))
         github_sync_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("github_knowledge_sync", lookback=120))))
         art_pattern_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("art_pattern", lookback=120))))
@@ -2260,6 +2264,8 @@ class HermesSuperOrchestrator:
                 + (signal_stability * speed_score * 0.05)
                 + (watch_coverage * cost_score * 0.04)
                 + (watch_efficiency * power_score * 0.06)
+                + (action_brain_signal * power_score * 0.07)
+                + (bonus_signal * power_score * 0.05)
             )
             scored.append((blend, p, speed_score, cost_score, power_score))
 
@@ -2285,6 +2291,8 @@ class HermesSuperOrchestrator:
                 "signal_stability": signal_stability,
                 "watch_coverage": watch_coverage,
                 "watch_efficiency": watch_efficiency,
+                "action_brain_signal": action_brain_signal,
+                "bonus_signal": bonus_signal,
                 "sql_pattern_signal": sql_pattern_signal,
                 "github_sync_signal": github_sync_signal,
                 "art_pattern_signal": art_pattern_signal,

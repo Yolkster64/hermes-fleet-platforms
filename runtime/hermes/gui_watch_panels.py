@@ -46,6 +46,13 @@ def render_aihub_watch_panels(
     maturity = float(growth_data.get("maturity_index", 0.0)) if isinstance(growth_data, dict) else 0.0
     trend = float(sql_intel.get("trend", 0.0)) if isinstance(sql_intel, dict) else 0.0
     watch_eff = float(sql_intel.get("variable_means", {}).get("watch_efficiency", 0.5)) if isinstance(sql_intel, dict) else 0.5
+    sql_health = sql_intel.get("sql_health", {}) if isinstance(sql_intel, dict) else {}
+    if not isinstance(sql_health, dict):
+        sql_health = {}
+    db_mb = float(sql_health.get("db_mb", 0.0))
+    total_cycles = int(sql_health.get("total_cycles", 0))
+    action_brain = float(growth_data.get("avg_action_brain", 0.0)) if isinstance(growth_data, dict) else 0.0
+    adaptive_brain = float(growth_data.get("avg_adaptive_brain", 0.0)) if isinstance(growth_data, dict) else 0.0
 
     fleet_growth_hour = max(0.0, ((growth_index * 0.55) + (maturity * 0.25) + max(0.0, trend) * 0.20) * 100.0)
     fleet_growth_day = fleet_growth_hour * 9.5
@@ -104,16 +111,30 @@ def render_aihub_watch_panels(
     else:
         st.success("System complexity looks manageable. Continue balanced scaling.")
 
+    st.markdown("#### Ultimate Ops Center (Brain + SQL + Power)")
+    u1, u2, u3, u4, u5 = st.columns(5)
+    u1.metric("Action Brain", f"{action_brain * 100:.1f}%")
+    u2.metric("Adaptive Brain", f"{adaptive_brain * 100:.1f}%")
+    u3.metric("SQL Size", f"{db_mb:.2f} MB")
+    u4.metric("SQL Cycles", str(total_cycles))
+    u5.metric("Complexity", f"{complexity * 100:.1f}%")
+    stability_index = max(0.0, min(1.0, (watch_eff * 0.35) + ((1.0 - complexity) * 0.30) + (adaptive_brain * 0.20) + (action_brain * 0.15)))
+    escalation_index = max(0.0, min(1.0, (complexity * 0.45) + (max(0.0, -trend) * 0.30) + ((1.0 - watch_eff) * 0.25)))
+    st.progress(stability_index, text=f"Stability Index: {stability_index * 100:.1f}%")
+    st.progress(escalation_index, text=f"Escalation Pressure: {escalation_index * 100:.1f}%")
+
     return {
         "complexity": complexity,
         "complicated": complicated,
+        "stability_index": stability_index,
+        "escalation_index": escalation_index,
         "recommended_payload": {
             "specialty": "fleet:aihub:auto-design",
-            "steps": 640 if complicated else 460,
-            "candidates": 280 if complicated else 200,
-            "sql_signal": 0.92 if complicated else 0.85,
+            "steps": int(700 if complicated else 500),
+            "candidates": int(320 if complicated else 220),
+            "sql_signal": 0.94 if complicated else 0.86,
             "internet_signal": 0.10 if complicated else 0.08,
-            "llm_signal": 0.95 if complicated else 0.90,
-            "stability_bias": 0.88 if complicated else 0.82,
+            "llm_signal": 0.96 if complicated else 0.91,
+            "stability_bias": max(0.78, min(0.96, (0.84 if complicated else 0.80) + (stability_index * 0.08))),
         },
     }

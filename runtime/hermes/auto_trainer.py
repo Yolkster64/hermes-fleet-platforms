@@ -814,6 +814,41 @@ def _max_upgrade_training_plan(
     }
 
 
+def _ultimate_super_plan(
+    *,
+    steps: int,
+    candidates: int,
+    sql_signal: float,
+    llm_signal: float,
+    stability_bias: float,
+    previous_sql_intel: dict[str, object],
+    training_variables: dict[str, float],
+    max_plan: dict[str, float],
+) -> dict[str, float]:
+    sql_health = previous_sql_intel.get("sql_health", {}) if isinstance(previous_sql_intel, dict) else {}
+    if not isinstance(sql_health, dict):
+        sql_health = {}
+    db_mb = float(sql_health.get("db_mb", 0.0))
+    total_cycles = float(sql_health.get("total_cycles", 0.0))
+    watch_eff = float(training_variables.get("watch_efficiency", 0.5))
+    signal_stability = float(training_variables.get("signal_stability", 0.5))
+    retention = float(training_variables.get("retention_strength", 0.5))
+    complexity = float(max_plan.get("complexity", 0.5))
+    storage_pressure = _clamp01((db_mb / 1024.0) * 0.45 + (total_cycles / 10000.0) * 0.55)
+    optimizer_force = _clamp01((complexity * 0.45) + ((1.0 - watch_eff) * 0.20) + ((1.0 - signal_stability) * 0.20) + ((1.0 - retention) * 0.15))
+    scale = 1.0 + (optimizer_force * 0.28) - (storage_pressure * 0.12)
+    return {
+        "steps": float(min(1100, max(180, int(steps * scale)))),
+        "candidates": float(min(680, max(96, int(candidates * (0.92 + (optimizer_force * 0.42) - (storage_pressure * 0.10)))))),
+        "sql_signal": float(_clamp01(max(0.58, min(0.995, sql_signal + (optimizer_force * 0.07) - (storage_pressure * 0.02))))),
+        "llm_signal": float(_clamp01(max(0.62, min(0.995, llm_signal + (optimizer_force * 0.08))))),
+        "stability_bias": float(_clamp01(max(0.56, min(0.995, stability_bias + (signal_stability * 0.06) + ((1.0 - optimizer_force) * 0.03))))),
+        "optimizer_force": float(optimizer_force),
+        "storage_pressure": float(storage_pressure),
+        "scale": float(scale),
+    }
+
+
 def run_cycle() -> None:
     global _cycle, _volume_root, _last_sql_intel
     _cycle += 1
@@ -911,6 +946,21 @@ def run_cycle() -> None:
     sql_signal = float(max_plan["sql_signal"])
     llm_signal = float(max_plan["llm_signal"])
     stability_bias = float(max_plan["stability_bias"])
+    super_plan = _ultimate_super_plan(
+        steps=pulse_steps,
+        candidates=pulse_candidates,
+        sql_signal=sql_signal,
+        llm_signal=llm_signal,
+        stability_bias=stability_bias,
+        previous_sql_intel=_last_sql_intel,
+        training_variables=training_variables,
+        max_plan=max_plan,
+    )
+    pulse_steps = int(super_plan["steps"])
+    pulse_candidates = int(super_plan["candidates"])
+    sql_signal = float(super_plan["sql_signal"])
+    llm_signal = float(super_plan["llm_signal"])
+    stability_bias = float(super_plan["stability_bias"])
     _emit_signal(
         "auto_trainer.max_upgrade_plan",
         float(max_plan["uplift"]),
@@ -924,6 +974,22 @@ def run_cycle() -> None:
             "llm_signal": llm_signal,
             "stability_bias": stability_bias,
             "training_variables": training_variables,
+        },
+        timeout=30,
+    )
+    _emit_signal(
+        "auto_trainer.ultimate_super_plan",
+        float(super_plan["scale"]),
+        {
+            "cycle": _cycle,
+            "optimizer_force": float(super_plan["optimizer_force"]),
+            "storage_pressure": float(super_plan["storage_pressure"]),
+            "scale": float(super_plan["scale"]),
+            "steps": pulse_steps,
+            "candidates": pulse_candidates,
+            "sql_signal": sql_signal,
+            "llm_signal": llm_signal,
+            "stability_bias": stability_bias,
         },
         timeout=30,
     )

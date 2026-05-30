@@ -107,10 +107,12 @@ This runtime enables:
   - Trainer now auto-exports SQL-backed Hermes profile snapshots to volume (`training/hermes_agent_profiles_snapshot.json`) for backup/restore handoff
   - SQL intelligence now includes deep compression + 3D overlap metrics and auto-generated benefits/ideas for next training moves
   - SQL layer is now performance-hardened with indexes + automatic retention pruning (`HERMES_SQL_MAX_CYCLE_ROWS`, `HERMES_SQL_MAX_AGENT_ROWS`, `HERMES_SQL_MAX_GITHUB_ROWS`, `HERMES_SQL_MAX_PROFILE_ROWS`) plus cadence controls (`HERMES_SQL_INTEL_LOOKBACK`, `HERMES_SQL_PRUNE_EVERY`, `HERMES_SQL_OPTIMIZE_EVERY`, `HERMES_SQL_PROFILE_SNAPSHOT_EVERY`, `HERMES_SQL_GITHUB_INGEST_EVERY`)
+  - Trainer now emits an `auto_trainer.ultimate_super_plan` signal that adapts pulse steps/candidates and sql/llm/stability weights from SQL health pressure + watch stability + retention
   - AIHub optimizer now blends watch telemetry (`watch_signal`) with SQL/art/bridge signals for smarter model routing and bonus shaping
   - Hermes trainer now applies a max-upgrade planner per cycle (`auto_trainer.max_upgrade_plan`) that scales steps/candidates/signals from SQL trend + watch efficiency complexity
   - Learning brain now includes an action-brain policy layer (aggression/safety/rollout) for stronger decide+act optimization in training loops
   - AIHub bonus now fuses action-brain memory with adaptive/watch/SQL signals for stronger whole-brain scaling
+  - GUI AIHub watch now includes an Ultimate Ops Center panel with brain/SQL/power/complexity stability and escalation indices
   - Docker services now explicitly set `HERMES_VOLUME_DATA_PATH=/workspace/runtime/hermes_persist` so SQL setup is auto-initialized in the mounted volume
   - GUI now shows per-Hermes level/XP/speed bonus/token gain bars, GitHub CLI connection panel, and fleet lock/unlock controls for hard-problem mode
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
