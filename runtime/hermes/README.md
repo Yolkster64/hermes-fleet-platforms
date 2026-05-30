@@ -33,6 +33,48 @@
 6. **Operate the fleet continuously**
    - Keep auto-learning active, monitor thinking/specialization tables, and use deploy/return cycles for controlled orchestration.
 
+## X-Everything Smart Guide (best mix by project)
+
+Use these mixes as baseline presets:
+
+1. **Best overall project mix**
+   - Mode: `Programming + C++`
+   - Type: `Ultimate ML X5`
+   - Swarm: `multipolar`
+   - Micro agents: `224`
+   - Gaussian pressure: `0.90`
+   - High-level learning: `0.88`
+   - Core tools: `chaos-engine-lab`, `multi-parallel-orchestrator`, `brain-fusion-monitor`, `sql-pattern-lens`
+
+2. **C++ intensive + performance**
+   - Mode: `Programming + C++`
+   - Type: `quantum-cpp-mesh`
+   - Swarm: `swarm`
+   - Micro agents: `240`
+   - Gaussian pressure: `0.82`
+   - High-level learning: `0.78`
+   - Core tools: `multi-parallel-orchestrator`, `quantized-compression-engine`, `parallel-compile-shaper`
+
+3. **UI/UX + SQL clarity**
+   - Mode: `GUI + Visual`
+   - Type: `visual-ux-oracle`
+   - Swarm: `mesh`
+   - Micro agents: `160`
+   - Gaussian pressure: `0.74`
+   - High-level learning: `0.84`
+   - Core tools: `ux-clarity-orchestrator`, `sql-pattern-lens`, `signal-art-synthesizer`
+
+4. **Security + reliability**
+   - Mode: `Learning Depth`
+   - Type: `security-fortress-core`
+   - Swarm: `specialist-mix`
+   - Micro agents: `192`
+   - Gaussian pressure: `0.86`
+   - High-level learning: `0.92`
+   - Core tools: `security-sentinel`, `truth-safety-guardian`, `memory-integrity-auditor`
+
+Dashboard includes a one-click **Apply Selected Smart Mix** control that applies these settings directly.
+
 This runtime enables:
 - QNAA/KNAA training simulations through `/simulate` and `/horizon-tests`
 - External/online signal ingest through `/ingest-signal` for cross-model learning influence

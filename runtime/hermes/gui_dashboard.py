@@ -1642,6 +1642,88 @@ with st.expander("Full Hermes Guide (complete quick-reference)", expanded=False)
     )
     st.caption("Best overall preset: use the 'Enable Ultimate + All Options' button, then run SQL Center setup and AIHub next-level upgrade.")
 
+st.markdown("#### X-Everything Smart Mix Guide (best settings by project)")
+smart_mix_catalog: Dict[str, Dict[str, Any]] = {
+    "Best overall project mix": {
+        "mode": "Programming + C++",
+        "type": "ultimate-ml-x5",
+        "swarm": "multipolar",
+        "micro_agents": 224,
+        "gaussian_pressure": 0.90,
+        "high_level_learning": 0.88,
+        "study_areas": ["Security", "Optimization", "AIHub", "Fleet Topology", "Learning Retention", "Truth & Safety", "Cost Efficiency"],
+        "tools": ["chaos-engine-lab", "multi-parallel-orchestrator", "brain-fusion-monitor", "sql-pattern-lens", "deployment-flow-router", "security-sentinel"],
+        "why": "Best blend for C++ intensity, deep learning, reliable SQL, and safe deployment.",
+    },
+    "C++ intensive + performance": {
+        "mode": "Programming + C++",
+        "type": "quantum-cpp-mesh",
+        "swarm": "swarm",
+        "micro_agents": 240,
+        "gaussian_pressure": 0.82,
+        "high_level_learning": 0.78,
+        "study_areas": ["Optimization", "AIHub", "Fleet Topology", "Cost Efficiency"],
+        "tools": ["multi-parallel-orchestrator", "quantized-compression-engine", "parallel-compile-shaper", "llm-latency-balancer", "deployment-flow-router"],
+        "why": "Pushes throughput and compile speed while keeping model routing efficient.",
+    },
+    "UI/UX + SQL clarity": {
+        "mode": "GUI + Visual",
+        "type": "visual-ux-oracle",
+        "swarm": "mesh",
+        "micro_agents": 160,
+        "gaussian_pressure": 0.74,
+        "high_level_learning": 0.84,
+        "study_areas": ["AIHub", "Learning Retention", "Movies & Media", "Truth & Safety"],
+        "tools": ["ux-clarity-orchestrator", "sql-pattern-lens", "signal-art-synthesizer", "llm-style-harmonizer", "brain-fusion-monitor"],
+        "why": "Cleaner interface behavior, stronger SQL visuals, and stable user-facing flow.",
+    },
+    "Security + reliability": {
+        "mode": "Learning Depth",
+        "type": "security-fortress-core",
+        "swarm": "specialist-mix",
+        "micro_agents": 192,
+        "gaussian_pressure": 0.86,
+        "high_level_learning": 0.92,
+        "study_areas": ["Security", "Truth & Safety", "Learning Retention", "Internet Signals"],
+        "tools": ["security-sentinel", "truth-safety-guardian", "chaos-engine-lab", "memory-integrity-auditor", "deployment-flow-router"],
+        "why": "Prioritizes hardening, safe decisions, and resilient long-horizon behavior.",
+    },
+}
+st.dataframe(
+    [
+        {
+            "Mix": name,
+            "Mode": str(cfg.get("mode", "")),
+            "Type": str(cfg.get("type", "")),
+            "Swarm": str(cfg.get("swarm", "")),
+            "Micro agents": int(cfg.get("micro_agents", 160)),
+            "Gaussian": float(cfg.get("gaussian_pressure", 0.80)),
+            "High-level learning": float(cfg.get("high_level_learning", 0.72)),
+            "Why this mix": str(cfg.get("why", "")),
+        }
+        for name, cfg in smart_mix_catalog.items()
+    ],
+    use_container_width=True,
+    hide_index=True,
+)
+mix_choice = st.selectbox("Choose smart project mix", list(smart_mix_catalog.keys()), key="ctl_smart_mix_choice")
+mix_cfg = smart_mix_catalog.get(mix_choice, {})
+st.caption(f"Smart recommendation: {mix_cfg.get('why', 'Balanced operating profile.')}")
+if st.button("Apply Selected Smart Mix", use_container_width=True):
+    st.session_state["ctl_operation_mode"] = str(mix_cfg.get("mode", "Programming + C++"))
+    st.session_state["ctl_hermes_type"] = str(mix_cfg.get("type", "ultimate-ml-x5"))
+    st.session_state["ctl_swarm_strategy"] = str(mix_cfg.get("swarm", "hybrid"))
+    st.session_state["ctl_micro_agents"] = int(max(16, min(256, int(mix_cfg.get("micro_agents", 160)))))
+    st.session_state["ctl_gaussian_pressure"] = float(max(0.40, min(1.00, float(mix_cfg.get("gaussian_pressure", 0.80)))))
+    st.session_state["ctl_high_level_learning"] = float(max(0.0, min(1.0, float(mix_cfg.get("high_level_learning", 0.72)))))
+    st.session_state["ctl_study_areas"] = list(mix_cfg.get("study_areas", []))
+    st.session_state["ctl_smart_tools"] = [t for t in list(mix_cfg.get("tools", [])) if t in SMART_TOOL_CATALOG]
+    st.session_state["ctl_x5_brain_pack"] = True
+    st.session_state["ctl_x6_learning_pack"] = True
+    st.session_state["ctl_both_sides_training"] = True
+    st.success(f"Applied smart mix: {mix_choice}")
+    st.rerun()
+
 st.subheader("Activity Goal Profile (Fast User Controls)")
 entry_defaults = default_user_entry_profile()
 goal_profile = st.selectbox(
