@@ -1,4 +1,5 @@
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -739,58 +740,62 @@ if st.button("Run Ultimate Learning + SQL Pulse", use_container_width=True):
 
 st.divider()
 st.subheader("Ultimate Everything (Backend Only)")
-st.caption("Runs all earlier capabilities (or better): ultimate AIHub/LLMs + ultimate brain/learning/sql + ultimate deployment, while keeping GUI simple.")
-u1, u2 = st.columns(2)
-with u1:
-    run_ultimate_all = st.button("Run Ultimate Everything Now", use_container_width=True)
-with u2:
-    run_ultimate_alias = st.button("Run Ultimate Upgrade (All Similar Features)", use_container_width=True)
-if run_ultimate_all or run_ultimate_alias:
+st.caption("Runs all earlier capabilities (or better): ultimate AIHub/LLMs + ultimate brain/learning/sql + ultimate deployment, automatically.")
+auto_ultimate_upgrade = st.toggle("Automatic Ultimate Upgrade", value=True)
+if "last_auto_ultimate_ts" not in st.session_state:
+    st.session_state["last_auto_ultimate_ts"] = 0.0
+if auto_ultimate_upgrade:
     if not st.session_state["login_ok"]:
-        st.error("Log in first, then run Ultimate Everything.")
+        st.info("Automatic ultimate upgrade is armed. Log in to activate it.")
     else:
-        backend_specialty = f"ultimate-everything-{ultimate_x_tier}-{ai_mind_mode}"
-        if universal_apply_all:
-            backend_specialty = f"{backend_specialty}-universal-all"
-        aihub_ok, aihub_err = _apply_aihub_upgrade(
-            st.session_state["api_key"],
-            specialty=f"{backend_specialty}-aihub",
-            steps=560,
-            candidates=240,
-            sql_signal=0.98,
-            internet_signal=0.55,
-            llm_signal=0.99,
-            stability_bias=0.96,
-        )
-        learning_ok, learning_err = _run_learning_sql_pulse(
-            st.session_state["api_key"],
-            specialty=f"{backend_specialty}-learning-sql",
-            steps=540,
-            candidates=240,
-            sql_signal=0.98,
-            internet_signal=0.92,
-            llm_signal=0.99,
-            stability_bias=0.95,
-        )
-        deploy_ok, deploy_err = _deploy_agent(
-            st.session_state["api_key"],
-            specialty=f"{backend_specialty}-deploy",
-            steps=560,
-            candidates=240,
-            sql_signal=0.98,
-            internet_signal=0.92,
-            llm_signal=0.99,
-            stability_bias=0.96,
-        )
-        if aihub_ok and learning_ok and deploy_ok:
-            st.success("Ultimate Everything completed for backend systems.")
+        now_ts = time.time()
+        if now_ts - float(st.session_state["last_auto_ultimate_ts"]) >= 90.0:
+            backend_specialty = f"ultimate-everything-{ultimate_x_tier}-{ai_mind_mode}"
+            if universal_apply_all:
+                backend_specialty = f"{backend_specialty}-universal-all"
+            aihub_ok, aihub_err = _apply_aihub_upgrade(
+                st.session_state["api_key"],
+                specialty=f"{backend_specialty}-aihub",
+                steps=560,
+                candidates=240,
+                sql_signal=0.98,
+                internet_signal=0.55,
+                llm_signal=0.99,
+                stability_bias=0.96,
+            )
+            learning_ok, learning_err = _run_learning_sql_pulse(
+                st.session_state["api_key"],
+                specialty=f"{backend_specialty}-learning-sql",
+                steps=540,
+                candidates=240,
+                sql_signal=0.98,
+                internet_signal=0.92,
+                llm_signal=0.99,
+                stability_bias=0.95,
+            )
+            deploy_ok, deploy_err = _deploy_agent(
+                st.session_state["api_key"],
+                specialty=f"{backend_specialty}-deploy",
+                steps=560,
+                candidates=240,
+                sql_signal=0.98,
+                internet_signal=0.92,
+                llm_signal=0.99,
+                stability_bias=0.96,
+            )
+            st.session_state["last_auto_ultimate_ts"] = now_ts
+            if aihub_ok and learning_ok and deploy_ok:
+                st.success("Automatic ultimate upgrade completed.")
+            else:
+                if not aihub_ok:
+                    st.error(f"Ultimate AIHub failed: {aihub_err}")
+                if not learning_ok:
+                    st.error(f"Ultimate learning/sql failed: {learning_err}")
+                if not deploy_ok:
+                    st.error(f"Ultimate deployment failed: {deploy_err}")
         else:
-            if not aihub_ok:
-                st.error(f"Ultimate AIHub failed: {aihub_err}")
-            if not learning_ok:
-                st.error(f"Ultimate learning/sql failed: {learning_err}")
-            if not deploy_ok:
-                st.error(f"Ultimate deployment failed: {deploy_err}")
+            wait_for = int(90 - (now_ts - float(st.session_state["last_auto_ultimate_ts"])))
+            st.caption(f"Automatic ultimate upgrade cooldown: {max(wait_for, 0)}s")
 
 if st.session_state["agents"]:
     st.caption(f"Agents created: {len(st.session_state['agents'])}")
