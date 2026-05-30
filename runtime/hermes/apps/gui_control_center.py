@@ -407,12 +407,61 @@ if ultimate_choice_preset in {"ultimate-agents", "ultimate-all"}:
     agent_swarm_size = max(agent_swarm_size, 128)
 st.caption(f"Active ultimate choice: {ultimate_choice_preset}")
 
+st.divider()
+st.subheader("Easy Agent Picker (Recommended)")
+easy_picker = st.toggle("Use easy picker", value=True)
+hermes_type_choice = st.selectbox(
+    "Hermes Type",
+    options=["hermes", "analyst", "builder", "optimizer", "guardian", "ultimate-x"],
+    index=0,
+)
+hermes_model_choice = st.selectbox(
+    "Hermes Model (4 profiles)",
+    options=["model-1-core", "model-2-hybrid", "model-3-x5", "model-4-x6-ultimate"],
+    index=3,
+)
+hermes_form_choice = st.selectbox(
+    "Form",
+    options=["standard", "hybrid", "x5", "x6"],
+    index=3,
+)
+workload_goal = st.selectbox(
+    "Goal",
+    options=["balanced", "deep-analysis", "rapid-deploy", "safe-production"],
+    index=0,
+)
+if easy_picker:
+    model_map = {
+        "model-1-core": ("full-brain", "assist", "advanced"),
+        "model-2-hybrid": ("full-brain", "assist", "advanced"),
+        "model-3-x5": ("ultimate-x5", "max", "ultimate"),
+        "model-4-x6-ultimate": ("ultimate-x6", "max", "ultimate"),
+    }
+    goal_specs = {
+        "balanced": ["reasoning", "coding", "deployment"],
+        "deep-analysis": ["reasoning", "research", "sql"],
+        "rapid-deploy": ["deployment", "ops", "routing"],
+        "safe-production": ["security", "ops", "deployment"],
+    }
+    chosen_brain, chosen_aihub, chosen_learning = model_map.get(hermes_model_choice, ("full-brain", "assist", "advanced"))
+    agent_type = hermes_type_choice
+    brain_mode = "ultimate-x6" if hermes_form_choice == "x6" else ("ultimate-x5" if hermes_form_choice == "x5" else chosen_brain)
+    aihub_mode = chosen_aihub
+    hermes_learning_mode = chosen_learning
+    specializations = goal_specs.get(workload_goal, goal_specs["balanced"])
+    smart_upgrade_bars = 30 if "ultimate" in hermes_model_choice else max(18, smart_upgrade_bars)
+    xp_boost = 95 if "ultimate" in hermes_model_choice else max(70, xp_boost)
+    training_intensity = max(training_intensity, 360 if "ultimate" in hermes_model_choice else 220)
+    st.caption("Smart add-ons auto-applied from your type/model/goal choice.")
+st.progress(int(xp_boost) / 100.0)
+st.caption(f"XP bar: {int(xp_boost)} | SQL level: {int(ultimate_sql_level)} | Smart bars: {int(smart_upgrade_bars)}")
+
 with st.expander("Quick Guide", expanded=False):
     st.markdown(
         "1. Save API key and click Login.\n"
-        "2. Create an agent (or select a saved one).\n"
-        "3. Pick packs/modes/sliders.\n"
-        "4. Click Deploy Agent."
+        "2. Use Easy Agent Picker (type + model + form + goal).\n"
+        "3. Click Save + Deploy Chosen Agent.\n"
+        "4. Use advanced controls only if needed."
     )
 with st.expander("Deep Guide: Hermes Types, X Forms, Hybrid, and 4 Models", expanded=False):
     st.markdown(
@@ -437,11 +486,20 @@ with st.expander("Deep Guide: Hermes Types, X Forms, Hybrid, and 4 Models", expa
         "| Model-2 Hybrid | Mixed workloads | Flexibility |\n"
         "| Model-3 X5 | Fast scaling/deploy | Throughput |\n"
         "| Model-4 X6 Ultimate | Deep learning + AIHub mesh | Maximum capability |\n\n"
+        "**Who should pick what**\n"
+        "- Pick `hermes + model-1-core` for stable daily use.\n"
+        "- Pick `analyst + model-2-hybrid` for deep reasoning and research.\n"
+        "- Pick `builder + model-3-x5` for faster delivery/deploy.\n"
+        "- Pick `ultimate-x + model-4-x6-ultimate` for max AIHub + LLM + learning power.\n\n"
+        "**Best defaults**\n"
+        "- If unsure, use `balanced` goal first.\n"
+        "- For production, prefer `safe-production` goal.\n"
+        "- For experiments, use `rapid-deploy` or `deep-analysis` goal.\n\n"
         "**How to use**\n"
-        "1. Pick Agent Type and Ultimate X Tier.\n"
-        "2. Enable Ultimate X bundle for full legacy-max behavior.\n"
-        "3. Use AIHub mesh + Learning/SQL pulse.\n"
-        "4. Run `Run Ultimate Everything Now` for full backend execution."
+        "1. Pick Hermes Type + 4-model profile + Form.\n"
+        "2. Pick a goal (balanced/deep-analysis/rapid-deploy/safe-production).\n"
+        "3. Save and deploy chosen agent.\n"
+        "4. Let automatic AIHub/learning/sql flows keep optimizing."
     )
 with st.expander("Mix & Match Guide (Presets, Hints, Best Starting Practices)", expanded=False):
     st.markdown(
@@ -706,6 +764,55 @@ with a2:
                     st.success(f"Deploy triggered for {target_name} ({specialty}) using {source}.")
                 else:
                     st.error(f"Deploy failed: {err}")
+
+if st.button("Save + Deploy Chosen Agent", use_container_width=True):
+    if not st.session_state["login_ok"]:
+        st.error("Log in first, then save + deploy.")
+    else:
+        chosen_name = (deploy_target if deploy_target != "(new agent)" else agent_name).strip() or "ultimate-x"
+        agents = [a for a in st.session_state["agents"] if a.get("name") != chosen_name]
+        agents.append(
+            {
+                "name": chosen_name,
+                "type": agent_type,
+                "brain_mode": brain_mode,
+                "aihub_mode": aihub_mode,
+                "hermes_learning_mode": hermes_learning_mode,
+                "xp_boost": xp_boost,
+                "saber_power": saber_power,
+                "feature_packs": len(selected_packs),
+                "max_cpu": max_cpu,
+                "max_ram": max_ram,
+                "max_gpu": max_gpu,
+                "created_utc": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        st.session_state["agents"] = agents
+        saved, save_err = _save_agents(agents)
+        if not saved:
+            st.error(f"Save failed: {save_err}")
+        simple_specialty = f"{agent_type}-{brain_mode}-{aihub_mode}-{hermes_learning_mode}-xp{int(xp_boost)}-sql{int(ultimate_sql_level)}"
+        ok, err = _deploy_agent(
+            st.session_state["api_key"],
+            specialty=simple_specialty,
+            steps=max(180, int(training_intensity)),
+            candidates=max(80, min(240, int(smart_upgrade_bars) * 6)),
+            sql_signal=max(0.55, min(1.0, ultimate_sql_level / 100.0)),
+            internet_signal=max(0.35, min(1.0, max_ram / 100.0)),
+            llm_signal=_llm_optimization_factor(
+                mesh_size=len(llm_mesh),
+                cost_bias=llm_cost_bias,
+                power_bias=llm_power_bias,
+                perf_bias=llm_perf_bias,
+                profile=llm_optimization_profile,
+                force_ultimate=(earlier_ultimate_bundle or universal_apply_all),
+            ),
+            stability_bias=max(0.55, min(1.0, ((xp_boost + saber_power) / 2) / 100.0)),
+        )
+        if ok:
+            st.success(f"Saved and deployed: {chosen_name}")
+        else:
+            st.error(f"Deploy failed after save: {err}")
 
 px1, px2 = st.columns(2)
 with px1:
