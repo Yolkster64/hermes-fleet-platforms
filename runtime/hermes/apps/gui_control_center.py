@@ -313,6 +313,18 @@ with cbrain:
 with caihub:
     aihub_mode = st.selectbox("AIHub Mode", options=["off", "assist", "max"], index=2)
 ultimate_x_tier = st.selectbox("Ultimate X Tier", options=["ultimate-x5", "ultimate-x6"], index=1)
+ultimate_choice_preset = st.selectbox(
+    "Ultimate Choice Preset",
+    options=[
+        "custom",
+        "ultimate-agents",
+        "ultimate-ai",
+        "ultimate-learning",
+        "ultimate-llms",
+        "ultimate-all",
+    ],
+    index=5,
+)
 
 st.subheader("Global Hermes Learning Core")
 earlier_ultimate_bundle = st.toggle("Everything from earlier or better (Ultimate X bundle)", value=True)
@@ -346,6 +358,31 @@ st.caption(
     f"(cost {llm_cost_bias}, power {llm_power_bias}, perf {llm_perf_bias})"
 )
 
+# Apply one-shot ultimate presets across agents, AI, learning, and LLM paths.
+if ultimate_choice_preset != "custom":
+    if ultimate_choice_preset in {"ultimate-agents", "ultimate-all"}:
+        agent_type = "ultimate-x"
+        ultimate_x_tier = "ultimate-x6"
+        smart_upgrade_bars = max(smart_upgrade_bars, 30)
+        agent_variance_model = "linear-regression"
+        agent_variance_strength = max(agent_variance_strength, 88)
+    if ultimate_choice_preset in {"ultimate-ai", "ultimate-all"}:
+        aihub_mode = "max"
+        ai_mind_mode = "ultimate-brain"
+        universal_apply_all = True
+    if ultimate_choice_preset in {"ultimate-learning", "ultimate-all"}:
+        hermes_learning_mode = "ultimate"
+        dynamic_brain_learning = True
+        carry_learning_all_agents = True
+        training_intensity = max(training_intensity, 420)
+        ultimate_sql_level = max(ultimate_sql_level, 95)
+    if ultimate_choice_preset in {"ultimate-llms", "ultimate-all"}:
+        llm_mesh = ["openai", "anthropic", "gemini", "mistral", "grok", "deepseek", "llama", "qwen"]
+        llm_optimization_profile = "throughput-max"
+        llm_cost_bias = min(llm_cost_bias, 10)
+        llm_power_bias = max(llm_power_bias, 99)
+        llm_perf_bias = max(llm_perf_bias, 99)
+
 ccpu, cram, cgpu = st.columns(3)
 with ccpu:
     max_cpu = st.slider("Max CPU %", 10, 100, 85)
@@ -364,6 +401,11 @@ specializations = st.multiselect(
 micro_parallelism = st.slider("Agent Micro Parallelization", 1, 128, 24)
 macro_parallelism = st.slider("Agent Macro Parallelization", 1, 64, 12)
 agent_swarm_size = st.slider("Agent Swarm Size", 1, 256, 32)
+if ultimate_choice_preset in {"ultimate-agents", "ultimate-all"}:
+    micro_parallelism = max(micro_parallelism, 96)
+    macro_parallelism = max(macro_parallelism, 32)
+    agent_swarm_size = max(agent_swarm_size, 128)
+st.caption(f"Active ultimate choice: {ultimate_choice_preset}")
 
 with st.expander("Quick Guide", expanded=False):
     st.markdown(
