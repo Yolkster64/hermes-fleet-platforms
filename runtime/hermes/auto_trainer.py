@@ -10,7 +10,9 @@ from volume_setup import ensure_runtime_volume_setup
 from training_sql_intel import (
     compute_sql_pattern_intel,
     ensure_training_sql,
+    export_hermes_profiles_snapshot,
     ingest_github_context,
+    optimize_training_sql,
     prune_training_sql,
     record_hermes_agent_variables,
     record_training_cycle,
@@ -79,6 +81,11 @@ SQL_MAX_CYCLE_ROWS = int(os.getenv("HERMES_SQL_MAX_CYCLE_ROWS", "6000"))
 SQL_MAX_AGENT_ROWS = int(os.getenv("HERMES_SQL_MAX_AGENT_ROWS", "24000"))
 SQL_MAX_GITHUB_ROWS = int(os.getenv("HERMES_SQL_MAX_GITHUB_ROWS", "4000"))
 SQL_MAX_PROFILE_ROWS = int(os.getenv("HERMES_SQL_MAX_PROFILE_ROWS", "3000"))
+SQL_INTEL_LOOKBACK = int(os.getenv("HERMES_SQL_INTEL_LOOKBACK", "240"))
+SQL_PRUNE_EVERY = int(os.getenv("HERMES_SQL_PRUNE_EVERY", "10"))
+SQL_OPTIMIZE_EVERY = int(os.getenv("HERMES_SQL_OPTIMIZE_EVERY", "30"))
+SQL_PROFILE_SNAPSHOT_EVERY = int(os.getenv("HERMES_SQL_PROFILE_SNAPSHOT_EVERY", "8"))
+SQL_GITHUB_INGEST_EVERY = int(os.getenv("HERMES_SQL_GITHUB_INGEST_EVERY", "4"))
 SPECIALIST_MODES = [m.strip() for m in os.getenv("HERMES_SPECIALIST_MODES", "swarm,mesh,multipolar,specialist-mix").split(",") if m.strip()]
 AGENT_WORK_STYLES = [s.strip() for s in os.getenv("HERMES_AGENT_WORK_STYLES", "fast_micro,deep_specialist,balanced_hybrid").split(",") if s.strip()]
 AGENT_SKILLS_25 = [
@@ -972,11 +979,14 @@ def run_cycle() -> None:
                 training_variables=training_variables,
                 micro_agents=dynamic_micro_agents,
             )
-            if _cycle % 4 == 0:
+            if _cycle % max(1, SQL_GITHUB_INGEST_EVERY) == 0:
                 ingest_github_context(_volume_root, repo_root=os.getcwd())
-            sql_intel = compute_sql_pattern_intel(_volume_root, lookback=240)
+            if _cycle % 2 == 0 or not _last_sql_intel:
+                sql_intel = compute_sql_pattern_intel(_volume_root, lookback=SQL_INTEL_LOOKBACK)
+            else:
+                sql_intel = _last_sql_intel
             art_pattern = sql_intel.get("art_pattern", {}) if isinstance(sql_intel, dict) else {}
-            if _cycle % 10 == 0:
+            if _cycle % max(1, SQL_PRUNE_EVERY) == 0:
                 prune_stats = prune_training_sql(
                     _volume_root,
                     max_cycles=SQL_MAX_CYCLE_ROWS,
@@ -988,6 +998,22 @@ def run_cycle() -> None:
                     "auto_trainer.sql_maintenance",
                     0.75,
                     {"cycle": _cycle, "prune_stats": prune_stats},
+                    timeout=20,
+                )
+            if _cycle % max(1, SQL_OPTIMIZE_EVERY) == 0:
+                optimize_stats = optimize_training_sql(_volume_root, quick=not MAX_MODE)
+                _emit_signal(
+                    "auto_trainer.sql_optimize",
+                    0.78,
+                    {"cycle": _cycle, "optimize_stats": optimize_stats},
+                    timeout=20,
+                )
+            if _cycle % max(1, SQL_PROFILE_SNAPSHOT_EVERY) == 0:
+                snapshot_info = export_hermes_profiles_snapshot(_volume_root, max_rows=min(600, max(120, SQL_MAX_PROFILE_ROWS)))
+                _emit_signal(
+                    "auto_trainer.profile_snapshot",
+                    0.82,
+                    {"cycle": _cycle, "snapshot": snapshot_info},
                     timeout=20,
                 )
             _last_sql_intel = sql_intel if isinstance(sql_intel, dict) else _last_sql_intel

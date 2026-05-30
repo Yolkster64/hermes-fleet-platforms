@@ -9,6 +9,21 @@ import streamlit as st
 from training_sql_intel import compute_sql_pattern_intel, ensure_training_sql
 from volume_setup import ensure_runtime_volume_setup, resolve_runtime_volume_root
 
+_SCAN_SKIP_DIRS = {
+    ".git",
+    "__pycache__",
+    "node_modules",
+    ".venv",
+    "venv",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".idea",
+    ".vs",
+    "bin",
+    "obj",
+}
+_SCAN_SKIP_SUFFIXES = {".pyc", ".tmp", ".lock"}
+
 
 def resolve_volume_root() -> str:
     return resolve_runtime_volume_root()
@@ -21,8 +36,10 @@ def scan_volume_files(root: str, limit: int = 500) -> List[Dict[str, object]]:
     if not os.path.exists(root):
         return []
     for base, dirs, files in os.walk(root):
-        dirs[:] = [d for d in dirs if d not in {".git", "__pycache__", "node_modules"}]
+        dirs[:] = [d for d in dirs if d not in _SCAN_SKIP_DIRS]
         for name in files:
+            if any(name.endswith(sfx) for sfx in _SCAN_SKIP_SUFFIXES):
+                continue
             path = os.path.join(base, name)
             try:
                 stat = os.stat(path)

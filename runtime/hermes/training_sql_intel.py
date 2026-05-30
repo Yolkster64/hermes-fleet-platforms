@@ -7,6 +7,7 @@ import time
 from typing import Dict, List
 
 _SCHEMA_READY: set[str] = set()
+_SQL_INTEL_CACHE: Dict[str, Dict[str, object]] = {}
 
 
 def _db_path(volume_root: str) -> str:
@@ -21,6 +22,31 @@ def _connect(db: str) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=OFF")
     conn.execute("PRAGMA cache_size=-20000")
     return conn
+
+
+def optimize_training_sql(volume_root: str, quick: bool = True) -> Dict[str, object]:
+    db = ensure_training_sql(volume_root)
+    payload = {"wal_checkpoint": "none", "analyze": False, "vacuum": False}
+    with _connect(db) as conn:
+        try:
+            checkpoint_row = conn.execute("PRAGMA wal_checkpoint(PASSIVE)").fetchone()
+            if checkpoint_row:
+                payload["wal_checkpoint"] = [int(v) for v in checkpoint_row]
+        except sqlite3.Error:
+            payload["wal_checkpoint"] = "error"
+        try:
+            conn.execute("ANALYZE")
+            payload["analyze"] = True
+        except sqlite3.Error:
+            payload["analyze"] = False
+        if not quick:
+            try:
+                conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+                payload["vacuum"] = True
+            except sqlite3.Error:
+                payload["vacuum"] = False
+        conn.commit()
+    return payload
 
 
 def ensure_training_sql(volume_root: str) -> str:
@@ -389,7 +415,18 @@ def _benefits_and_ideas(art_pattern: Dict[str, float], trend: float) -> tuple[Li
 
 def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str, object]:
     db = ensure_training_sql(volume_root)
+    cache = _SQL_INTEL_CACHE.get(db, {})
+    cache_window = max(1, min(2000, int(lookback)))
     with _connect(db) as conn:
+        latest_cycle_id_row = conn.execute("SELECT COALESCE(MAX(id), 0) FROM training_cycles").fetchone()
+        latest_cycle_id = int(latest_cycle_id_row[0]) if latest_cycle_id_row else 0
+        if (
+            cache
+            and int(cache.get("latest_cycle_id", -1)) == latest_cycle_id
+            and int(cache.get("lookback", 0)) == cache_window
+            and isinstance(cache.get("payload"), dict)
+        ):
+            return dict(cache["payload"])
         rows = conn.execute(
             """
             SELECT cycle, signal_score, reward, truth_score, shape_score, training_variables_json
@@ -425,6 +462,10 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
             LIMIT 30
             """
         ).fetchall()
+        total_cycles = conn.execute("SELECT COUNT(1) FROM training_cycles").fetchone()
+        total_agents = conn.execute("SELECT COUNT(1) FROM hermes_agent_variables").fetchone()
+        total_profiles = conn.execute("SELECT COUNT(1) FROM hermes_agent_profiles").fetchone()
+        total_github = conn.execute("SELECT COUNT(1) FROM github_context").fetchone()
 
     if not rows:
         return {"rows": 0, "pattern_score": 0.0, "trend": 0.0, "variable_means": {}, "latest_github": {}}
@@ -475,7 +516,8 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
     else:
         recent_hermes_profiles = [_build_recent_hermes_profile(row) for row in latest_agents]
     benefits, ideas = _benefits_and_ideas(art_pattern, trend)
-    return {
+    db_bytes = os.path.getsize(db) if os.path.exists(db) else 0
+    payload = {
         "rows": len(rows),
         "pattern_score": float(pattern_score),
         "trend": float(trend),
@@ -491,9 +533,22 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
         "art_pattern": art_pattern,
         "latest_github": github_payload,
         "recent_hermes_profiles": recent_hermes_profiles,
+        "sql_health": {
+            "db_mb": float(db_bytes) / (1024.0 * 1024.0),
+            "total_cycles": int(total_cycles[0]) if total_cycles else len(rows),
+            "total_agent_rows": int(total_agents[0]) if total_agents else 0,
+            "total_profile_rows": int(total_profiles[0]) if total_profiles else 0,
+            "total_github_rows": int(total_github[0]) if total_github else 0,
+        },
         "benefits": benefits,
         "ideas": ideas,
     }
+    _SQL_INTEL_CACHE[db] = {
+        "latest_cycle_id": latest_cycle_id,
+        "lookback": cache_window,
+        "payload": payload,
+    }
+    return payload
 
 
 def ingest_github_context(volume_root: str, repo_root: str) -> Dict[str, object]:
@@ -630,3 +685,34 @@ def record_hermes_agent_variables(
             profile_rows,
         )
         conn.commit()
+
+
+def export_hermes_profiles_snapshot(volume_root: str, max_rows: int = 200) -> Dict[str, object]:
+    db = ensure_training_sql(volume_root)
+    output_path = os.path.join(volume_root, "training", "hermes_agent_profiles_snapshot.json")
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    with _connect(db) as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                hermes_id, specialty, signal_score, art_pattern_score, experience_xp,
+                level, speed_bonus, token_power_gain, size_mode, specialties_json, tools_json, variables_json, updated_unix
+            FROM hermes_agent_profiles
+            ORDER BY updated_unix DESC
+            LIMIT ?
+            """,
+            (max(1, int(max_rows)),),
+        ).fetchall()
+    profiles: List[Dict[str, object]] = []
+    for row in rows:
+        profile = _build_saved_hermes_profile(row[:12])
+        profile["updated_unix"] = float(row[12])
+        profiles.append(profile)
+    payload = {
+        "created_unix": time.time(),
+        "rows": len(profiles),
+        "profiles": profiles,
+    }
+    with open(output_path, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, ensure_ascii=True, separators=(",", ":"))
+    return {"path": output_path, "rows": len(profiles), "created_unix": payload["created_unix"]}

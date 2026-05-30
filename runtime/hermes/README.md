@@ -104,8 +104,9 @@ This runtime enables:
   - SQL-backed training intelligence now writes cycle data to volume (`training/hermes_training_intel.sqlite3`), computes deep variable-pattern summaries, and surfaces pattern/variable/GitHub context in GUI
   - Per-Hermes variable profiles are now stored in SQL (`hermes_agent_variables`) with art-pattern scoring for each Hermes micro profile
   - Saved Hermes agent profiles now persist in SQL (`hermes_agent_profiles`) with upserted XP/level/speed/token/size/tools/specialties for fast restore and GUI display
+  - Trainer now auto-exports SQL-backed Hermes profile snapshots to volume (`training/hermes_agent_profiles_snapshot.json`) for backup/restore handoff
   - SQL intelligence now includes deep compression + 3D overlap metrics and auto-generated benefits/ideas for next training moves
-  - SQL layer is now performance-hardened with indexes + automatic retention pruning (`HERMES_SQL_MAX_CYCLE_ROWS`, `HERMES_SQL_MAX_AGENT_ROWS`, `HERMES_SQL_MAX_GITHUB_ROWS`, `HERMES_SQL_MAX_PROFILE_ROWS`)
+  - SQL layer is now performance-hardened with indexes + automatic retention pruning (`HERMES_SQL_MAX_CYCLE_ROWS`, `HERMES_SQL_MAX_AGENT_ROWS`, `HERMES_SQL_MAX_GITHUB_ROWS`, `HERMES_SQL_MAX_PROFILE_ROWS`) plus cadence controls (`HERMES_SQL_INTEL_LOOKBACK`, `HERMES_SQL_PRUNE_EVERY`, `HERMES_SQL_OPTIMIZE_EVERY`, `HERMES_SQL_PROFILE_SNAPSHOT_EVERY`, `HERMES_SQL_GITHUB_INGEST_EVERY`)
   - AIHub optimizer now blends watch telemetry (`watch_signal`) with SQL/art/bridge signals for smarter model routing and bonus shaping
   - Hermes trainer now applies a max-upgrade planner per cycle (`auto_trainer.max_upgrade_plan`) that scales steps/candidates/signals from SQL trend + watch efficiency complexity
   - Learning brain now includes an action-brain policy layer (aggression/safety/rollout) for stronger decide+act optimization in training loops
