@@ -8,6 +8,7 @@ from gui_api_client import API_BASE, log_text, run_logged_post_action, safe_get,
 from gui_evolution_panels import render_evolution_centerpiece, render_learning_graphs
 from gui_insights import fleet_score_history, latest_learned_profile, render_learning_diagram, render_xp_bar
 from gui_sql_panels import render_sql_intelligence_panels
+from gui_watch_panels import render_aihub_watch_panels
 from gui_volume_tools import (
     initialize_volume_layout,
     read_sql_training_intelligence,
@@ -329,6 +330,7 @@ with st.sidebar:
     refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, value=20, step=5)
 
 watch_payload, watch_err = safe_get("/system-watch", timeout=25)
+gateway_watch, gateway_watch_err = safe_get("/gateway-max-status", timeout=20)
 if not watch_err and isinstance(watch_payload, dict):
     unified = watch_payload.get("unified_config", {}) if isinstance(watch_payload.get("unified_config"), dict) else {}
     bonus_data = watch_payload.get("aihub_bonus", {}) if isinstance(watch_payload.get("aihub_bonus"), dict) else {}
@@ -401,6 +403,27 @@ render_evolution_centerpiece(
     training_status=training_status if isinstance(training_status, dict) else {},
 )
 render_learning_graphs(live_sql_intel if isinstance(live_sql_intel, dict) else {})
+watch_plan = render_aihub_watch_panels(
+    unified=unified if isinstance(unified, dict) else {},
+    watch_payload=watch_payload if isinstance(watch_payload, dict) else {},
+    gateway_status=gateway_watch if isinstance(gateway_watch, dict) else {},
+    sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
+    training_status=training_status if isinstance(training_status, dict) else {},
+    growth_data=growth_data if isinstance(growth_data, dict) else {},
+    optimizer_state=st.session_state.get("last_chat_optimizer", {}),
+)
+if gateway_watch_err:
+    st.caption(f"Gateway watch telemetry pending: {gateway_watch_err}")
+if st.button("Auto-Design AIHub Plan for Complex Situations", use_container_width=True):
+    payload = watch_plan.get("recommended_payload", {}) if isinstance(watch_plan, dict) else {}
+    run_logged_post_action(
+        label="aihub-max-upgrade",
+        path="/aihub-max-upgrade",
+        payload=payload,
+        success_message="AIHub max-upgrade plan triggered.",
+        error_prefix="AIHub max-upgrade failed",
+        timeout=160,
+    )
 
 st.subheader("Training Compliance + Always-On Status")
 ts1, ts2, ts3, ts4, ts5 = st.columns(5)

@@ -51,6 +51,7 @@ This runtime enables:
   - GUI insights/render split: `runtime/hermes/gui_insights.py`
   - GUI volume explorer split: `runtime/hermes/gui_volume_tools.py`
   - GUI SQL intelligence panels split: `runtime/hermes/gui_sql_panels.py`
+  - GUI AIHub watch/forecast panels split: `runtime/hermes/gui_watch_panels.py`
   - Runtime volume bootstrap: `runtime/hermes/volume_setup.py` (shared by trainer + GUI)
   - SQL training intelligence: `runtime/hermes/training_sql_intel.py` (deep variable-pattern tracking + GitHub context)
   - Variable registry now includes watch/observer variables (`signal_stability`, `watch_coverage`, `anomaly_resistance`, `drift_control`) for brain+SQL alignment
@@ -63,6 +64,7 @@ This runtime enables:
   - `GET /system-watch` (aggregated watch endpoint: health + snapshot + training + cpp + SQL/AIHub-linked signals)
   - `GET /gateway-max-status` (high-visibility gateway telemetry: route counts/errors/latency)
   - `POST /aihub-max-upgrade` (one-shot max AIHub curation + learning-pulse upgrade path)
+  - Dashboard now includes an **Auto-Design AIHub Plan** action for complex situations (uses `/aihub-max-upgrade`)
   - `POST /runtime-orchestrate/deploy` (C#-dispatched learning pulse + optimize deploy flow, supports batch deploy sizing)
   - `POST /runtime-orchestrate/return` (return Hermes units signal path for controlled pullback)
   - `POST /runtime-orchestrate/restore` (restore/swap orchestration signal path)
