@@ -20,17 +20,20 @@ if ($Trigger -in @("Always", "AtLogon")) {
 }
 $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
     -StartWhenAvailable `
     -RestartCount 999 `
     -RestartInterval (New-TimeSpan -Minutes 1) `
-    -MultipleInstances IgnoreNew
+    -MultipleInstances IgnoreNew `
+    -ExecutionTimeLimit (New-TimeSpan -Seconds 0)
+$principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 
 Register-ScheduledTask `
     -TaskName "HermesRuntimeAutostart" `
     -Action $action `
     -Trigger $taskTriggers `
     -Settings $settings `
-    -RunLevel Highest `
+    -Principal $principal `
     -Force | Out-Null
 Start-ScheduledTask -TaskName "HermesRuntimeAutostart"
 $taskState = (Get-ScheduledTask -TaskName "HermesRuntimeAutostart").State
