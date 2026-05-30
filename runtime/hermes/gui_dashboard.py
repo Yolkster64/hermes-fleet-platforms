@@ -171,65 +171,65 @@ HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
     },
 }
 ALGORITHMIC_HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
-    "algo-knaa-qnaa": {
-        "title": "Algorithmic KNAA/QNAA",
-        "group": "Original Algorithmic",
-        "personality": "High-precision formal reasoner for structured decision trees.",
-        "description": "Optimized for deep logic paths, strict decomposition, and robust correctness checks.",
-        "swarm_strategy": "specialist-mix",
-        "micro_agents": 240,
-        "gaussian_pressure": 0.89,
-        "high_level_learning": 0.84,
-        "techniques": ["KNAA/QNAA reasoning", "Quantized compression", "Cross-agent communication mesh"],
-        "specialty_tag": "algo-knaa-qnaa",
+    "legacy-hybrid": {
+        "title": "Hybrid Legacy",
+        "group": "Legacy Strategy",
+        "personality": "Balanced coordinator that keeps performance and stability aligned.",
+        "description": "Legacy hybrid profile from the original strategy set.",
+        "swarm_strategy": "hybrid",
+        "micro_agents": 196,
+        "gaussian_pressure": 0.84,
+        "high_level_learning": 0.76,
+        "techniques": ["KNAA/QNAA reasoning", "Cross-agent communication mesh", "Natural pressure adaptation"],
+        "specialty_tag": "legacy-hybrid",
     },
-    "algo-gnaa-memory": {
-        "title": "Algorithmic GNAA Memory",
-        "group": "Original Algorithmic",
-        "personality": "Long-memory optimizer focused on retention quality and historical coherence.",
-        "description": "Best for memory-heavy training with persistent improvement loops.",
+    "legacy-mesh": {
+        "title": "Mesh Legacy",
+        "group": "Legacy Strategy",
+        "personality": "Collaborative depth mode with stronger multi-agent linkage.",
+        "description": "Legacy mesh profile focused on coordinated sub-agent reasoning.",
         "swarm_strategy": "mesh",
-        "micro_agents": 224,
-        "gaussian_pressure": 0.86,
-        "high_level_learning": 0.88,
-        "techniques": ["GNAA adaptive memory", "Cross-agent communication mesh", "Natural pressure adaptation"],
-        "specialty_tag": "algo-gnaa-memory",
-    },
-    "algo-gaussian-3d": {
-        "title": "Algorithmic Gaussian 3D",
-        "group": "Original Algorithmic",
-        "personality": "Signal-shape analyst that emphasizes probabilistic stability and anomaly sensing.",
-        "description": "Great for SQL trend quality and training health optimization.",
-        "swarm_strategy": "multipolar",
-        "micro_agents": 232,
-        "gaussian_pressure": 0.93,
-        "high_level_learning": 0.87,
-        "techniques": ["Gaussian 3D evidence", "GNAA adaptive memory", "Quantized compression"],
-        "specialty_tag": "algo-gaussian-3d",
-    },
-    "algo-multipolar-ensemble": {
-        "title": "Algorithmic Multipolar Ensemble",
-        "group": "Original Algorithmic",
-        "personality": "Diverse parallel planner that compares multiple reasoning poles in real time.",
-        "description": "Good for strategy diversity and resilient fallback choices.",
-        "swarm_strategy": "multipolar",
-        "micro_agents": 248,
-        "gaussian_pressure": 0.91,
-        "high_level_learning": 0.86,
-        "techniques": ["Multipolar ensemble", "Multi-parallel swarm", "Cross-agent communication mesh"],
-        "specialty_tag": "algo-multipolar",
-    },
-    "algo-chaos-trials": {
-        "title": "Algorithmic Chaos Trials",
-        "group": "Original Algorithmic",
-        "personality": "Exploration-first variant that stress-tests edges and unusual paths.",
-        "description": "Use for aggressive search and unconventional optimization runs.",
-        "swarm_strategy": "swarm",
-        "micro_agents": 256,
-        "gaussian_pressure": 0.95,
+        "micro_agents": 214,
+        "gaussian_pressure": 0.87,
         "high_level_learning": 0.80,
-        "techniques": ["Chaos engine trials", "Multi-parallel swarm", "GNAA adaptive memory"],
-        "specialty_tag": "algo-chaos",
+        "techniques": ["GNAA adaptive memory", "Cross-agent communication mesh", "Natural pressure adaptation"],
+        "specialty_tag": "legacy-mesh",
+    },
+    "legacy-parallel-swarm": {
+        "title": "Parallel Swarm",
+        "group": "Legacy Strategy",
+        "personality": "Parallel-heavy profile for rapid multi-lane execution.",
+        "description": "The parallel-ish legacy mode for high-throughput operations.",
+        "swarm_strategy": "swarm",
+        "micro_agents": 236,
+        "gaussian_pressure": 0.90,
+        "high_level_learning": 0.72,
+        "techniques": ["Multi-parallel swarm", "C++ neural kernel boost", "Quantized compression"],
+        "specialty_tag": "legacy-parallel",
+    },
+    "legacy-multipolar": {
+        "title": "Multipolar",
+        "group": "Legacy Strategy",
+        "personality": "Multi-perspective planner with rich strategy diversity.",
+        "description": "Legacy multipolar mode for complex strategy comparisons.",
+        "swarm_strategy": "multipolar",
+        "micro_agents": 244,
+        "gaussian_pressure": 0.91,
+        "high_level_learning": 0.85,
+        "techniques": ["Multipolar ensemble", "Multi-parallel swarm", "Cross-agent communication mesh"],
+        "specialty_tag": "legacy-multipolar",
+    },
+    "legacy-specialist-mix": {
+        "title": "Specialist Mix",
+        "group": "Legacy Strategy",
+        "personality": "Niche expert blend where each sub-agent handles a focused domain.",
+        "description": "Legacy specialist profile for precision workflows and role partitioning.",
+        "swarm_strategy": "specialist-mix",
+        "micro_agents": 206,
+        "gaussian_pressure": 0.82,
+        "high_level_learning": 0.79,
+        "techniques": ["Sub-agent niche shaping", "GNAA adaptive memory", "KNAA/QNAA reasoning"],
+        "specialty_tag": "legacy-specialist",
     },
 }
 MODEL_OPTIONS = [
@@ -604,7 +604,7 @@ with st.sidebar:
     refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, value=20, step=5)
     focused_layout = st.checkbox("Focused layout (clean view)", value=True)
     show_legacy_map_ui = st.checkbox("Show AIHub Hub + Map panels", value=True)
-    st.checkbox("Enable original algorithmic Hermes types", value=False, key="ctl_enable_algorithmic_types")
+    st.checkbox("Enable legacy strategy Hermes types", value=False, key="ctl_enable_algorithmic_types")
     st.markdown("### Hermes Type + Model")
     active_type_presets = _active_hermes_presets()
     hermes_type_labels = {k: str(v.get("title", k)) for k, v in active_type_presets.items()}
@@ -788,7 +788,7 @@ with st.expander("Hermes Type Catalog + Optimization Tips", expanded=False):
         hide_index=True,
     )
     if not _use_algorithmic_presets():
-        st.caption("Turn on 'Enable original algorithmic Hermes types' in the sidebar to load the full legacy ML algorithm catalog.")
+        st.caption("Turn on 'Enable legacy strategy Hermes types' in the sidebar to load Hybrid/Mesh/Parallel + additional legacy strategy modes.")
     st.markdown(
         "- **Optimization tip:** use Quick/Hybrid for deployment speed, Mesh/Creative for collaboration breadth, and Deep modes for harder reasoning.\n"
         "- **Stability tip:** keep gaussian pressure in 0.78-0.90 for consistent SQL growth quality.\n"

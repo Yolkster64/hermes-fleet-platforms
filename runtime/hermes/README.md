@@ -149,7 +149,7 @@ This runtime enables:
   - GUI now includes expanded **Hermes Type + Model** controls with **custom + official** personalities and descriptions:
     - Custom: `Hybrid`, `Mesh`, `Normal`, `Deep Thinker`
     - Official: `Quick Thinker`, `Official Deep Thinker`, `Balanced Thinker`, `Creative Thinker`
-  - Optional legacy ML catalog toggle: **Enable original algorithmic Hermes types** (KNAA/QNAA, GNAA memory, Gaussian 3D, multipolar ensemble, chaos trials)
+  - Optional legacy strategy catalog toggle: **Enable legacy strategy Hermes types** (`Hybrid Legacy`, `Mesh Legacy`, `Parallel Swarm`, `Multipolar`, `Specialist Mix`)
   - Level 4 center adds SQL/hub deployment buttons and sub-agent readiness bars with optimization tips
   - GUI now shows per-Hermes level/XP/speed bonus/token gain bars, GitHub CLI connection panel, and fleet lock/unlock controls for hard-problem mode
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
