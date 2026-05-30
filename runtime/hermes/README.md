@@ -108,6 +108,8 @@ This runtime enables:
   - SQL layer is now performance-hardened with indexes + automatic retention pruning (`HERMES_SQL_MAX_CYCLE_ROWS`, `HERMES_SQL_MAX_AGENT_ROWS`, `HERMES_SQL_MAX_GITHUB_ROWS`, `HERMES_SQL_MAX_PROFILE_ROWS`)
   - AIHub optimizer now blends watch telemetry (`watch_signal`) with SQL/art/bridge signals for smarter model routing and bonus shaping
   - Hermes trainer now applies a max-upgrade planner per cycle (`auto_trainer.max_upgrade_plan`) that scales steps/candidates/signals from SQL trend + watch efficiency complexity
+  - Learning brain now includes an action-brain policy layer (aggression/safety/rollout) for stronger decide+act optimization in training loops
+  - AIHub bonus now fuses action-brain memory with adaptive/watch/SQL signals for stronger whole-brain scaling
   - Docker services now explicitly set `HERMES_VOLUME_DATA_PATH=/workspace/runtime/hermes_persist` so SQL setup is auto-initialized in the mounted volume
   - GUI now shows per-Hermes level/XP/speed bonus/token gain bars, GitHub CLI connection panel, and fleet lock/unlock controls for hard-problem mode
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI

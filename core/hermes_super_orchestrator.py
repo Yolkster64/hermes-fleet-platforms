@@ -652,6 +652,7 @@ class HermesSuperOrchestrator:
             "long_haul_meta_memory": [],
             "aihub_bonus_memory": [],
             "adaptive_brain_memory": [],
+            "action_brain_memory": [],
             "hard_facts": {},
             "adaptive_dynamic_modifiers": {},
         }
@@ -702,7 +703,7 @@ class HermesSuperOrchestrator:
             "mid": [float(v) for v in list(source_horizon.get("mid", []))[-max_tail:]],
             "long": [float(v) for v in list(source_horizon.get("long", []))[-max_tail:]],
         }
-        for key in ("knaa_qnaa_memory", "punishment_memory", "fleet_shape_memory", "long_haul_meta_memory", "aihub_bonus_memory", "adaptive_brain_memory"):
+        for key in ("knaa_qnaa_memory", "punishment_memory", "fleet_shape_memory", "long_haul_meta_memory", "aihub_bonus_memory", "adaptive_brain_memory", "action_brain_memory"):
             values = self.algorithm_state.get(key, [])
             if isinstance(values, list):
                 state[key] = [float(v) for v in values[-max_tail:]]
@@ -721,7 +722,7 @@ class HermesSuperOrchestrator:
     def _deserialize_algorithm_state(self, payload: Dict) -> None:
         if not isinstance(payload, dict):
             return
-        for key in ("bandit_values", "horizon_memory", "knaa_qnaa_memory", "punishment_memory", "fleet_shape_memory", "long_haul_meta_memory", "aihub_bonus_memory", "adaptive_brain_memory", "hard_facts", "adaptive_dynamic_modifiers"):
+        for key in ("bandit_values", "horizon_memory", "knaa_qnaa_memory", "punishment_memory", "fleet_shape_memory", "long_haul_meta_memory", "aihub_bonus_memory", "adaptive_brain_memory", "action_brain_memory", "hard_facts", "adaptive_dynamic_modifiers"):
             if key in payload and isinstance(payload[key], (dict, list)):
                 self.algorithm_state[key] = payload[key]
         q_table = payload.get("q_table", {})
@@ -791,8 +792,19 @@ class HermesSuperOrchestrator:
         meta = self.algorithm_state["long_haul_meta_memory"]
         bonus = self.algorithm_state["aihub_bonus_memory"]
         adaptive = self.algorithm_state["adaptive_brain_memory"]
-        total_learning_events = len(knaa) + len(fleet) + len(meta) + len(adaptive)
-        growth_index = max(0.0, min(1.0, (_tail_avg(knaa) * 0.28) + (_tail_avg(fleet) * 0.24) + (_tail_avg(meta) * 0.24) + (_tail_avg(adaptive) * 0.24)))
+        action = self.algorithm_state.get("action_brain_memory", [])
+        total_learning_events = len(knaa) + len(fleet) + len(meta) + len(adaptive) + len(action)
+        growth_index = max(
+            0.0,
+            min(
+                1.0,
+                (_tail_avg(knaa) * 0.24)
+                + (_tail_avg(fleet) * 0.21)
+                + (_tail_avg(meta) * 0.20)
+                + (_tail_avg(adaptive) * 0.20)
+                + (_tail_avg(action) * 0.15),
+            ),
+        )
         mesh_summary = self.store.knowledge_mesh_summary()
         return {
             "growth_index": growth_index,
@@ -801,6 +813,7 @@ class HermesSuperOrchestrator:
             "avg_long_haul_meta": _tail_avg(meta),
             "avg_aihub_bonus": _tail_avg(bonus),
             "avg_adaptive_brain": _tail_avg(adaptive),
+            "avg_action_brain": _tail_avg(action),
             "total_learning_events": total_learning_events,
             "knowledge_depth": {
                 "bandit_specialties": len(self.algorithm_state["bandit_values"]),
@@ -1386,6 +1399,56 @@ class HermesSuperOrchestrator:
             },
         }
 
+    def _action_brain_policy(
+        self,
+        adaptive_decision: Dict[str, float],
+        training_variables: Dict[str, float],
+        efficiency_profile: Dict[str, float],
+        big_decision_plan: Optional[Dict],
+        hard_fact: Dict[str, float],
+        workload_complexity: float,
+    ) -> Dict[str, float]:
+        confidence = max(0.0, min(1.0, float(adaptive_decision.get("confidence", 0.5))))
+        proactive = max(0.0, min(1.0, float(adaptive_decision.get("proactive_score", 0.5))))
+        adaptation = max(0.0, min(1.0, float(adaptive_decision.get("adaptation_rate", 0.5))))
+        watch_eff = max(0.0, min(1.0, float(training_variables.get("watch_efficiency", 0.5))))
+        wrongness = max(0.0, min(1.0, float(training_variables.get("wrongness_signal", 0.5))))
+        yield_eff = max(0.0, min(1.0, float(efficiency_profile.get("yield_efficiency", 0.5))))
+        confidence_to_pivot = float(big_decision_plan.get("confidence_to_pivot", 0.0)) if isinstance(big_decision_plan, dict) else 0.0
+        aggression = max(
+            0.0,
+            min(
+                1.0,
+                (proactive * 0.34)
+                + (adaptation * 0.18)
+                + (yield_eff * 0.18)
+                + (watch_eff * 0.12)
+                + (confidence_to_pivot * 0.10)
+                + ((1.0 - workload_complexity) * 0.08),
+            ),
+        )
+        safety_guard = max(
+            0.0,
+            min(
+                1.0,
+                (wrongness * 0.36)
+                + ((1.0 - confidence) * 0.22)
+                + ((1.0 - watch_eff) * 0.16)
+                + (workload_complexity * 0.18)
+                + (0.08 if bool(hard_fact.get("locked", False)) else 0.0),
+            ),
+        )
+        rollout_scale = max(0.2, min(1.4, 0.72 + (aggression * 0.56) - (safety_guard * 0.34)))
+        policy_score = max(0.0, min(1.0, (aggression * 0.62) + ((1.0 - safety_guard) * 0.38)))
+        action_mode = "burst" if aggression >= 0.68 and safety_guard <= 0.40 else ("guarded" if safety_guard >= 0.62 else "balanced")
+        return {
+            "aggression": aggression,
+            "safety_guard": safety_guard,
+            "rollout_scale": rollout_scale,
+            "policy_score": policy_score,
+            "action_mode": action_mode,
+        }
+
     def _natural_selection(self) -> None:
         inactive_candidates = [a for a in self.agents if a.success_rate < 0.2 and a.reward_score < 0.1]
         if inactive_candidates and len(self.agents) > 6:
@@ -1673,6 +1736,19 @@ class HermesSuperOrchestrator:
             big_decision_plan = self._build_big_decision_plan(specialty_hint=specialty_hint, adaptive_decision=adaptive_decision, workload_complexity=effective_work)
             hard_fact = self._apply_hard_facts(agent.specialty, adaptive_decision, truth_score, quality)
             aihub_bonus = self._soft_blend(self.compute_aihub_bonus(), aihub_bonus_live, alpha=0.22)
+            action_brain = self._action_brain_policy(
+                adaptive_decision=adaptive_decision,
+                training_variables=training_variables,
+                efficiency_profile=efficiency_profile,
+                big_decision_plan=big_decision_plan,
+                hard_fact=hard_fact,
+                workload_complexity=effective_work,
+            )
+            action_mem = self.algorithm_state.get("action_brain_memory", [])
+            if isinstance(action_mem, list):
+                action_mem.append(float(action_brain["policy_score"]))
+                if len(action_mem) > 2000:
+                    del action_mem[: len(action_mem) - 2000]
             objective_score += knaa_qnaa_score * 0.12
             objective_score += quantized_compression_score * 0.06
             objective_score += fleet_shape_score * 0.08
@@ -1698,11 +1774,16 @@ class HermesSuperOrchestrator:
             objective_score += training_variables["size_factor"] * 0.02
             objective_score += efficiency_profile["yield_efficiency"] * 0.045
             objective_score += efficiency_profile["energy_efficiency"] * (0.02 + (float(user_profile.get("energy_saver", 0.55)) * 0.03))
+            objective_score += action_brain["policy_score"] * 0.08
+            objective_score += action_brain["aggression"] * 0.03
+            objective_score -= action_brain["safety_guard"] * 0.025
             objective_score = (objective_score * 0.55) + (self._multi_objective_score(outcome) * 0.45)
             objective_score = self._soft_blend(objective_score, horizon_profile["growth_index"], alpha=(0.10 + (horizon_profile["softening_factor"] * 0.18)))
             delta = self._truth_gate_adjustment(objective_score, truth_score)
             delta += punishment_correction
             delta += (adaptive_decision["confidence"] - 0.5) * 0.20
+            delta += (action_brain["aggression"] - 0.5) * 0.08
+            delta -= (action_brain["safety_guard"] - 0.5) * 0.05
 
             agent.reward_score = max(0.0, min(10.0, agent.reward_score + (delta - 0.28)))
             agent.success_rate = max(
@@ -1710,7 +1791,7 @@ class HermesSuperOrchestrator:
                 min(
                     1.0,
                     (agent.success_rate * (0.85 - (adaptive_decision["adaptation_rate"] * 0.05)))
-                    + (success * (0.15 + (adaptive_decision["proactive_score"] * 0.03))),
+                    + (success * ((0.13 + (adaptive_decision["proactive_score"] * 0.03)) * action_brain["rollout_scale"])),
                 ),
             )
             agent.load = max(0.0, min(1.0, effective_work))
@@ -1753,6 +1834,7 @@ class HermesSuperOrchestrator:
                 "gaussian_alignment": gaussian_alignment,
                 "long_haul_meta_score": long_haul_meta_score,
                 "adaptive_brain": adaptive_decision,
+                "action_brain": action_brain,
                 "big_decision_plan": big_decision_plan,
                 "hard_fact": hard_fact,
                 "horizon_profile": horizon_profile,
@@ -1804,6 +1886,7 @@ class HermesSuperOrchestrator:
         avg_fleet_shape = sum(r["fleet_shape_score"] for r in results) / len(results)
         avg_long_haul_meta = sum(r["long_haul_meta_score"] for r in results) / len(results)
         avg_adaptive = sum(float(r.get("adaptive_brain", {}).get("decision_score", 0.0)) for r in results) / len(results)
+        avg_action = sum(float(r.get("action_brain", {}).get("policy_score", 0.0)) for r in results) / len(results)
         avg_aihub_bonus = sum(r["aihub_bonus"] for r in results) / len(results)
         truth_violations = len([r for r in results if r["truth_score"] < self.truth_threshold])
         return {
@@ -1821,6 +1904,7 @@ class HermesSuperOrchestrator:
             "avg_fleet_shape_score": avg_fleet_shape,
             "avg_long_haul_meta_score": avg_long_haul_meta,
             "avg_adaptive_brain_score": avg_adaptive,
+            "avg_action_brain_score": avg_action,
             "avg_aihub_bonus": avg_aihub_bonus,
             "truth_violations": truth_violations,
             "prethink_plan": prethink,
@@ -2234,24 +2318,27 @@ class HermesSuperOrchestrator:
         fleet_tail = self.algorithm_state["fleet_shape_memory"][-80:]
         meta_tail = self.algorithm_state["long_haul_meta_memory"][-80:]
         adaptive_tail = self.algorithm_state["adaptive_brain_memory"][-80:]
+        action_tail = self.algorithm_state.get("action_brain_memory", [])[-80:]
         knaa_avg = (sum(knaa_tail) / len(knaa_tail)) if knaa_tail else 0.5
         fleet_avg = (sum(fleet_tail) / len(fleet_tail)) if fleet_tail else 0.5
         meta_avg = (sum(meta_tail) / len(meta_tail)) if meta_tail else 0.5
         adaptive_avg = (sum(adaptive_tail) / len(adaptive_tail)) if adaptive_tail else 0.5
+        action_avg = (sum(action_tail) / len(action_tail)) if action_tail else 0.5
         bonus = max(
             0.0,
             min(
                 1.0,
-                (signal * 0.20)
-                + (movie_domain_signal * 0.10)
-                + (knaa_avg * 0.13)
-                + (fleet_avg * 0.13)
-                + (meta_avg * 0.12)
-                + (adaptive_avg * 0.12)
-                + (sql_pattern_signal * 0.08)
-                + (art_pattern_signal * 0.06)
-                + (aihub_bridge_signal * 0.06)
-                + (watch_signal * 0.10),
+                (signal * 0.17)
+                + (movie_domain_signal * 0.08)
+                + (knaa_avg * 0.12)
+                + (fleet_avg * 0.11)
+                + (meta_avg * 0.11)
+                + (adaptive_avg * 0.11)
+                + (action_avg * 0.12)
+                + (sql_pattern_signal * 0.07)
+                + (art_pattern_signal * 0.05)
+                + (aihub_bridge_signal * 0.05)
+                + (watch_signal * 0.11),
             ),
         )
         if persist:
@@ -2342,6 +2429,7 @@ class HermesSuperOrchestrator:
             "punishment_memory_tail": self.algorithm_state["punishment_memory"][-20:],
             "long_haul_meta_memory_tail": self.algorithm_state["long_haul_meta_memory"][-20:],
             "adaptive_brain_memory_tail": self.algorithm_state["adaptive_brain_memory"][-20:],
+            "action_brain_memory_tail": self.algorithm_state.get("action_brain_memory", [])[-20:],
             "adaptive_dynamic_modifiers": self.algorithm_state.get("adaptive_dynamic_modifiers", {}),
             "aihub_bonus_memory_tail": self.algorithm_state["aihub_bonus_memory"][-20:],
             "agents": [asdict(a) for a in self.agents],
