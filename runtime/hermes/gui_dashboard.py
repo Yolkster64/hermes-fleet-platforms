@@ -121,6 +121,18 @@ HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
         "techniques": ["Gaussian 3D evidence", "Multipolar ensemble", "GNAA adaptive memory"],
         "specialty_tag": "deep-thinker",
     },
+    "ultimate-aihub-fusion": {
+        "title": "Ultimate AIHub Fusion",
+        "group": "Official Hermes",
+        "personality": "Top-tier AI integration profile for blended reasoning, SQL intelligence, and orchestration depth.",
+        "description": "Best all-around AI integration type when you want strong coding, training, SQL signals, and fleet execution in one profile.",
+        "swarm_strategy": "multipolar",
+        "micro_agents": 236,
+        "gaussian_pressure": 0.92,
+        "high_level_learning": 0.91,
+        "techniques": ["KNAA/QNAA reasoning", "GNAA adaptive memory", "Cross-agent communication mesh", "Multi-armed Bayesian planning"],
+        "specialty_tag": "ultimate-aihub-fusion",
+    },
     "official-quick-thinker": {
         "title": "Quick Thinker",
         "group": "Official",
@@ -1024,6 +1036,48 @@ with dcol2:
 for algo_name, algo_value, algo_tip in _algorithm_bar_pack(deck_preset, deck_optimized, str(st.session_state.get("ctl_operation_mode", "Programming + C++"))):
     st.progress(algo_value, text=f"{algo_name} {algo_value * 100:.1f}%")
     st.caption(algo_tip)
+st.markdown("#### Mix & Match Optimizer (Best Working Combos)")
+mix_rows = [
+    {
+        "Goal": "C++ / Programming Depth",
+        "Best Mode": "Programming + C++",
+        "Best Type": "Deep Thinker",
+        "Why it works": "Highest reasoning depth and strongest structure retention for compile/debug/refactor loops.",
+        "Suggested bars": "Gaussian 82-90, KNAA high, GNAA high, Linear Regression medium-high",
+    },
+    {
+        "Goal": "GUI / Smooth Visuals",
+        "Best Mode": "GUI + Visual",
+        "Best Type": "Mesh Swarm",
+        "Why it works": "Fast visual iteration with high collaboration and stable design-cycle convergence.",
+        "Suggested bars": "Gaussian 78-86, KNN Mesh high, GNAA medium-high, Parallelism medium",
+    },
+    {
+        "Goal": "Intensive Throughput",
+        "Best Mode": "Intensive Throughput",
+        "Best Type": "Parallel Swarm",
+        "Why it works": "Max parallel throughput and wide candidate search for heavy orchestration load.",
+        "Suggested bars": "Parallelism high, KNN Mesh high, Gaussian 70-82, Linear Regression medium",
+    },
+    {
+        "Goal": "Learning + Retention",
+        "Best Mode": "Learning Depth",
+        "Best Type": "Gaussian Blur",
+        "Why it works": "Best long-horizon stability, memory retention, and robust adaptation under noise.",
+        "Suggested bars": "Gaussian high, GNAA high, KNAA medium-high, Linear Regression medium-high",
+    },
+    {
+        "Goal": "Ultimate AI Integration",
+        "Best Mode": "Programming + C++",
+        "Best Type": "Ultimate AIHub Fusion",
+        "Why it works": "Highest blended performance for AIHub + SQL + fleet orchestration with strong reasoning quality.",
+        "Suggested bars": "Gaussian 88-94, KNAA high, GNAA high, KNN Mesh high, Parallelism high",
+    },
+]
+st.dataframe(mix_rows, use_container_width=True, hide_index=True)
+st.caption(
+    "Optimal practical flow: pick mode -> pick type -> apply deck type -> run one-click SQL/training setup in center SQL tab -> run Ultimate Hermes + AIHub upgrade."
+)
 with st.expander("Hermes Type Catalog + Optimization Tips", expanded=False):
     catalog_presets = _active_hermes_presets()
     st.dataframe(

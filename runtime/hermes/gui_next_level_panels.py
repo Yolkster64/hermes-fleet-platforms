@@ -99,6 +99,30 @@ def _render_center_nexus(
     )
 
 
+def _render_center_sql_visual(sql_health: Dict[str, Any], evidence: Dict[str, Any]) -> None:
+    db_mb = float(sql_health.get("db_mb", 0.0))
+    wal_mb = float(sql_health.get("wal_mb", 0.0))
+    rows = float(sql_health.get("total_evidence_rows", 0.0))
+    evidence_score = float(evidence.get("score", 0.0)) if isinstance(evidence, dict) else 0.0
+    db_ratio = _clamp01(db_mb / 1024.0)
+    wal_ratio = _clamp01(wal_mb / 256.0)
+    row_ratio = _clamp01(rows / 200000.0)
+    st.markdown("#### Center SQL Visual")
+    st.markdown(
+        """
+<div style="border:1px solid rgba(0,230,255,0.35); border-radius:16px; padding:14px; background:radial-gradient(circle at 50% 20%, rgba(40,90,170,0.22), rgba(13,19,36,0.84));">
+  <div style="font-weight:800; color:#e9f5ff; margin-bottom:6px;">SQL Core Pulse</div>
+  <div style="font-size:0.80rem; color:#d2e7ff;">Simple center view for SQL deployment + training readiness.</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+    st.progress(db_ratio, text=f"DB Utilization {db_ratio * 100:.1f}% ({db_mb:.1f} MB)")
+    st.progress(wal_ratio, text=f"WAL Utilization {wal_ratio * 100:.1f}% ({wal_mb:.1f} MB)")
+    st.progress(row_ratio, text=f"Evidence Rows {int(rows)}")
+    st.progress(_clamp01(evidence_score), text=f"Evidence Confidence {evidence_score * 100:.1f}%")
+
+
 def render_next_level_control_center(
     *,
     sql_intel: Dict[str, Any],
@@ -125,6 +149,7 @@ def render_next_level_control_center(
         evidence = {}
 
     with tabs[0]:
+        _render_center_sql_visual(sql_health=sql_health, evidence=evidence)
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("SQL DB MB", f"{float(sql_health.get('db_mb', 0.0)):.2f}")
         c2.metric("Training Dir MB", f"{float(sql_health.get('training_dir_mb', 0.0)):.2f}")
@@ -144,6 +169,45 @@ def render_next_level_control_center(
         }
         st.code(json.dumps(report_payload, indent=2)[:4000], language="json")
         st.download_button("Download Instant Report", data=json.dumps(report_payload, indent=2), file_name=f"hermes_{report_scope}_report.json", mime="application/json", use_container_width=True)
+        st.markdown("#### Easy Setup + Deploy")
+        s1, s2 = st.columns(2)
+        with s1:
+            if st.button("One-Click SQL + Training Setup", use_container_width=True):
+                run_logged_post_action(
+                    label="one-click-sql-training-setup",
+                    path="/learning-pulse",
+                    payload={
+                        "specialty": "fleet:sql-training-easy-setup",
+                        "steps": 460,
+                        "candidates": 260,
+                        "sql_signal": 0.97,
+                        "internet_signal": 0.05,
+                        "llm_signal": 0.94,
+                        "stability_bias": 0.90,
+                    },
+                    success_message="SQL + training setup deployed.",
+                    error_prefix="SQL + training setup failed",
+                    timeout=150,
+                )
+        with s2:
+            if st.button("Ultimate Hermes + AIHub Upgrade", use_container_width=True):
+                run_logged_post_action(
+                    label="ultimate-hermes-aihub-upgrade",
+                    path="/aihub-max-upgrade",
+                    payload={
+                        "specialty": "fleet:ultimate-hermes-aihub",
+                        "steps": 980,
+                        "candidates": 420,
+                        "sql_signal": 0.98,
+                        "internet_signal": 0.08,
+                        "llm_signal": 0.97,
+                        "stability_bias": 0.92,
+                    },
+                    success_message="Ultimate Hermes + AIHub upgrade triggered.",
+                    error_prefix="Ultimate Hermes + AIHub upgrade failed",
+                    timeout=200,
+                )
+        st.caption("Use One-Click setup first, then run Ultimate upgrade for max capability.")
         if st.button("Save Hermes Snapshot Now", use_container_width=True):
             info = export_hermes_profiles_snapshot(volume_root, max_rows=600)
             st.success(f"Hermes snapshot saved: {info.get('path', 'unknown')} ({info.get('rows', 0)} rows)")
@@ -188,7 +252,7 @@ def render_next_level_control_center(
             )
 
     with tabs[2]:
-        st.markdown("#### Hermes Army / Barn Settings")
+        st.markdown("#### Hermes Army Settings")
         if show_center_nexus:
             _render_center_nexus(
                 sql_health=sql_health,
@@ -221,7 +285,7 @@ def render_next_level_control_center(
         if isinstance(github_ctx, dict):
             st.markdown("#### GitHub CLI/Data Snapshot")
             st.json(github_ctx, expanded=False)
-        st.markdown("#### Entrance + Building Nexus")
+        st.markdown("#### Entrance + Army Nexus")
         entrance = ultimate_entrance if isinstance(ultimate_entrance, dict) else {}
         b1, b2, b3, b4 = st.columns(4)
         b1.metric("Entrance Integration", f"{float(entrance.get('integration_score', 0.0)) * 100:.1f}%")
