@@ -937,6 +937,19 @@ class HermesSuperOrchestrator:
         wrongness_signal = activity_model["short"]["wrongness"]
         group_vs_solo = activity_model["mid"]["group_strength"] - activity_model["mid"]["solo_strength"]
         monitor_comparison = 1.0 - abs(group_vs_solo)
+        signal_stability = max(0.0, min(1.0, 1.0 - abs(success_signal - (1.0 - wrongness_signal))))
+        watch_coverage = max(
+            0.0,
+            min(
+                1.0,
+                (size_factor * 0.45)
+                + (activity_model["mid"]["monitor_balance"] * 0.35)
+                + (horizon_profile["mid_horizon"] * 0.20),
+            ),
+        )
+        anomaly_resistance = max(0.0, min(1.0, ((1.0 - wrongness_signal) * 0.55) + (signal_stability * 0.25) + (horizon_profile["long_horizon"] * 0.20)))
+        drift_control = max(0.0, min(1.0, (monitor_comparison * 0.42) + (horizon_profile["maturity_index"] * 0.33) + (horizon_profile["growth_index"] * 0.25)))
+        watch_efficiency = max(0.0, min(1.0, (watch_coverage * 0.35) + (signal_stability * 0.25) + (anomaly_resistance * 0.20) + (drift_control * 0.20)))
         return {
             "size_factor": size_factor,
             "position_score": position_score,
@@ -945,6 +958,11 @@ class HermesSuperOrchestrator:
             "group_vs_solo_delta": max(-1.0, min(1.0, group_vs_solo)),
             "monitor_comparison": max(0.0, min(1.0, monitor_comparison)),
             "maturity_signal": horizon_profile["maturity_index"],
+            "signal_stability": signal_stability,
+            "watch_coverage": watch_coverage,
+            "anomaly_resistance": anomaly_resistance,
+            "drift_control": drift_control,
+            "watch_efficiency": watch_efficiency,
         }
 
     def cpp_kernel_status(self) -> Dict:
@@ -2116,10 +2134,14 @@ class HermesSuperOrchestrator:
         monitor_comparison = max(0.0, min(1.0, float(training_variables.get("monitor_comparison", 0.5))))
         success_signal = max(0.0, min(1.0, float(training_variables.get("success_signal", 0.5))))
         wrongness_signal = max(0.0, min(1.0, float(training_variables.get("wrongness_signal", 0.5))))
+        signal_stability = max(0.0, min(1.0, float(training_variables.get("signal_stability", 0.5))))
+        watch_coverage = max(0.0, min(1.0, float(training_variables.get("watch_coverage", 0.5))))
+        watch_efficiency = max(0.0, min(1.0, float(training_variables.get("watch_efficiency", 0.5))))
         sql_pattern_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("sql_pattern", lookback=120))))
         github_sync_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("github_knowledge_sync", lookback=120))))
         art_pattern_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("art_pattern", lookback=120))))
         aihub_bridge_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("aihub_bridge", lookback=120))))
+        watch_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("watch_signal", lookback=120))))
         speed_priority = clamp01(speed_priority)
         energy_saver = clamp01(energy_saver)
 
@@ -2148,8 +2170,12 @@ class HermesSuperOrchestrator:
                 + (github_sync_signal * speed_score * 0.04)
                 + (art_pattern_signal * power_score * 0.05)
                 + (aihub_bridge_signal * power_score * 0.05)
+                + (watch_signal * power_score * 0.05)
                 + (speed_priority * speed_score * 0.06)
                 + (energy_saver * cost_score * 0.06)
+                + (signal_stability * speed_score * 0.05)
+                + (watch_coverage * cost_score * 0.04)
+                + (watch_efficiency * power_score * 0.06)
             )
             scored.append((blend, p, speed_score, cost_score, power_score))
 
@@ -2172,10 +2198,14 @@ class HermesSuperOrchestrator:
                 "monitor_comparison": monitor_comparison,
                 "success_signal": success_signal,
                 "wrongness_signal": wrongness_signal,
+                "signal_stability": signal_stability,
+                "watch_coverage": watch_coverage,
+                "watch_efficiency": watch_efficiency,
                 "sql_pattern_signal": sql_pattern_signal,
                 "github_sync_signal": github_sync_signal,
                 "art_pattern_signal": art_pattern_signal,
                 "aihub_bridge_signal": aihub_bridge_signal,
+                "watch_signal": watch_signal,
             },
             "candidates": [
                 {
@@ -2196,6 +2226,7 @@ class HermesSuperOrchestrator:
         sql_pattern_signal = self.store.recent_external_signal_score_by_source("sql_pattern")
         art_pattern_signal = self.store.recent_external_signal_score_by_source("art_pattern")
         aihub_bridge_signal = self.store.recent_external_signal_score_by_source("aihub_bridge")
+        watch_signal = self.store.recent_external_signal_score_by_source("watch_signal")
         movie_mesh_signal = self.store.knowledge_mesh_task_signal("movie")
         media_mesh_signal = self.store.knowledge_mesh_task_signal("media")
         movie_domain_signal = max(0.0, min(1.0, (movie_signal * 0.4) + (media_signal * 0.2) + (movie_mesh_signal * 0.25) + (media_mesh_signal * 0.15)))
@@ -2219,7 +2250,8 @@ class HermesSuperOrchestrator:
                 + (adaptive_avg * 0.12)
                 + (sql_pattern_signal * 0.08)
                 + (art_pattern_signal * 0.06)
-                + (aihub_bridge_signal * 0.06),
+                + (aihub_bridge_signal * 0.06)
+                + (watch_signal * 0.10),
             ),
         )
         if persist:

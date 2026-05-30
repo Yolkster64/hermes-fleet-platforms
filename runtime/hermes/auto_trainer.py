@@ -966,6 +966,19 @@ def run_cycle() -> None:
                 },
                 timeout=30,
             )
+            _emit_signal(
+                "auto_trainer.watch_signal",
+                float(training_variables.get("watch_efficiency", signal_score)),
+                {
+                    "cycle": _cycle,
+                    "specialty": dynamic_specialty,
+                    "watch_efficiency": float(training_variables.get("watch_efficiency", 0.5)),
+                    "signal_stability": float(training_variables.get("signal_stability", 0.5)),
+                    "watch_coverage": float(training_variables.get("watch_coverage", 0.5)),
+                    "training_variables": training_variables,
+                },
+                timeout=30,
+            )
         except Exception as sql_exc:
             print(f"[auto-trainer] sql intel failed: {sql_exc}")
     weighted_reward = max(0.0, min(1.0, (learned_reward * 0.75) + (brain_value["value"] * 0.25)))

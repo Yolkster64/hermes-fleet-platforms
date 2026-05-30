@@ -102,6 +102,7 @@ This runtime enables:
   - Saved Hermes agent profiles now persist in SQL (`hermes_agent_profiles`) with upserted XP/level/speed/token/size/tools/specialties for fast restore and GUI display
   - SQL intelligence now includes deep compression + 3D overlap metrics and auto-generated benefits/ideas for next training moves
   - SQL layer is now performance-hardened with indexes + automatic retention pruning (`HERMES_SQL_MAX_CYCLE_ROWS`, `HERMES_SQL_MAX_AGENT_ROWS`, `HERMES_SQL_MAX_GITHUB_ROWS`, `HERMES_SQL_MAX_PROFILE_ROWS`)
+  - AIHub optimizer now blends watch telemetry (`watch_signal`) with SQL/art/bridge signals for smarter model routing and bonus shaping
   - Docker services now explicitly set `HERMES_VOLUME_DATA_PATH=/workspace/runtime/hermes_persist` so SQL setup is auto-initialized in the mounted volume
   - GUI now shows per-Hermes level/XP/speed bonus/token gain bars, GitHub CLI connection panel, and fleet lock/unlock controls for hard-problem mode
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
