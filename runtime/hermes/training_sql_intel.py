@@ -24,6 +24,43 @@ def _connect(db: str) -> sqlite3.Connection:
     return conn
 
 
+def _training_volume_health(volume_root: str, db_path: str) -> Dict[str, float]:
+    training_dir = os.path.join(volume_root, "training")
+    file_count = 0
+    total_bytes = 0
+    if os.path.isdir(training_dir):
+        for name in os.listdir(training_dir):
+            path = os.path.join(training_dir, name)
+            if not os.path.isfile(path):
+                continue
+            try:
+                st = os.stat(path)
+            except OSError:
+                continue
+            file_count += 1
+            total_bytes += int(st.st_size)
+    wal_bytes = 0
+    wal_path = f"{db_path}-wal"
+    if os.path.exists(wal_path):
+        try:
+            wal_bytes = int(os.path.getsize(wal_path))
+        except OSError:
+            wal_bytes = 0
+    snapshot_path = os.path.join(training_dir, "hermes_agent_profiles_snapshot.json")
+    snapshot_age_minutes = -1.0
+    if os.path.exists(snapshot_path):
+        try:
+            snapshot_age_minutes = max(0.0, (time.time() - float(os.path.getmtime(snapshot_path))) / 60.0)
+        except OSError:
+            snapshot_age_minutes = -1.0
+    return {
+        "training_files": float(file_count),
+        "training_dir_mb": float(total_bytes) / (1024.0 * 1024.0),
+        "wal_mb": float(wal_bytes) / (1024.0 * 1024.0),
+        "snapshot_age_minutes": float(snapshot_age_minutes),
+    }
+
+
 def optimize_training_sql(volume_root: str, quick: bool = True) -> Dict[str, object]:
     db = ensure_training_sql(volume_root)
     payload = {"wal_checkpoint": "none", "analyze": False, "vacuum": False}
@@ -517,6 +554,7 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
         recent_hermes_profiles = [_build_recent_hermes_profile(row) for row in latest_agents]
     benefits, ideas = _benefits_and_ideas(art_pattern, trend)
     db_bytes = os.path.getsize(db) if os.path.exists(db) else 0
+    volume_health = _training_volume_health(volume_root, db)
     payload = {
         "rows": len(rows),
         "pattern_score": float(pattern_score),
@@ -539,6 +577,10 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
             "total_agent_rows": int(total_agents[0]) if total_agents else 0,
             "total_profile_rows": int(total_profiles[0]) if total_profiles else 0,
             "total_github_rows": int(total_github[0]) if total_github else 0,
+            "training_files": float(volume_health.get("training_files", 0.0)),
+            "training_dir_mb": float(volume_health.get("training_dir_mb", 0.0)),
+            "wal_mb": float(volume_health.get("wal_mb", 0.0)),
+            "snapshot_age_minutes": float(volume_health.get("snapshot_age_minutes", -1.0)),
         },
         "benefits": benefits,
         "ideas": ideas,

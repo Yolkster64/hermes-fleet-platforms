@@ -1052,6 +1052,30 @@ def run_cycle() -> None:
             else:
                 sql_intel = _last_sql_intel
             art_pattern = sql_intel.get("art_pattern", {}) if isinstance(sql_intel, dict) else {}
+            sql_health = sql_intel.get("sql_health", {}) if isinstance(sql_intel, dict) else {}
+            if not isinstance(sql_health, dict):
+                sql_health = {}
+            volume_pressure = _clamp01(
+                (min(1.0, float(sql_health.get("db_mb", 0.0)) / 1024.0) * 0.34)
+                + (min(1.0, float(sql_health.get("training_dir_mb", 0.0)) / 2048.0) * 0.22)
+                + (min(1.0, float(sql_health.get("wal_mb", 0.0)) / 256.0) * 0.28)
+                + (
+                    0.0
+                    if float(sql_health.get("snapshot_age_minutes", -1.0)) < 0
+                    else min(1.0, float(sql_health.get("snapshot_age_minutes", 0.0)) / 240.0) * 0.16
+                )
+            )
+            _emit_signal(
+                "auto_trainer.sql_volume_pressure",
+                volume_pressure,
+                {
+                    "cycle": _cycle,
+                    "specialty": dynamic_specialty,
+                    "volume_pressure": volume_pressure,
+                    "sql_health": sql_health,
+                },
+                timeout=20,
+            )
             if _cycle % max(1, SQL_PRUNE_EVERY) == 0:
                 prune_stats = prune_training_sql(
                     _volume_root,
@@ -1066,12 +1090,15 @@ def run_cycle() -> None:
                     {"cycle": _cycle, "prune_stats": prune_stats},
                     timeout=20,
                 )
-            if _cycle % max(1, SQL_OPTIMIZE_EVERY) == 0:
-                optimize_stats = optimize_training_sql(_volume_root, quick=not MAX_MODE)
+            optimize_now = (_cycle % max(1, SQL_OPTIMIZE_EVERY) == 0) or (
+                volume_pressure >= 0.74 and _cycle % max(1, SQL_OPTIMIZE_EVERY // 2) == 0
+            )
+            if optimize_now:
+                optimize_stats = optimize_training_sql(_volume_root, quick=not (MAX_MODE or volume_pressure >= 0.82))
                 _emit_signal(
                     "auto_trainer.sql_optimize",
                     0.78,
-                    {"cycle": _cycle, "optimize_stats": optimize_stats},
+                    {"cycle": _cycle, "optimize_stats": optimize_stats, "volume_pressure": volume_pressure},
                     timeout=20,
                 )
             if _cycle % max(1, SQL_PROFILE_SNAPSHOT_EVERY) == 0:
