@@ -20,9 +20,16 @@ def _inject_next_level_theme() -> None:
 .hermes-glow {border: 1px solid rgba(0, 230, 255, 0.45); border-radius: 14px; padding: 12px; background: linear-gradient(120deg, rgba(10,20,40,0.8), rgba(25,25,45,0.65)); box-shadow: 0 0 16px rgba(0, 210, 255, 0.25);}
 .recommended-pill {display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; color: #00101a; background: linear-gradient(90deg, #00f0ff, #7dffb3); font-weight: 700; box-shadow: 0 0 12px rgba(0, 240, 255, 0.45);}
 .cool-title {font-size: 1.1rem; font-weight: 700; letter-spacing: 0.3px;}
+.monado-orbit {position: relative; height: 44px; margin: 6px 0 10px 0;}
+.monado-orbit span {position: absolute; border-radius: 999px; border: 1px solid rgba(130, 205, 255, 0.35);}
+.monado-orbit span:nth-child(1) {inset: 8px 36%; animation: monadoPulse 3.2s ease-in-out infinite;}
+.monado-orbit span:nth-child(2) {inset: 3px 29%; animation: monadoPulse 4.1s ease-in-out infinite reverse;}
+.monado-orbit span:nth-child(3) {inset: 0px 22%; opacity: 0.58; animation: monadoSpinLite 12s linear infinite;}
 .clock-wrap {display:flex; justify-content:center; align-items:center; height:96px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); background: radial-gradient(circle at 50% 20%, rgba(0,255,220,0.15), rgba(20,20,40,0.65));}
 .clock-glow {animation: pulseGlow 1.8s ease-in-out infinite; font-family: 'Segoe UI', Inter, Arial;}
 @keyframes pulseGlow {0% {transform: scale(1.0); text-shadow: 0 0 8px rgba(120,220,255,0.35);} 50% {transform: scale(1.03); text-shadow: 0 0 16px rgba(120,220,255,0.75);} 100% {transform: scale(1.0); text-shadow: 0 0 8px rgba(120,220,255,0.35);}}
+@keyframes monadoPulse {0% {transform: scaleX(0.94); opacity: 0.30;} 50% {transform: scaleX(1.06); opacity: 0.85;} 100% {transform: scaleX(0.94); opacity: 0.30;}}
+@keyframes monadoSpinLite {from {transform: rotate(0deg);} to {transform: rotate(360deg);}}
 </style>
 """,
         unsafe_allow_html=True,
@@ -141,6 +148,7 @@ def render_next_level_control_center(
     _inject_next_level_theme()
     st.markdown("### Level 5 AIHub + SQL Command Center")
     st.markdown('<div class="hermes-glow"><span class="recommended-pill">LEVEL 5</span> <span class="cool-title">Enhanced visuals, center SQL design, richer bars/animations, fleet styling, and guided deployment</span></div>', unsafe_allow_html=True)
+    st.markdown('<div class="monado-orbit"><span></span><span></span><span></span></div>', unsafe_allow_html=True)
     smart_tools = [str(x) for x in st.session_state.get("ctl_smart_tools", []) if isinstance(x, str)]
     both_sides_training = bool(st.session_state.get("ctl_both_sides_training", True))
     x5_brain_pack = bool(st.session_state.get("ctl_x5_brain_pack", False))

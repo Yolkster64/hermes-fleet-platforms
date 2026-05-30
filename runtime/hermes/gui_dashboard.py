@@ -593,7 +593,12 @@ def inject_majestic_theme() -> None:
     st.markdown(
         """
 <style>
-.stApp {background: radial-gradient(circle at 10% -12%, rgba(92,126,255,0.11), rgba(12,14,24,0.96) 42%), radial-gradient(circle at 92% 0%, rgba(94,166,255,0.08), rgba(10,10,20,0.0) 50%);}
+.stApp {position: relative; overflow-x: hidden; background: radial-gradient(circle at 10% -12%, rgba(92,126,255,0.11), rgba(12,14,24,0.96) 42%), radial-gradient(circle at 92% 0%, rgba(94,166,255,0.08), rgba(10,10,20,0.0) 50%);}
+.stApp::before, .stApp::after {content:""; position: fixed; inset: -20vmax; pointer-events:none; z-index:-1; filter: blur(1px);}
+.stApp::before {background: radial-gradient(circle at 18% 18%, rgba(122,191,255,0.10) 0%, rgba(122,191,255,0.0) 36%), radial-gradient(circle at 84% 30%, rgba(104,132,255,0.10) 0%, rgba(104,132,255,0.0) 40%); animation: monadoDrift 22s ease-in-out infinite alternate;}
+.stApp::after {background: conic-gradient(from 180deg at 50% 50%, rgba(130,190,255,0.00) 0deg, rgba(130,190,255,0.12) 55deg, rgba(116,145,255,0.00) 120deg, rgba(116,145,255,0.10) 220deg, rgba(130,190,255,0.00) 360deg); opacity:0.22; transform-origin:50% 50%; animation: monadoSpin 46s linear infinite;}
+@keyframes monadoDrift {0% {transform: translate3d(-2%, -1%, 0) scale(1.0);} 100% {transform: translate3d(2%, 1.5%, 0) scale(1.05);}}
+@keyframes monadoSpin {from {transform: rotate(0deg) scale(1.08);} to {transform: rotate(360deg) scale(1.08);}}
 .block-container {max-width: 1650px; padding-top: 1.4rem; padding-bottom: 2.2rem;}
 [data-testid="stMetricValue"] {color: #e9f4ff;}
 [data-testid="stSidebar"] {background: linear-gradient(180deg, rgba(12,16,32,0.98), rgba(10,13,26,0.95));}
