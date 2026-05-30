@@ -1,6 +1,6 @@
 services:
   hermes-api:
-    image: "${HERMES_RUNTIME_IMAGE:-docker.io/yolkster1/dev_workflow:latest}"
+    image: "docker.io/yolkster1/dev_workflow:latest"
     pull_policy: build
     build:
       context: ../..
@@ -73,7 +73,7 @@ services:
               capabilities: [gpu]
 
   hermes-gui:
-    image: "${HERMES_RUNTIME_IMAGE:-docker.io/yolkster1/dev_workflow:latest}"
+    image: "docker.io/yolkster1/dev_workflow:latest"
     pull_policy: build
     build:
       context: ../..
@@ -121,7 +121,7 @@ services:
       start_period: 25s
 
   hermes-trainer:
-    image: "${HERMES_RUNTIME_IMAGE:-docker.io/yolkster1/dev_workflow:latest}"
+    image: "docker.io/yolkster1/dev_workflow:latest"
     pull_policy: build
     build:
       context: ../..
