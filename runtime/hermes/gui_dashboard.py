@@ -327,13 +327,30 @@ with st.sidebar:
     live_refresh = st.checkbox("Live fleet auto-refresh", value=True)
     refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, value=20, step=5)
 
-unified, unified_err = safe_get("/unified-config", timeout=20)
-bonus_data, bonus_err = safe_get("/aihub-bonus", timeout=20)
-snapshot, snapshot_err = safe_get("/snapshot", timeout=20)
-growth_data, growth_err = safe_get("/learning-growth", timeout=20)
-training_status, training_status_err = safe_get("/training-status", timeout=20)
-cpp_kernel, cpp_kernel_err = safe_get("/cpp-kernel-status", timeout=20)
-knowledge_mesh, mesh_err = safe_get("/knowledge-mesh", timeout=20)
+watch_payload, watch_err = safe_get("/system-watch", timeout=25)
+if not watch_err and isinstance(watch_payload, dict):
+    unified = watch_payload.get("unified_config", {}) if isinstance(watch_payload.get("unified_config"), dict) else {}
+    bonus_data = watch_payload.get("aihub_bonus", {}) if isinstance(watch_payload.get("aihub_bonus"), dict) else {}
+    snapshot = watch_payload.get("snapshot", {}) if isinstance(watch_payload.get("snapshot"), dict) else {}
+    growth_data = watch_payload.get("learning_growth", {}) if isinstance(watch_payload.get("learning_growth"), dict) else {}
+    training_status = watch_payload.get("training_status", {}) if isinstance(watch_payload.get("training_status"), dict) else {}
+    cpp_kernel = watch_payload.get("cpp_kernel_status", {}) if isinstance(watch_payload.get("cpp_kernel_status"), dict) else {}
+    knowledge_mesh = watch_payload.get("knowledge_mesh", {}) if isinstance(watch_payload.get("knowledge_mesh"), dict) else {}
+    unified_err = ""
+    bonus_err = ""
+    snapshot_err = ""
+    growth_err = ""
+    training_status_err = ""
+    cpp_kernel_err = ""
+    mesh_err = ""
+else:
+    unified, unified_err = safe_get("/unified-config", timeout=20)
+    bonus_data, bonus_err = safe_get("/aihub-bonus", timeout=20)
+    snapshot, snapshot_err = safe_get("/snapshot", timeout=20)
+    growth_data, growth_err = safe_get("/learning-growth", timeout=20)
+    training_status, training_status_err = safe_get("/training-status", timeout=20)
+    cpp_kernel, cpp_kernel_err = safe_get("/cpp-kernel-status", timeout=20)
+    knowledge_mesh, mesh_err = safe_get("/knowledge-mesh", timeout=20)
 aihub_bonus = float(bonus_data.get("aihub_bonus", 0.0))
 agent_rows = normalize_agents(snapshot, aihub_bonus) if not snapshot_err else []
 runtime_hermes = len(agent_rows)
@@ -348,6 +365,8 @@ c2.metric("Hermes Amount", str(total_hermes), delta=f"runtime {runtime_hermes} |
 c3.metric("Active Hermes", str(active_hermes))
 c4.metric("AIHub Bonus", f"{aihub_bonus * 100:.1f}%")
 c5.metric("Model", str(unified.get("aihub_shared_model_id", "aihub-unified-v1")))
+if not watch_err and isinstance(watch_payload, dict):
+    st.caption(f"Watch stream: {watch_payload.get('watch_timestamp_utc', 'n/a')} (gateway aggregated)")
 orchestration_counts = snapshot.get("super_orchestration_counts", {}) if isinstance(snapshot, dict) else {}
 if orchestration_counts:
     oc1, oc2, oc3 = st.columns(3)

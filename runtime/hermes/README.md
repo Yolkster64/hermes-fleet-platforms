@@ -59,6 +59,7 @@ This runtime enables:
 - C# performance front-end (`hermes-gateway`) for smoother API routing and integration
 - C# orchestration control-plane endpoints:
   - `POST /auth/login` (session token for gateway auth)
+  - `GET /system-watch` (aggregated watch endpoint: health + snapshot + training + cpp + SQL/AIHub-linked signals)
   - `POST /runtime-orchestrate/deploy` (C#-dispatched learning pulse + optimize deploy flow, supports batch deploy sizing)
   - `POST /runtime-orchestrate/return` (return Hermes units signal path for controlled pullback)
   - `POST /runtime-orchestrate/restore` (restore/swap orchestration signal path)

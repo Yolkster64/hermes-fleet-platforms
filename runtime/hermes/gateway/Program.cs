@@ -137,6 +137,7 @@ app.MapGet("/", () =>
         {
             "/auth/login",
             "/health",
+            "/system-watch",
             "/snapshot",
             "/learning-growth",
             "/training-status",
@@ -208,6 +209,78 @@ app.MapGet("/cpp-kernel-status", async (IHttpClientFactory factory, HttpContext 
 app.MapGet("/knowledge-mesh", async (IHttpClientFactory factory, HttpContext context) =>
 {
     return await ProxyGetJson(factory, context, "/knowledge-mesh");
+});
+
+app.MapGet("/system-watch", async (IHttpClientFactory factory, HttpContext context) =>
+{
+    if (!Authorized(context))
+        return Results.Unauthorized();
+    using var client = factory.CreateClient("hermes");
+    AttachBackendKey(client);
+
+    async Task<object> FetchJsonOrError(string path)
+    {
+        try
+        {
+            using var response = await client.GetAsync($"{backendUrl}{path}", context.RequestAborted);
+            var body = await response.Content.ReadAsStringAsync(context.RequestAborted);
+            if (!response.IsSuccessStatusCode)
+            {
+                return new { ok = false, status = (int)response.StatusCode, error = $"backend returned {(int)response.StatusCode}" };
+            }
+            using var doc = JsonDocument.Parse(body);
+            return doc.RootElement.Clone();
+        }
+        catch (HttpRequestException ex)
+        {
+            return new { ok = false, error = ex.Message };
+        }
+        catch (TaskCanceledException ex)
+        {
+            return new { ok = false, error = ex.Message };
+        }
+        catch (JsonException ex)
+        {
+            return new { ok = false, error = ex.Message };
+        }
+    }
+
+    var healthTask = FetchJsonOrError("/health");
+    var snapshotTask = FetchJsonOrError("/snapshot");
+    var growthTask = FetchJsonOrError("/learning-growth");
+    var trainingTask = FetchJsonOrError("/training-status");
+    var cppTask = FetchJsonOrError("/cpp-kernel-status");
+    var bonusTask = FetchJsonOrError("/aihub-bonus");
+    var meshTask = FetchJsonOrError("/knowledge-mesh");
+    await Task.WhenAll(healthTask, snapshotTask, growthTask, trainingTask, cppTask, bonusTask, meshTask);
+
+    return Results.Json(new
+    {
+        watch_timestamp_utc = DateTimeOffset.UtcNow,
+        gateway = new
+        {
+            ok = true,
+            low_bandwidth_mode = lowBandwidthMode,
+            offline_only_mode = offlineOnlyMode,
+            user_routed_internet = userRoutedInternet
+        },
+        unified_config = new
+        {
+            single_exe_entrypoint = "hermes-gateway",
+            aihub_unified_enabled = unifiedEnabled,
+            aihub_shared_model_id = sharedModelId,
+            aihub_shared_ml_profile = sharedMlProfile,
+            fleet_model_label = fleetModelLabel,
+            mcp_server = mcpServer
+        },
+        health = healthTask.Result,
+        snapshot = snapshotTask.Result,
+        learning_growth = growthTask.Result,
+        training_status = trainingTask.Result,
+        cpp_kernel_status = cppTask.Result,
+        aihub_bonus = bonusTask.Result,
+        knowledge_mesh = meshTask.Result
+    });
 });
 
 app.MapGet("/unified-config", (HttpContext context) =>
