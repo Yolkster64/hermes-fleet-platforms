@@ -13,6 +13,8 @@
 3. GUI:
    - `http://localhost:${HERMES_GUI_PORT:-8501}`
 
+> Note: Compose now uses `pull_policy: build` for runtime services so local Dockerfiles are built directly for reliable startup.
+
 ## Full Hermes Guide (quick master flow)
 
 1. **Choose mode + type**
