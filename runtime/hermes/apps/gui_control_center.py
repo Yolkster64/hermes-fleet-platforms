@@ -175,6 +175,34 @@ def _apply_aihub_upgrade(
         return False, str(exc)
 
 
+def _run_learning_sql_pulse(
+    key: str,
+    specialty: str,
+    steps: int,
+    candidates: int,
+    sql_signal: float,
+    internet_signal: float,
+    llm_signal: float,
+    stability_bias: float,
+) -> tuple[bool, str]:
+    payload = {
+        "Specialty": specialty,
+        "Steps": steps,
+        "Candidates": candidates,
+        "SqlSignal": sql_signal,
+        "InternetSignal": internet_signal,
+        "LlmSignal": llm_signal,
+        "StabilityBias": stability_bias,
+    }
+    headers = {"X-Hermes-Key": key.strip()}
+    try:
+        r = requests.post(f"{_gateway_base()}/learning-pulse", json=payload, headers=headers, timeout=30)
+        r.raise_for_status()
+        return True, ""
+    except requests.RequestException as exc:
+        return False, str(exc)
+
+
 st.set_page_config(page_title="Hermes Simple GUI", layout="centered")
 st.title("Hermes Simple GUI")
 st.caption("Ultra-minimal login and gateway health check.")
@@ -214,16 +242,16 @@ with c2:
 
 st.divider()
 st.subheader("Agents")
-agent_name = st.text_input("Agent Name", value="hermes-agent-1")
+agent_name = st.text_input("Agent Name", value="ultimate-x")
 agent_type = st.selectbox(
     "Agent Type",
-    options=["hermes", "analyst", "builder", "optimizer", "deployer", "guardian"],
+    options=["ultimate-x", "hermes", "analyst", "builder", "optimizer", "deployer", "guardian"],
     index=0,
 )
 saved_agent_names = [str(a.get("name", "")).strip() for a in st.session_state["agents"] if str(a.get("name", "")).strip()]
 deploy_target = st.selectbox("Select Saved Agent", options=["(new agent)"] + saved_agent_names, index=0)
 
-st.subheader("Ultimate X5/X6 Controls")
+st.subheader("Ultimate X Controls (X5 / X6)")
 feature_options = [f"core-pack-{i:02d}" for i in range(1, 31)]
 selected_packs = st.multiselect("30 Feature Packs", options=feature_options, default=feature_options[:8])
 cxp, csb, ctr = st.columns(3)
@@ -236,14 +264,16 @@ with ctr:
 
 cbrain, caihub = st.columns(2)
 with cbrain:
-    brain_mode = st.selectbox("Brain Mode", options=["lite", "standard", "full-brain", "x5-ultimate", "x6"], index=2)
+    brain_mode = st.selectbox("Brain Mode", options=["lite", "standard", "full-brain", "ultimate-x5", "ultimate-x6"], index=2)
 with caihub:
     aihub_mode = st.selectbox("AIHub Mode", options=["off", "assist", "max"], index=2)
+ultimate_x_tier = st.selectbox("Ultimate X Tier", options=["ultimate-x5", "ultimate-x6"], index=1)
 
 st.subheader("Global Hermes Learning Core")
-earlier_ultimate_bundle = st.toggle("Everything from earlier (ultimate bundle)", value=True)
+earlier_ultimate_bundle = st.toggle("Everything from earlier (Ultimate X bundle)", value=True)
 carry_learning_all_agents = st.toggle("Carry learning to all agents", value=True)
 hermes_learning_mode = st.selectbox("Hermes Learning Mode", options=["standard", "advanced", "ultimate"], index=2)
+ai_mind_mode = st.selectbox("AI Mind + Brain Core", options=["balanced", "deep-mind", "ultimate-brain"], index=2)
 llm_mesh = st.multiselect(
     "Ultimate AIHub LLM Mesh",
     options=["openai", "anthropic", "gemini", "mistral", "grok", "deepseek", "llama", "qwen"],
@@ -257,6 +287,7 @@ with cram:
     max_ram = st.slider("Max RAM %", 10, 100, 82)
 with cgpu:
     max_gpu = st.slider("Max GPU %", 10, 100, 90)
+ultimate_sql_level = st.slider("Ultimate SQL Level", 0, 100, 88)
 
 with st.expander("Quick Guide", expanded=False):
     st.markdown(
@@ -366,7 +397,7 @@ with a2:
             active_saber = int((backbone or {}).get("saber_power", saber_power))
 
             if earlier_ultimate_bundle:
-                active_brain = "x6"
+                active_brain = ultimate_x_tier
                 active_aihub = "max"
                 active_learning_mode = "ultimate"
                 active_learning_share = True
@@ -385,6 +416,7 @@ with a2:
             mesh_suffix = "+".join(active_llm_mesh[:3]) if isinstance(active_llm_mesh, list) and active_llm_mesh else "default-mesh"
             share_suffix = "shared" if active_learning_share else "solo"
             specialty = f"{agent_type}-{active_brain}-{active_aihub}-{active_learning_mode}-{share_suffix}-{mesh_suffix}"
+            specialty = f"{specialty}-{ai_mind_mode}"
             steps = max(60, int(active_training))
             candidates = max(40, min(240, pack_count * 8))
             sql_signal = max(0.4, min(1.0, active_cpu / 100.0))
@@ -437,6 +469,80 @@ if st.button("Apply Ultimate AIHub for All Agents", use_container_width=True):
             st.success("Ultimate AIHub upgrade applied.")
         else:
             st.error(f"AIHub upgrade failed: {err}")
+
+st.divider()
+st.subheader("Ultimate Learning + SQL")
+if st.button("Run Ultimate Learning + SQL Pulse", use_container_width=True):
+    if not st.session_state["login_ok"]:
+        st.error("Log in first, then run learning pulse.")
+    else:
+        sql_signal = max(0.60, min(1.0, ultimate_sql_level / 100.0))
+        llm_factor = min(0.99, max(0.60, 0.60 + (0.04 * len(llm_mesh))))
+        if earlier_ultimate_bundle:
+            sql_signal = max(sql_signal, 0.95)
+            llm_factor = 0.99
+        ok, err = _run_learning_sql_pulse(
+            st.session_state["api_key"],
+            specialty=f"ultimate-learning-sql-{ai_mind_mode}",
+            steps=max(280, training_intensity),
+            candidates=max(120, len(selected_packs) * 10),
+            sql_signal=sql_signal,
+            internet_signal=max(0.35, min(1.0, max_ram / 100.0)),
+            llm_signal=llm_factor,
+            stability_bias=max(0.70, ((xp_boost + saber_power) / 2) / 100.0),
+        )
+        if ok:
+            st.success("Ultimate learning + SQL pulse triggered.")
+        else:
+            st.error(f"Learning pulse failed: {err}")
+
+st.divider()
+st.subheader("Ultimate Everything (Backend Only)")
+st.caption("Runs ultimate AIHub integration + ultimate learning/sql + ultimate deployment while keeping GUI simple.")
+if st.button("Run Ultimate Everything Now", use_container_width=True):
+    if not st.session_state["login_ok"]:
+        st.error("Log in first, then run Ultimate Everything.")
+    else:
+        backend_specialty = f"ultimate-everything-{ultimate_x_tier}-{ai_mind_mode}"
+        aihub_ok, aihub_err = _apply_aihub_upgrade(
+            st.session_state["api_key"],
+            specialty=f"{backend_specialty}-aihub",
+            steps=560,
+            candidates=240,
+            sql_signal=0.98,
+            internet_signal=0.55,
+            llm_signal=0.99,
+            stability_bias=0.96,
+        )
+        learning_ok, learning_err = _run_learning_sql_pulse(
+            st.session_state["api_key"],
+            specialty=f"{backend_specialty}-learning-sql",
+            steps=540,
+            candidates=240,
+            sql_signal=0.98,
+            internet_signal=0.92,
+            llm_signal=0.99,
+            stability_bias=0.95,
+        )
+        deploy_ok, deploy_err = _deploy_agent(
+            st.session_state["api_key"],
+            specialty=f"{backend_specialty}-deploy",
+            steps=560,
+            candidates=240,
+            sql_signal=0.98,
+            internet_signal=0.92,
+            llm_signal=0.99,
+            stability_bias=0.96,
+        )
+        if aihub_ok and learning_ok and deploy_ok:
+            st.success("Ultimate Everything completed for backend systems.")
+        else:
+            if not aihub_ok:
+                st.error(f"Ultimate AIHub failed: {aihub_err}")
+            if not learning_ok:
+                st.error(f"Ultimate learning/sql failed: {learning_err}")
+            if not deploy_ok:
+                st.error(f"Ultimate deployment failed: {deploy_err}")
 
 if st.session_state["agents"]:
     st.caption(f"Agents created: {len(st.session_state['agents'])}")
