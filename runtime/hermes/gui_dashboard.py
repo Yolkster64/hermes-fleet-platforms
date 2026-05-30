@@ -873,7 +873,7 @@ with st.sidebar:
     st.caption("Quick login uses local Hermes keys and reconnect checks.")
     st.markdown("### How it works")
     st.caption("1. Send prompt or click auto action\n2. Hermes fleet simulates + learns\n3. Bonus and XP improve")
-    live_refresh = st.checkbox("Live fleet auto-refresh", value=True)
+    live_refresh = st.checkbox("Live fleet auto-refresh", value=False)
     refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, value=20, step=5)
     focused_layout = st.checkbox("Focused layout (clean view)", value=True)
     show_legacy_map_ui = st.checkbox("Show AIHub Hub + Map panels", value=True)
