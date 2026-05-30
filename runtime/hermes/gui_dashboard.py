@@ -72,6 +72,50 @@ SIZE_MODE_DETAILS = {
     "medium-balanced": "Balanced Hermes: steady quality/speed for daily training.",
     "large-deep": "Full Hermes: deeper reasoning and long-horizon adaptation.",
 }
+HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
+    "vanguard-guardian": {
+        "title": "Vanguard Guardian",
+        "swarm_strategy": "mesh",
+        "micro_agents": 176,
+        "gaussian_pressure": 0.84,
+        "high_level_learning": 0.74,
+        "techniques": ["KNAA/QNAA reasoning", "Cross-agent communication mesh", "Natural pressure adaptation"],
+        "specialty_tag": "guardian",
+    },
+    "sql-oracle": {
+        "title": "SQL Oracle",
+        "swarm_strategy": "specialist-mix",
+        "micro_agents": 208,
+        "gaussian_pressure": 0.88,
+        "high_level_learning": 0.79,
+        "techniques": ["Gaussian 3D evidence", "GNAA adaptive memory", "Quantized compression"],
+        "specialty_tag": "sql-oracle",
+    },
+    "cpp-striker": {
+        "title": "C++ Striker",
+        "swarm_strategy": "swarm",
+        "micro_agents": 224,
+        "gaussian_pressure": 0.82,
+        "high_level_learning": 0.66,
+        "techniques": ["C++ neural kernel boost", "Multi-parallel swarm", "Quantized compression"],
+        "specialty_tag": "cpp-striker",
+    },
+    "aibox-architect": {
+        "title": "AIBox Architect",
+        "swarm_strategy": "multipolar",
+        "micro_agents": 192,
+        "gaussian_pressure": 0.90,
+        "high_level_learning": 0.86,
+        "techniques": ["Multipolar ensemble", "GNAA adaptive memory", "Cross-agent communication mesh"],
+        "specialty_tag": "aibox-architect",
+    },
+}
+MODEL_OPTIONS = [
+    "hermes-fleet-latest",
+    "hermes-fleet-mini",
+    "hermes-fleet-reasoning-max",
+    "bonusllm-ultra",
+]
 def pull_metric(payload: Any, names: Tuple[str, ...], default: float = 0.0) -> float:
     if isinstance(payload, dict):
         for name in names:
@@ -134,6 +178,21 @@ def _effective_internet_signal(raw_signal: float, low_cap: bool = False) -> floa
     return raw_signal
 
 
+def _selected_hermes_type_key() -> str:
+    key = str(st.session_state.get("ctl_hermes_type", "vanguard-guardian"))
+    return key if key in HERMES_TYPE_PRESETS else "vanguard-guardian"
+
+
+def _selected_model_override() -> str:
+    return str(st.session_state.get("ctl_model_override", "")).strip()
+
+
+def _specialty_base() -> str:
+    type_key = _selected_hermes_type_key()
+    tag = str(HERMES_TYPE_PRESETS.get(type_key, {}).get("specialty_tag", type_key))
+    return f"fleet:{tag}"
+
+
 def _guided_auto_bond_status(
     *,
     unified_err: str,
@@ -173,6 +232,8 @@ def _initialize_session_state() -> None:
         "ctl_gaussian_pressure": 0.88,
         "ctl_permanent_intelligence": True,
         "ctl_high_level_learning": 0.72,
+        "ctl_hermes_type": "vanguard-guardian",
+        "ctl_model_override": "hermes-fleet-latest",
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -207,7 +268,7 @@ def run_auto_cycle(max_mode: bool, technique: Dict[str, Any]) -> Dict[str, Any]:
     steps = (280 if max_mode else 140) if LOW_BANDWIDTH_MODE else (520 if max_mode else 220)
     candidates = min(500, ((190 if max_mode else 90) if LOW_BANDWIDTH_MODE else (320 if max_mode else 140)) + int(technique.get("micro_agents", 48) * (0.12 if LOW_BANDWIDTH_MODE else 0.2)))
     sim_steps = (140 if max_mode else 70) if LOW_BANDWIDTH_MODE else (320 if max_mode else 120)
-    specialty = f"fleet:{technique.get('swarm_strategy', 'hybrid')}"
+    specialty = f"{_specialty_base()}:{technique.get('swarm_strategy', 'hybrid')}"
 
     simulate, sim_err = safe_post("/simulate", {"specialty": specialty, "steps": sim_steps})
     pulse, pulse_err = safe_post(
@@ -250,7 +311,7 @@ def run_special_fleet_training(max_mode: bool, study_areas: List[str], technique
     steps = 760 if max_mode else 300
     candidates = min(500, (360 if max_mode else 180) + int(technique.get("micro_agents", 48) * 0.15))
     areas = "-".join([s.lower().replace(" & ", "-").replace(" ", "-") for s in study_areas[:3]]) if study_areas else "general"
-    specialty = f"fleet:{technique.get('swarm_strategy', 'hybrid')}:{areas}"
+    specialty = f"{_specialty_base()}:{technique.get('swarm_strategy', 'hybrid')}:{areas}"
     pulse, pulse_err = safe_post(
         "/learning-pulse",
         {
@@ -332,7 +393,7 @@ def deep_auto_learning_zone(max_mode: bool, study_areas: List[str], rounds: int,
         pulse, pulse_err = safe_post(
             "/learning-pulse",
             {
-                "specialty": f"fleet:{technique.get('swarm_strategy', 'hybrid')}",
+                "specialty": f"{_specialty_base()}:{technique.get('swarm_strategy', 'hybrid')}",
                 "steps": steps + (i * 120),
                 "candidates": candidates,
                 "sql_signal": technique["sql_signal"],
@@ -349,7 +410,13 @@ def deep_auto_learning_zone(max_mode: bool, study_areas: List[str], rounds: int,
         )
         compare, compare_err = safe_post(
             "/llm-chat",
-            {"prompt": compare_prompt, "system_prompt": "You are Hermes deep-learning coordinator.", "temperature": 0.2, "max_tokens": 900},
+            {
+                "prompt": compare_prompt,
+                "system_prompt": "You are Hermes deep-learning coordinator.",
+                "model": _selected_model_override() or None,
+                "temperature": 0.2,
+                "max_tokens": 900,
+            },
             timeout=120,
         )
         outputs.append({"round": i + 1, "pulse": pulse, "pulse_error": pulse_err, "compare": compare, "compare_error": compare_err})
@@ -373,6 +440,66 @@ with st.sidebar:
     live_refresh = st.checkbox("Live fleet auto-refresh", value=True)
     refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, value=20, step=5)
     focused_layout = st.checkbox("Focused layout (clean view)", value=True)
+    st.markdown("### Hermes Type + Model")
+    hermes_type_labels = {k: str(v.get("title", k)) for k, v in HERMES_TYPE_PRESETS.items()}
+    hermes_type_keys = list(hermes_type_labels.keys())
+    current_type = _selected_hermes_type_key()
+    hermes_type_index = hermes_type_keys.index(current_type) if current_type in hermes_type_keys else 0
+    selected_hermes_type = st.selectbox(
+        "Choose Hermes type (4)",
+        options=hermes_type_keys,
+        index=hermes_type_index,
+        format_func=lambda key: hermes_type_labels.get(key, key),
+        key="ctl_hermes_type",
+    )
+    selected_model = st.selectbox(
+        "Preferred model",
+        options=MODEL_OPTIONS,
+        index=max(0, MODEL_OPTIONS.index(_selected_model_override())) if _selected_model_override() in MODEL_OPTIONS else 0,
+        key="ctl_model_override",
+    )
+    s1, s2 = st.columns(2)
+    with s1:
+        if st.button("Apply Type Preset", use_container_width=True):
+            preset = HERMES_TYPE_PRESETS.get(selected_hermes_type, {})
+            st.session_state["ctl_swarm_strategy"] = str(preset.get("swarm_strategy", st.session_state.get("ctl_swarm_strategy", "hybrid")))
+            st.session_state["ctl_micro_agents"] = int(preset.get("micro_agents", st.session_state.get("ctl_micro_agents", 160)))
+            st.session_state["ctl_gaussian_pressure"] = float(preset.get("gaussian_pressure", st.session_state.get("ctl_gaussian_pressure", 0.8)))
+            st.session_state["ctl_high_level_learning"] = float(preset.get("high_level_learning", st.session_state.get("ctl_high_level_learning", 0.72)))
+            preset_techniques = preset.get("techniques", [])
+            if isinstance(preset_techniques, list) and preset_techniques:
+                st.session_state["ctl_techniques"] = [str(t) for t in preset_techniques[:6]]
+            safe_post(
+                "/ingest-signal",
+                {
+                    "source": "gui_hermes_type",
+                    "signal_score": 0.86,
+                    "payload": {
+                        "hermes_type": selected_hermes_type,
+                        "title": hermes_type_labels.get(selected_hermes_type, selected_hermes_type),
+                        "specialty_base": _specialty_base(),
+                    },
+                },
+                timeout=45,
+            )
+            st.success(f"Applied {hermes_type_labels.get(selected_hermes_type, selected_hermes_type)} preset.")
+    with s2:
+        if st.button("Apply Model", use_container_width=True):
+            safe_post(
+                "/ingest-signal",
+                {
+                    "source": "gui_model_preference",
+                    "signal_score": 0.84,
+                    "payload": {
+                        "model_preference": selected_model,
+                        "hermes_type": selected_hermes_type,
+                        "specialty_base": _specialty_base(),
+                    },
+                },
+                timeout=45,
+            )
+            st.success(f"Model preference set to {selected_model}.")
+    st.caption(f"Active type: {hermes_type_labels.get(_selected_hermes_type_key(), _selected_hermes_type_key())} | model: {_selected_model_override() or 'auto'}")
 
 watch_payload, watch_err = safe_get("/system-watch", timeout=25)
 gateway_watch, gateway_watch_err = safe_get("/gateway-max-status", timeout=20)
@@ -427,7 +554,8 @@ c1.metric("System", "Online" if not unified_err else "Offline")
 c2.metric("Hermes Amount", str(total_hermes), delta=f"runtime {runtime_hermes} | target {configured_hermes}")
 c3.metric("Active Hermes", str(active_hermes))
 c4.metric("AIHub Bonus", f"{aihub_bonus * 100:.1f}%")
-c5.metric("Model", str(unified.get("aihub_shared_model_id", "aihub-unified-v1")))
+active_model_display = _selected_model_override() or str(unified.get("aihub_shared_model_id", "aihub-unified-v1"))
+c5.metric("Model", active_model_display)
 auto_bootstrap = st.session_state.get("auto_volume_bootstrap", {})
 if isinstance(auto_bootstrap, dict):
     if bool(auto_bootstrap.get("ok", False)):
@@ -598,7 +726,7 @@ if st.button("Force Training Pulse Now", use_container_width=True):
     run_logged_post_action(
         label="force-training-pulse",
         path="/learning-pulse",
-        payload={"specialty": "fleet", "steps": 220, "candidates": 140},
+        payload={"specialty": _specialty_base(), "steps": 220, "candidates": 140},
         success_message="Training pulse triggered.",
         error_prefix="Training pulse failed",
         timeout=120,
@@ -938,7 +1066,13 @@ with summary_right:
         )
         chat, chat_err = safe_post(
             "/llm-chat",
-            {"prompt": report_prompt, "system_prompt": "You are Hermes AIHub fleet analyst.", "temperature": 0.2, "max_tokens": 800},
+            {
+                "prompt": report_prompt,
+                "system_prompt": "You are Hermes AIHub fleet analyst.",
+                "model": _selected_model_override() or None,
+                "temperature": 0.2,
+                "max_tokens": 800,
+            },
         )
         if chat_err:
             st.error(f"Report generation failed: {chat_err}")
@@ -955,7 +1089,7 @@ with summary_right:
                     "mode": "deploy",
                     "scope": "all",
                     "batch_size": deploy_batch,
-                    "specialty": "fleet",
+                    "specialty": _specialty_base(),
                     "steps": 240,
                     "candidates": 160,
                     "sql_signal": min(0.99, technique_profile["sql_signal"] + 0.05),
@@ -975,7 +1109,7 @@ with summary_right:
                     "mode": "deploy",
                     "scope": "batch",
                     "batch_size": deploy_batch,
-                    "specialty": "fleet",
+                    "specialty": _specialty_base(),
                     "steps": 180,
                     "candidates": max(80, deploy_batch * 6),
                     "sql_signal": min(0.99, technique_profile["sql_signal"] + 0.03),
@@ -991,7 +1125,7 @@ with summary_right:
             run_logged_post_action(
                 label="return-hermes",
                 path="/runtime-orchestrate/return",
-                payload={"mode": "return", "specialty": "fleet", "units": deploy_batch, "reason": "gui-return-request", "confidence": 0.88},
+                payload={"mode": "return", "specialty": _specialty_base(), "units": deploy_batch, "reason": "gui-return-request", "confidence": 0.88},
                 success_message=f"Return signal sent for {deploy_batch} Hermes units.",
                 error_prefix="Return action failed",
                 timeout=90,
@@ -1033,7 +1167,7 @@ if action_mode == "Simple":
         if st.button("Quick Optimize", use_container_width=True):
             optimize, opt_err = safe_post(
                 "/optimize-fleet",
-                {"specialty": f"fleet:{technique_profile['swarm_strategy']}", "candidates": min(500, (480 if max_mode else 160) + int(technique_profile["micro_agents"] * 0.2))},
+                {"specialty": f"{_specialty_base()}:{technique_profile['swarm_strategy']}", "candidates": min(500, (480 if max_mode else 160) + int(technique_profile["micro_agents"] * 0.2))},
                 timeout=120,
             )
             if opt_err:
@@ -1105,7 +1239,13 @@ prompt = st.text_area(
 if st.button("Send to Hermes", use_container_width=True):
     chat, chat_err = safe_post(
         "/llm-chat",
-        {"prompt": prompt, "system_prompt": "You are Hermes AIHub fleet learning assistant.", "temperature": 0.25, "max_tokens": 700},
+        {
+            "prompt": prompt,
+            "system_prompt": "You are Hermes AIHub fleet learning assistant.",
+            "model": _selected_model_override() or None,
+            "temperature": 0.25,
+            "max_tokens": 700,
+        },
     )
     if chat_err:
         st.error(f"Hermes text request failed: {chat_err}")
@@ -1321,7 +1461,7 @@ t2.info("Tip: Use Study Areas to steer what Hermes learns next.")
 t3.info("Tip: Run Permanent Bonus Boost after major changes.")
 
 if not st.session_state["auto_boot_done"]:
-    warm, warm_err = safe_post("/learning-pulse", {"specialty": "fleet", "steps": 260, "candidates": 180}, timeout=90)
+    warm, warm_err = safe_post("/learning-pulse", {"specialty": _specialty_base(), "steps": 260, "candidates": 180}, timeout=90)
     if not warm_err:
         log_text("auto-boot-warmstart", warm)
         st.session_state["auto_boot_done"] = True
