@@ -597,6 +597,40 @@ def _initialize_session_state() -> None:
             st.session_state[key] = value
 
 
+def _persisted_api_key_path() -> str:
+    root = resolve_volume_root()
+    return os.path.join(root, "auth", "gui_api_key.txt")
+
+
+def _load_persisted_api_key() -> None:
+    if bool(st.session_state.get("_api_key_loaded_from_disk", False)):
+        return
+    try:
+        key_path = _persisted_api_key_path()
+        if os.path.exists(key_path):
+            with open(key_path, "r", encoding="utf-8") as fh:
+                loaded_key = fh.read().strip()
+            if loaded_key:
+                st.session_state["api_key"] = loaded_key
+    except OSError:
+        pass
+    st.session_state["_api_key_loaded_from_disk"] = True
+
+
+def _save_persisted_api_key(api_key: str) -> Tuple[bool, str]:
+    key_value = str(api_key).strip()
+    if not key_value:
+        return False, "API key is empty."
+    try:
+        key_path = _persisted_api_key_path()
+        os.makedirs(os.path.dirname(key_path), exist_ok=True)
+        with open(key_path, "w", encoding="utf-8") as fh:
+            fh.write(key_value)
+        return True, ""
+    except OSError as exc:
+        return False, str(exc)
+
+
 def inject_majestic_theme() -> None:
     st.markdown(
         """
@@ -898,6 +932,7 @@ st.markdown('<div class="holo-title">Hermes Fleet Control Dashboard</div>', unsa
 st.caption("Clear control view: runtime status, SQL intelligence, and one-click fleet actions.")
 
 _initialize_session_state()
+_load_persisted_api_key()
 if "stability_bootstrap_done" not in st.session_state:
     # One-time guard to neutralize stale browser session values that can cause UI churn.
     st.session_state["ctl_live_refresh"] = False
@@ -916,7 +951,7 @@ with st.sidebar:
         options=["auto", "local-hermes-ui-key", "local-hermes-dev-key"],
         index=0,
     )
-    l1, l2 = st.columns(2)
+    l1, l2, l3 = st.columns(3)
     with l1:
         if st.button("Login", use_container_width=True):
             if login_profile != "auto":
@@ -930,7 +965,23 @@ with st.sidebar:
             else:
                 st.success("Hermes connection restored.")
                 st.rerun()
-    st.caption("Quick login uses local Hermes keys and reconnect checks.")
+    with l3:
+        if st.button("Submit + Save Key", use_container_width=True):
+            current_key = str(st.session_state.get("api_key", "")).strip()
+            if not current_key:
+                st.error("Enter an API key first.")
+            else:
+                ping, ping_err = safe_get("/system-watch", timeout=12)
+                if ping_err:
+                    st.error(f"Login failed with that key: {ping_err}")
+                else:
+                    saved_ok, saved_err = _save_persisted_api_key(current_key)
+                    if saved_ok:
+                        st.success("Logged in and API key saved.")
+                    else:
+                        st.warning(f"Logged in, but key save failed: {saved_err}")
+                    st.rerun()
+    st.caption("Enter your API key, then use Submit + Save Key to log in and persist it.")
     st.markdown("### How it works")
     st.caption("1. Send prompt or click auto action\n2. Hermes fleet simulates + learns\n3. Bonus and XP improve")
     live_refresh = st.checkbox("Live fleet auto-refresh", key="ctl_live_refresh")
