@@ -491,6 +491,49 @@ def render_next_level_control_center(
                 error_prefix="Web + fleet optimization failed",
                 timeout=90,
             )
+        st.markdown("#### Runtime Lockdown + Max Power")
+        p1, p2, p3 = st.columns(3)
+        cpu_target = p1.slider("CPU target utilization", min_value=0.50, max_value=1.00, value=1.00, step=0.01, key="ctl_cpu_target_util")
+        memory_target = p2.slider("Memory target utilization", min_value=0.50, max_value=1.00, value=0.96, step=0.01, key="ctl_memory_target_util")
+        gpu_target = p3.slider("GPU target utilization", min_value=0.50, max_value=1.00, value=1.00, step=0.01, key="ctl_gpu_target_util")
+        st.caption("Use Lockdown first to shut remote/hidden paths, then Max Power to push CPU/RAM/GPU profile.")
+        if st.button("Apply Remote/Hidden Machine Lockdown", use_container_width=True):
+            run_logged_post_action(
+                label="runtime-lockdown-hard",
+                path="/runtime-orchestrate/lock-mode",
+                payload={
+                    "specialty": "fleet:lockdown-hard",
+                    "mode": "lockdown-hard",
+                    "block_remote": bool(block_remote),
+                    "disable_hidden_hyperv": bool(disable_hidden_hv),
+                    "lock_remote_cli": bool(lock_remote_cli),
+                    "strict_headers": bool(strict_headers),
+                    "csrf_guard": bool(csrf_guard),
+                    "secure_cookie": bool(secure_cookie),
+                    "rate_guard": bool(rate_guard),
+                },
+                success_message="Remote/hidden-machine lockdown applied.",
+                error_prefix="Lockdown apply failed",
+                timeout=90,
+            )
+        if st.button("Apply Max Power CPU/RAM/GPU", use_container_width=True):
+            run_logged_post_action(
+                label="runtime-max-power-profile",
+                path="/runtime-orchestrate/deploy",
+                payload={
+                    "specialty": "fleet:max-power",
+                    "mode": "deploy-max-power",
+                    "cpu_target_utilization": cpu_target,
+                    "memory_target_utilization": memory_target,
+                    "gpu_target_utilization": gpu_target,
+                    "x5_brain_pack": x5_brain_pack,
+                    "x6_learning_pack": x6_learning_pack,
+                    "smart_tools": smart_tools,
+                },
+                success_message="Max power profile applied.",
+                error_prefix="Max power profile failed",
+                timeout=90,
+            )
 
         st.markdown("#### Benchmark")
         if st.button("Run Benchmark", use_container_width=True):

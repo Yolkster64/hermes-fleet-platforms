@@ -37,6 +37,9 @@
 - Use **Security + Benchmark** tab to apply:
   - **Web Security Profile**: strict headers, CSRF guard, secure cookie mode, rate-limit guard.
   - **Optimization Profile**: web cache level, parallel rendering, SQL query optimization.
+  - **Runtime Lockdown + Max Power**:
+    - `Apply Remote/Hidden Machine Lockdown` (lock-mode hardening)
+    - `Apply Max Power CPU/RAM/GPU` (high-power deployment profile)
 - One-click actions:
   - `Apply Web Security Shield`
   - `Apply Web + Fleet Optimization`
