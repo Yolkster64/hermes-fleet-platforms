@@ -1573,14 +1573,68 @@ def run_cycle() -> None:
         super_plan=super_plan,
         sql_intel=sql_intel if isinstance(sql_intel, dict) else {},
     )
-    decision_train_brain = float(fusion_scores.get("decision_brain", 0.5))
+    learning_specific = float(fusion_scores.get("learning_brain", 0.5))
+    decision_specific = float(fusion_scores.get("decision_brain", 0.5))
+    conscious_specific = float(fusion_scores.get("conscious_brain", 0.5))
+    brain_trinity = _clamp01((learning_specific * 0.36) + (decision_specific * 0.34) + (conscious_specific * 0.30))
+    decision_train_brain = decision_specific
     _emit_signal(
-        "auto_trainer.learning_brain",
-        float(fusion_scores.get("learning_brain", decision_train_brain)),
+        "auto_trainer.brain_specific_learning",
+        learning_specific,
         {
             "cycle": _cycle,
             "specialty": dynamic_specialty,
-            "learning_brain": float(fusion_scores.get("learning_brain", 0.5)),
+            "learning_specific": learning_specific,
+            "brain_trinity": brain_trinity,
+            "training_variables": training_variables,
+        },
+        timeout=30,
+    )
+    _emit_signal(
+        "auto_trainer.brain_specific_decision",
+        decision_specific,
+        {
+            "cycle": _cycle,
+            "specialty": dynamic_specialty,
+            "decision_specific": decision_specific,
+            "brain_trinity": brain_trinity,
+            "training_variables": training_variables,
+        },
+        timeout=30,
+    )
+    _emit_signal(
+        "auto_trainer.brain_specific_conscious",
+        conscious_specific,
+        {
+            "cycle": _cycle,
+            "specialty": dynamic_specialty,
+            "conscious_specific": conscious_specific,
+            "brain_trinity": brain_trinity,
+            "training_variables": training_variables,
+        },
+        timeout=30,
+    )
+    _emit_signal(
+        "auto_trainer.brain_trinity",
+        brain_trinity,
+        {
+            "cycle": _cycle,
+            "specialty": dynamic_specialty,
+            "brain_trinity": brain_trinity,
+            "learning_specific": learning_specific,
+            "decision_specific": decision_specific,
+            "conscious_specific": conscious_specific,
+            "training_variables": training_variables,
+        },
+        timeout=30,
+    )
+    _emit_signal(
+        "auto_trainer.learning_brain",
+        learning_specific,
+        {
+            "cycle": _cycle,
+            "specialty": dynamic_specialty,
+            "learning_brain": learning_specific,
             "fusion_score": float(fusion_scores.get("fusion_score", 0.5)),
             "weighted_reward": weighted_reward,
             "truth_score": learned_truth,
@@ -1596,9 +1650,10 @@ def run_cycle() -> None:
         {
             "cycle": _cycle,
             "specialty": dynamic_specialty,
-            "learning_brain": float(fusion_scores.get("learning_brain", 0.5)),
-            "decision_brain": float(fusion_scores.get("decision_brain", 0.5)),
-            "conscious_brain": float(fusion_scores.get("conscious_brain", 0.5)),
+            "learning_brain": learning_specific,
+            "decision_brain": decision_specific,
+            "conscious_brain": conscious_specific,
+            "brain_trinity": brain_trinity,
             "fusion_score": float(fusion_scores.get("fusion_score", 0.5)),
             "training_variables": training_variables,
         },
@@ -1617,8 +1672,9 @@ def run_cycle() -> None:
             "brain_value": float(brain_value.get("value", 0.5)),
             "max_uplift": float(max_plan.get("uplift", 1.0)),
             "fusion_score": float(fusion_scores.get("fusion_score", 0.5)),
-            "learning_brain": float(fusion_scores.get("learning_brain", 0.5)),
-            "conscious_brain": float(fusion_scores.get("conscious_brain", 0.5)),
+            "learning_brain": learning_specific,
+            "conscious_brain": conscious_specific,
+            "brain_trinity": brain_trinity,
             "training_variables": training_variables,
         },
         timeout=30,

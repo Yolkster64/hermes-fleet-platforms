@@ -119,6 +119,7 @@ This runtime enables:
   - Trainer conscious variables (`conscious_clarity`, `conscious_alignment`, `conscious_resilience`, `conscious_focus`) now feed `conscious_efficiency`, max/super plan scaling, and AIHub learning blend
   - Trainer now emits `auto_trainer.major_training_campaign` + `auto_trainer.aihub_training_pressure` to drive huge training campaign scaling and AIHub routing pressure
   - Trainer now emits `auto_trainer.bonusllm_goodies` (latency turbo, truth guard, creativity spark, cost saver) and AIHub optimizer consumes it for model routing + bonus shaping
+  - Trainer now emits brain-specific channels (`auto_trainer.brain_specific_learning`, `auto_trainer.brain_specific_decision`, `auto_trainer.brain_specific_conscious`) plus unified `auto_trainer.brain_trinity` for one-all-three orchestration
   - Orchestrator action/LLM routing now consumes advanced efficiency metrics (`decision_readiness`, `stability_guard`, `efficiency_confidence`, `composite_efficiency`) for tighter policy safety and model selection
   - AIHub optimizer now blends watch telemetry (`watch_signal`) with SQL/art/bridge signals for smarter model routing and bonus shaping
   - Hermes trainer now applies a max-upgrade planner per cycle (`auto_trainer.max_upgrade_plan`) that scales steps/candidates/signals from SQL trend + watch efficiency complexity

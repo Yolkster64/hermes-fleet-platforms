@@ -1314,20 +1314,28 @@ class HermesSuperOrchestrator:
         entrance_signal = _clamp(float(self.store.recent_external_signal_score_by_source("ultimate_entrance", lookback=120)))
         decision_train_signal = _clamp(float(self.store.recent_external_signal_score_by_source("decision_train_brain", lookback=120)))
         conscious_signal = _clamp(float(self.store.recent_external_signal_score_by_source("conscious_brain", lookback=120)))
+        learning_specific_signal = _clamp(float(self.store.recent_external_signal_score_by_source("brain_specific_learning", lookback=120)))
+        decision_specific_signal = _clamp(float(self.store.recent_external_signal_score_by_source("brain_specific_decision", lookback=120)))
+        conscious_specific_signal = _clamp(float(self.store.recent_external_signal_score_by_source("brain_specific_conscious", lookback=120)))
+        brain_trinity_signal = _clamp(float(self.store.recent_external_signal_score_by_source("brain_trinity", lookback=120)))
         confidence_signal = _clamp(
-            (evidence_ratio * 0.44)
-            + (truth_score * 0.16)
+            (evidence_ratio * 0.38)
+            + (truth_score * 0.14)
             + ((1.0 - chaos_control) * 0.08)
             + (hard_fact_signal * 0.10)
             + (ultimate_super_signal * 0.08)
             + (entrance_signal * 0.04)
             + (decision_train_signal * 0.04)
             + (conscious_signal * 0.06)
+            + (learning_specific_signal * 0.03)
+            + (decision_specific_signal * 0.02)
+            + (conscious_specific_signal * 0.02)
+            + (brain_trinity_signal * 0.09)
         )
         modifier_gain = _clamp(0.55 + (confidence_signal ** 2.2), 0.35, 1.95)
         caution_level = _clamp(1.0 - confidence_signal)
-        pivot_bias = _clamp((pivot_ratio * 0.44) + (exploration_pressure * 0.21) + (chaos_control * 0.16) + ((1.0 - confidence_signal) * 0.08) + ((1.0 - ultimate_super_signal) * 0.04) + ((1.0 - decision_train_signal) * 0.04) + ((1.0 - conscious_signal) * 0.03))
-        risk_damping = _clamp((stability_signal * 0.42) + (hard_fact_signal * 0.30) + (evidence_ratio * 0.16) + (conscious_signal * 0.12))
+        pivot_bias = _clamp((pivot_ratio * 0.42) + (exploration_pressure * 0.20) + (chaos_control * 0.15) + ((1.0 - confidence_signal) * 0.08) + ((1.0 - ultimate_super_signal) * 0.04) + ((1.0 - decision_train_signal) * 0.03) + ((1.0 - conscious_signal) * 0.03) + ((1.0 - brain_trinity_signal) * 0.05))
+        risk_damping = _clamp((stability_signal * 0.38) + (hard_fact_signal * 0.28) + (evidence_ratio * 0.14) + (conscious_signal * 0.10) + (brain_trinity_signal * 0.10))
         range_low = _clamp(center - spread)
         range_high = _clamp(center + spread)
 
@@ -1378,6 +1386,10 @@ class HermesSuperOrchestrator:
             "entrance_signal": entrance_signal,
             "decision_train_signal": decision_train_signal,
             "conscious_signal": conscious_signal,
+            "learning_specific_signal": learning_specific_signal,
+            "decision_specific_signal": decision_specific_signal,
+            "conscious_specific_signal": conscious_specific_signal,
+            "brain_trinity_signal": brain_trinity_signal,
         }
         self.algorithm_state["adaptive_dynamic_modifiers"] = decision["dynamic_context"]
         mem = self.algorithm_state["adaptive_brain_memory"]
@@ -2300,6 +2312,10 @@ class HermesSuperOrchestrator:
         major_training_campaign_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("major_training_campaign", lookback=120))))
         aihub_training_pressure_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("aihub_training_pressure", lookback=120))))
         bonusllm_goodies_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("bonusllm_goodies", lookback=120))))
+        brain_trinity_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("brain_trinity", lookback=120))))
+        brain_learning_specific_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("brain_specific_learning", lookback=120))))
+        brain_decision_specific_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("brain_specific_decision", lookback=120))))
+        brain_conscious_specific_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("brain_specific_conscious", lookback=120))))
         speed_priority = clamp01(speed_priority)
         energy_saver = clamp01(energy_saver)
 
@@ -2347,6 +2363,10 @@ class HermesSuperOrchestrator:
                 + (major_training_campaign_signal * power_score * 0.07)
                 + (aihub_training_pressure_signal * cost_score * 0.04)
                 + (bonusllm_goodies_signal * power_score * 0.08)
+                + (brain_trinity_signal * power_score * 0.10)
+                + (brain_learning_specific_signal * speed_score * 0.04)
+                + (brain_decision_specific_signal * power_score * 0.04)
+                + (brain_conscious_specific_signal * cost_score * 0.04)
             )
             scored.append((blend, p, speed_score, cost_score, power_score))
 
@@ -2396,6 +2416,10 @@ class HermesSuperOrchestrator:
                 "major_training_campaign_signal": major_training_campaign_signal,
                 "aihub_training_pressure_signal": aihub_training_pressure_signal,
                 "bonusllm_goodies_signal": bonusllm_goodies_signal,
+                "brain_trinity_signal": brain_trinity_signal,
+                "brain_learning_specific_signal": brain_learning_specific_signal,
+                "brain_decision_specific_signal": brain_decision_specific_signal,
+                "brain_conscious_specific_signal": brain_conscious_specific_signal,
             },
             "bonusllm_goodies": goodies_pack,
             "candidates": [
@@ -2424,6 +2448,10 @@ class HermesSuperOrchestrator:
         major_training_campaign_signal = self.store.recent_external_signal_score_by_source("major_training_campaign")
         aihub_training_pressure_signal = self.store.recent_external_signal_score_by_source("aihub_training_pressure")
         bonusllm_goodies_signal = self.store.recent_external_signal_score_by_source("bonusllm_goodies")
+        brain_trinity_signal = self.store.recent_external_signal_score_by_source("brain_trinity")
+        brain_learning_specific_signal = self.store.recent_external_signal_score_by_source("brain_specific_learning")
+        brain_decision_specific_signal = self.store.recent_external_signal_score_by_source("brain_specific_decision")
+        brain_conscious_specific_signal = self.store.recent_external_signal_score_by_source("brain_specific_conscious")
         movie_mesh_signal = self.store.knowledge_mesh_task_signal("movie")
         media_mesh_signal = self.store.knowledge_mesh_task_signal("media")
         movie_domain_signal = max(0.0, min(1.0, (movie_signal * 0.4) + (media_signal * 0.2) + (movie_mesh_signal * 0.25) + (media_mesh_signal * 0.15)))
@@ -2457,7 +2485,11 @@ class HermesSuperOrchestrator:
                 + (conscious_brain_signal * 0.06)
                 + (major_training_campaign_signal * 0.07)
                 + (aihub_training_pressure_signal * 0.05)
-                + (bonusllm_goodies_signal * 0.07),
+                + (bonusllm_goodies_signal * 0.07)
+                + (brain_trinity_signal * 0.08)
+                + (brain_learning_specific_signal * 0.03)
+                + (brain_decision_specific_signal * 0.03)
+                + (brain_conscious_specific_signal * 0.03),
             ),
         )
         if persist:
