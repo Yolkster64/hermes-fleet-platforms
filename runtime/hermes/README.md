@@ -139,6 +139,8 @@ This runtime enables:
   - Final GUI pass now adds a hybrid **AIHub/SQL/Fleet Nexus** centerpiece, deterministic fleet auto-sorting, richer tiny-avatar identity/accessory cards, and both global + per-role ETA surfaces
   - Guided auto-local bonding now surfaces API/watch/gateway/volume/SQL readiness in one status band for cleaner setup visibility and access confidence
   - Quick action clutter is reduced by default with optional extended deploy controls, while preserving all advanced actions behind a single toggle
+  - GUI API client now auto-falls back across gateway/API endpoints (`8788`/`8787`, localhost/container service names) and key variants to recover Hermes access automatically
+  - New sidebar **Focused layout (clean view)** keeps the main nexus/fleet/sql surfaces visible and hides legacy advanced blocks unless needed
   - GUI now shows per-Hermes level/XP/speed bonus/token gain bars, GitHub CLI connection panel, and fleet lock/unlock controls for hard-problem mode
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
   - Deep Auto Learning Zone (`♾️`) with study-area targeting and multi-round comparison

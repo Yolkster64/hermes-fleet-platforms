@@ -4,7 +4,7 @@ import time
 from typing import Any, Dict, List, Tuple
 
 import streamlit as st
-from gui_api_client import API_BASE, log_text, run_logged_post_action, safe_get, safe_post
+from gui_api_client import current_api_base, log_text, run_logged_post_action, safe_get, safe_post
 from gui_evolution_panels import render_evolution_centerpiece, render_learning_graphs
 from gui_fleet_showcase import render_fleet_showcase_panels
 from gui_next_level_panels import render_next_level_control_center
@@ -366,12 +366,13 @@ _initialize_session_state()
 with st.sidebar:
     st.subheader("Connection")
     st.text_input("API Key", key="api_key", type="password")
-    st.caption(f"Gateway: {API_BASE}")
+    st.caption(f"Gateway/API: {current_api_base()}")
     st.caption("Default Docker key is pre-filled.")
     st.markdown("### How it works")
     st.caption("1. Send prompt or click auto action\n2. Hermes fleet simulates + learns\n3. Bonus and XP improve")
     live_refresh = st.checkbox("Live fleet auto-refresh", value=True)
     refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, value=20, step=5)
+    focused_layout = st.checkbox("Focused layout (clean view)", value=True)
 
 watch_payload, watch_err = safe_get("/system-watch", timeout=25)
 gateway_watch, gateway_watch_err = safe_get("/gateway-max-status", timeout=20)
@@ -563,6 +564,21 @@ if st.button("Auto-Design AIHub Plan for Complex Situations", use_container_widt
         error_prefix="AIHub max-upgrade failed",
         timeout=160,
     )
+
+if focused_layout:
+    st.subheader("Focused SQL + Upgrade Center")
+    render_sql_intelligence_panels(
+        sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
+        render_xp_bar=render_xp_bar,
+        run_logged_post_action=run_logged_post_action,
+        high_level_learning=float(st.session_state.get("ctl_high_level_learning", 0.72)),
+    )
+    st.caption("Focused layout is ON: advanced legacy sections are hidden to keep the UI clean and centered.")
+    if live_refresh:
+        st.caption(f"Live refresh active: updating every {refresh_seconds}s")
+        time.sleep(refresh_seconds)
+        st.rerun()
+    st.stop()
 
 st.subheader("Training Compliance + Always-On Status")
 ts1, ts2, ts3, ts4, ts5 = st.columns(5)
