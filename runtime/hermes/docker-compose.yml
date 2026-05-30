@@ -8,6 +8,7 @@ services:
       sh -lc "if [ -f /workspace/core/native/hermes_learning_kernel.cpp ]; then
       g++ -O3 -std=c++17 -fPIC -shared /workspace/core/native/hermes_learning_kernel.cpp -o /workspace/core/native/hermes_learning_kernel.so;
       fi;
+      python runtime/hermes/apps/bootstrap_volume_sql.py;
       python core/hermes_super_orchestrator.py"
     environment:
       HERMES_API_HOST: 0.0.0.0
@@ -73,7 +74,9 @@ services:
       context: ../..
       dockerfile: runtime/hermes/Dockerfile
     container_name: hermes-gui
-    command: streamlit run runtime/hermes/apps/gui_control_center.py --server.port 8501 --server.address 0.0.0.0
+    command: >
+      sh -lc "python runtime/hermes/apps/bootstrap_volume_sql.py;
+      streamlit run runtime/hermes/apps/gui_control_center.py --server.port 8501 --server.address 0.0.0.0"
     environment:
       HERMES_API_BASE_URL: http://hermes-gateway:8788
       HERMES_GUI_API_KEY: "local-hermes-ui-key"

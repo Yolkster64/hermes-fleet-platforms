@@ -36,6 +36,42 @@ def render_sql_intelligence_panels(
                 "gh run list --limit 5"
             )
             st.caption("This feed trains volume SQL context and cross-links Hermes learning with repository reality.")
+    super_training = sql_intel.get("super_training", {}) if isinstance(sql_intel, dict) else {}
+    if isinstance(super_training, dict) and super_training:
+        sp1, sp2, sp3 = st.columns(3)
+        sp1.metric("SQL Super Score", f"{float(super_training.get('score', 0.0)) * 100:.1f}%")
+        sp2.metric("SQL Health", f"{float(super_training.get('health_score', 0.0)) * 100:.1f}%")
+        sp3.metric("Storage Pressure", f"{float(super_training.get('storage_pressure', 0.0)) * 100:.1f}%")
+        auto_setup = super_training.get("auto_setup", {})
+        if isinstance(auto_setup, dict):
+            st.caption(
+                f"Auto setup: manifest={'ready' if bool(auto_setup.get('volume_manifest_ready', False)) else 'missing'} | "
+                f"checkpoints={'ready' if bool(auto_setup.get('training_checkpoints_ready', False)) else 'missing'}"
+            )
+        guidance = super_training.get("guidance", [])
+        if isinstance(guidance, list) and guidance:
+            for note in guidance[:4]:
+                st.info(str(note))
+    strategy_leaderboard = sql_intel.get("strategy_leaderboard", []) if isinstance(sql_intel, dict) else []
+    if isinstance(strategy_leaderboard, list) and strategy_leaderboard:
+        st.caption("SQL strategy leaderboard")
+        st.dataframe(
+            [
+                {
+                    "strategy": str(row.get("strategy", "")),
+                    "blend_score": round(float(row.get("blend_score", 0.0)) * 100.0, 1),
+                    "count": int(row.get("count", 0)),
+                    "evidence": round(float(row.get("avg_evidence", 0.0)), 4),
+                    "reward": round(float(row.get("avg_reward", 0.0)), 4),
+                    "truth": round(float(row.get("avg_truth", 0.0)), 4),
+                    "shape": round(float(row.get("avg_shape", 0.0)), 4),
+                }
+                for row in strategy_leaderboard[:8]
+                if isinstance(row, dict)
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
     variable_means = sql_intel.get("variable_means", {}) if isinstance(sql_intel, dict) else {}
     if isinstance(variable_means, dict) and variable_means:
         top_vars = sorted(variable_means.items(), key=lambda item: abs(float(item[1]) - 0.5), reverse=True)[:10]

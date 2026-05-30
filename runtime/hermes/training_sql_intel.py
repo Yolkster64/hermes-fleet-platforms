@@ -528,6 +528,100 @@ def _benefits_and_ideas(art_pattern: Dict[str, float], trend: float) -> tuple[Li
     return benefits, ideas
 
 
+def _strategy_leaderboard(evidence_rows: List[tuple]) -> List[Dict[str, object]]:
+    if not evidence_rows:
+        return []
+    stats: Dict[str, Dict[str, float]] = {}
+    for row in evidence_rows:
+        strategy = str(row[4] or "unknown")
+        current = stats.setdefault(strategy, {"count": 0.0, "evidence": 0.0, "reward": 0.0, "truth": 0.0, "shape": 0.0})
+        current["count"] += 1.0
+        current["evidence"] += float(row[0])
+        current["reward"] += float(row[1])
+        current["truth"] += float(row[2])
+        current["shape"] += float(row[3])
+    leaderboard: List[Dict[str, object]] = []
+    for strategy, value in stats.items():
+        count = max(1.0, float(value["count"]))
+        avg_evidence = float(value["evidence"]) / count
+        avg_reward = float(value["reward"]) / count
+        avg_truth = float(value["truth"]) / count
+        avg_shape = float(value["shape"]) / count
+        blend_score = _clamp01((avg_evidence * 0.34) + (avg_reward * 0.24) + (avg_truth * 0.22) + (avg_shape * 0.20))
+        leaderboard.append(
+            {
+                "strategy": strategy,
+                "count": int(count),
+                "avg_evidence": float(avg_evidence),
+                "avg_reward": float(avg_reward),
+                "avg_truth": float(avg_truth),
+                "avg_shape": float(avg_shape),
+                "blend_score": float(blend_score),
+            }
+        )
+    leaderboard.sort(key=lambda item: (float(item.get("blend_score", 0.0)), float(item.get("count", 0))), reverse=True)
+    return leaderboard[:8]
+
+
+def _super_training_payload(
+    pattern_score: float,
+    trend: float,
+    evidence_payload: Dict[str, object],
+    art_pattern: Dict[str, float],
+    sql_health: Dict[str, float],
+    volume_root: str,
+    strategy_leaderboard: List[Dict[str, object]],
+) -> Dict[str, object]:
+    db_mb = float(sql_health.get("db_mb", 0.0))
+    wal_mb = float(sql_health.get("wal_mb", 0.0))
+    snapshot_age = float(sql_health.get("snapshot_age_minutes", -1.0))
+    snapshot_freshness = (
+        0.0
+        if snapshot_age < 0.0
+        else _clamp01(1.0 - (min(480.0, snapshot_age) / 480.0))
+    )
+    storage_pressure = _clamp01((min(2048.0, db_mb) / 2048.0) * 0.62 + (min(512.0, wal_mb) / 512.0) * 0.38)
+    health_score = _clamp01((snapshot_freshness * 0.58) + ((1.0 - storage_pressure) * 0.42))
+    evidence_score = float(evidence_payload.get("score", 0.0))
+    momentum = _clamp01(max(0.0, trend))
+    overlap = float(art_pattern.get("overlap_3d", 0.0))
+    super_score = _clamp01(
+        (float(pattern_score) * 0.38)
+        + (evidence_score * 0.24)
+        + (momentum * 0.13)
+        + (overlap * 0.13)
+        + (health_score * 0.12)
+    )
+    manifest_path = os.path.join(volume_root, "hermes_volume_manifest.json")
+    checkpoints_path = os.path.join(volume_root, "training", "checkpoints")
+    auto_setup = {
+        "volume_manifest_ready": bool(os.path.exists(manifest_path)),
+        "training_checkpoints_ready": bool(os.path.isdir(checkpoints_path)),
+    }
+    guidance: List[str] = []
+    if not auto_setup["volume_manifest_ready"]:
+        guidance.append("Initialize volume layout so manifest and required directories are recreated automatically.")
+    if not auto_setup["training_checkpoints_ready"]:
+        guidance.append("Create training/checkpoints inside volume so SQL snapshots persist per container restart.")
+    if storage_pressure >= 0.72:
+        guidance.append("Storage pressure is high; run SQL optimize/prune cycle more aggressively.")
+    if health_score < 0.45:
+        guidance.append("SQL health is soft; refresh snapshots and keep WAL pressure under control.")
+    if strategy_leaderboard:
+        top = strategy_leaderboard[0]
+        guidance.append(f"Top strategy now: {top.get('strategy', 'unknown')} ({float(top.get('blend_score', 0.0)) * 100.0:.1f}% blend score).")
+    if not guidance:
+        guidance.append("SQL training layer is stable; scale specialty diversity and continue high-signal cycles.")
+    return {
+        "score": float(super_score),
+        "health_score": float(health_score),
+        "storage_pressure": float(storage_pressure),
+        "momentum": float(momentum),
+        "auto_setup": auto_setup,
+        "guidance": guidance,
+    }
+
+
 def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str, object]:
     db = ensure_training_sql(volume_root)
     cache = _SQL_INTEL_CACHE.get(db, {})
@@ -661,6 +755,28 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
     benefits, ideas = _benefits_and_ideas(art_pattern, trend)
     db_bytes = os.path.getsize(db) if os.path.exists(db) else 0
     volume_health = _training_volume_health(volume_root, db)
+    sql_health_payload = {
+        "db_mb": float(db_bytes) / (1024.0 * 1024.0),
+        "total_cycles": int(total_cycles[0]) if total_cycles else len(rows),
+        "total_agent_rows": int(total_agents[0]) if total_agents else 0,
+        "total_profile_rows": int(total_profiles[0]) if total_profiles else 0,
+        "total_github_rows": int(total_github[0]) if total_github else 0,
+        "total_evidence_rows": int(total_evidence[0]) if total_evidence else 0,
+        "training_files": float(volume_health.get("training_files", 0.0)),
+        "training_dir_mb": float(volume_health.get("training_dir_mb", 0.0)),
+        "wal_mb": float(volume_health.get("wal_mb", 0.0)),
+        "snapshot_age_minutes": float(volume_health.get("snapshot_age_minutes", -1.0)),
+    }
+    strategy_leaderboard = _strategy_leaderboard(evidence_rows)
+    super_training = _super_training_payload(
+        pattern_score=float(pattern_score),
+        trend=float(trend),
+        evidence_payload=evidence_payload,
+        art_pattern=art_pattern,
+        sql_health=sql_health_payload,
+        volume_root=volume_root,
+        strategy_leaderboard=strategy_leaderboard,
+    )
     payload = {
         "rows": len(rows),
         "pattern_score": float(pattern_score),
@@ -678,18 +794,9 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
         "latest_github": github_payload,
         "recent_hermes_profiles": recent_hermes_profiles,
         "evidence": evidence_payload,
-        "sql_health": {
-            "db_mb": float(db_bytes) / (1024.0 * 1024.0),
-            "total_cycles": int(total_cycles[0]) if total_cycles else len(rows),
-            "total_agent_rows": int(total_agents[0]) if total_agents else 0,
-            "total_profile_rows": int(total_profiles[0]) if total_profiles else 0,
-            "total_github_rows": int(total_github[0]) if total_github else 0,
-            "total_evidence_rows": int(total_evidence[0]) if total_evidence else 0,
-            "training_files": float(volume_health.get("training_files", 0.0)),
-            "training_dir_mb": float(volume_health.get("training_dir_mb", 0.0)),
-            "wal_mb": float(volume_health.get("wal_mb", 0.0)),
-            "snapshot_age_minutes": float(volume_health.get("snapshot_age_minutes", -1.0)),
-        },
+        "sql_health": sql_health_payload,
+        "strategy_leaderboard": strategy_leaderboard,
+        "super_training": super_training,
         "benefits": benefits,
         "ideas": ideas,
     }

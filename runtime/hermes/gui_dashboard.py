@@ -380,6 +380,18 @@ total_hermes = runtime_hermes if runtime_hermes > 0 else configured_hermes
 active_hermes = len([a for a in agent_rows if a["active"]])
 avg_progress = (sum(a["progress"] for a in agent_rows) / total_hermes) if total_hermes else 0.0
 live_volume_root = resolve_volume_root()
+if "auto_volume_bootstrap" not in st.session_state:
+    try:
+        bootstrap_root, bootstrap_manifest = initialize_volume_layout(live_volume_root)
+        scan_volume_files.clear()
+        read_sql_training_intelligence.clear()
+        st.session_state["auto_volume_bootstrap"] = {
+            "root": bootstrap_root,
+            "created_count": int(bootstrap_manifest.get("created_count", 0)) if isinstance(bootstrap_manifest, dict) else 0,
+            "ok": True,
+        }
+    except Exception as bootstrap_exc:
+        st.session_state["auto_volume_bootstrap"] = {"ok": False, "error": str(bootstrap_exc)}
 live_sql_intel = read_sql_training_intelligence(live_volume_root)
 
 c1, c2, c3, c4, c5 = st.columns(5)
@@ -388,6 +400,15 @@ c2.metric("Hermes Amount", str(total_hermes), delta=f"runtime {runtime_hermes} |
 c3.metric("Active Hermes", str(active_hermes))
 c4.metric("AIHub Bonus", f"{aihub_bonus * 100:.1f}%")
 c5.metric("Model", str(unified.get("aihub_shared_model_id", "aihub-unified-v1")))
+auto_bootstrap = st.session_state.get("auto_volume_bootstrap", {})
+if isinstance(auto_bootstrap, dict):
+    if bool(auto_bootstrap.get("ok", False)):
+        st.caption(
+            f"Container auto-setup volume ready: {auto_bootstrap.get('root', live_volume_root)} "
+            f"(created {int(auto_bootstrap.get('created_count', 0))} paths)."
+        )
+    elif auto_bootstrap.get("error"):
+        st.caption(f"Container auto-setup warning: {auto_bootstrap.get('error')}")
 if not watch_err and isinstance(watch_payload, dict):
     st.caption(f"Watch stream: {watch_payload.get('watch_timestamp_utc', 'n/a')} (gateway aggregated)")
 orchestration_counts = snapshot.get("super_orchestration_counts", {}) if isinstance(snapshot, dict) else {}

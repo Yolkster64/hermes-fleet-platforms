@@ -2312,6 +2312,7 @@ class HermesSuperOrchestrator:
         major_training_campaign_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("major_training_campaign", lookback=120))))
         aihub_training_pressure_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("aihub_training_pressure", lookback=120))))
         bonusllm_goodies_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("bonusllm_goodies", lookback=120))))
+        sql_training_super_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("sql_training_super", lookback=120))))
         brain_trinity_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("brain_trinity", lookback=120))))
         brain_learning_specific_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("brain_specific_learning", lookback=120))))
         brain_decision_specific_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("brain_specific_decision", lookback=120))))
@@ -2363,6 +2364,7 @@ class HermesSuperOrchestrator:
                 + (major_training_campaign_signal * power_score * 0.07)
                 + (aihub_training_pressure_signal * cost_score * 0.04)
                 + (bonusllm_goodies_signal * power_score * 0.08)
+                + (sql_training_super_signal * power_score * 0.07)
                 + (brain_trinity_signal * power_score * 0.10)
                 + (brain_learning_specific_signal * speed_score * 0.04)
                 + (brain_decision_specific_signal * power_score * 0.04)
@@ -2416,6 +2418,7 @@ class HermesSuperOrchestrator:
                 "major_training_campaign_signal": major_training_campaign_signal,
                 "aihub_training_pressure_signal": aihub_training_pressure_signal,
                 "bonusllm_goodies_signal": bonusllm_goodies_signal,
+                "sql_training_super_signal": sql_training_super_signal,
                 "brain_trinity_signal": brain_trinity_signal,
                 "brain_learning_specific_signal": brain_learning_specific_signal,
                 "brain_decision_specific_signal": brain_decision_specific_signal,
@@ -2448,6 +2451,7 @@ class HermesSuperOrchestrator:
         major_training_campaign_signal = self.store.recent_external_signal_score_by_source("major_training_campaign")
         aihub_training_pressure_signal = self.store.recent_external_signal_score_by_source("aihub_training_pressure")
         bonusllm_goodies_signal = self.store.recent_external_signal_score_by_source("bonusllm_goodies")
+        sql_training_super_signal = self.store.recent_external_signal_score_by_source("sql_training_super")
         brain_trinity_signal = self.store.recent_external_signal_score_by_source("brain_trinity")
         brain_learning_specific_signal = self.store.recent_external_signal_score_by_source("brain_specific_learning")
         brain_decision_specific_signal = self.store.recent_external_signal_score_by_source("brain_specific_decision")
@@ -2486,6 +2490,7 @@ class HermesSuperOrchestrator:
                 + (major_training_campaign_signal * 0.07)
                 + (aihub_training_pressure_signal * 0.05)
                 + (bonusllm_goodies_signal * 0.07)
+                + (sql_training_super_signal * 0.07)
                 + (brain_trinity_signal * 0.08)
                 + (brain_learning_specific_signal * 0.03)
                 + (brain_decision_specific_signal * 0.03)

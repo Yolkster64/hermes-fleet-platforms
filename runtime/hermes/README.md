@@ -133,6 +133,9 @@ This runtime enables:
   - GUI now includes a **cosmic fleet row carousel** (majestic Hermes personas by characteristics/tool subsets), **growth/teamwork calculator**, **evidence advisor guides**, and **entrance+building nexus with volume readiness**
   - SQL center now supports one-click Hermes snapshot save directly from dashboard for fast persistence handoff
   - Docker services now explicitly set `HERMES_VOLUME_DATA_PATH=/workspace/runtime/hermes_persist` so SQL setup is auto-initialized in the mounted volume
+  - API + GUI container startup now runs `runtime/hermes/apps/bootstrap_volume_sql.py` so volume manifest and training SQL are prepared before serving
+  - GUI now auto-runs volume layout bootstrap on first load and surfaces container auto-setup status directly in the dashboard header
+  - SQL intelligence now includes `strategy_leaderboard` + `super_training` (health/storage pressure/auto-setup guidance) for stronger training decisions
   - GUI now shows per-Hermes level/XP/speed bonus/token gain bars, GitHub CLI connection panel, and fleet lock/unlock controls for hard-problem mode
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
   - Deep Auto Learning Zone (`♾️`) with study-area targeting and multi-round comparison

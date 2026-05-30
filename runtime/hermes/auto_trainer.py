@@ -1345,8 +1345,11 @@ def run_cycle() -> None:
                 sql_intel = _last_sql_intel
             art_pattern = sql_intel.get("art_pattern", {}) if isinstance(sql_intel, dict) else {}
             sql_health = sql_intel.get("sql_health", {}) if isinstance(sql_intel, dict) else {}
+            super_training = sql_intel.get("super_training", {}) if isinstance(sql_intel, dict) else {}
             if not isinstance(sql_health, dict):
                 sql_health = {}
+            if not isinstance(super_training, dict):
+                super_training = {}
             volume_pressure = _clamp01(
                 (min(1.0, float(sql_health.get("db_mb", 0.0)) / 1024.0) * 0.34)
                 + (min(1.0, float(sql_health.get("training_dir_mb", 0.0)) / 2048.0) * 0.22)
@@ -1363,6 +1366,25 @@ def run_cycle() -> None:
                 {
                     "cycle": _cycle,
                     "specialty": dynamic_specialty,
+                    "volume_pressure": volume_pressure,
+                    "sql_health": sql_health,
+                },
+                timeout=20,
+            )
+            sql_super_training = _clamp01(
+                (float(super_training.get("score", 0.0)) * 0.58)
+                + (float(super_training.get("health_score", 0.0)) * 0.20)
+                + ((1.0 - float(super_training.get("storage_pressure", volume_pressure))) * 0.12)
+                + (float(sql_intel.get("pattern_score", 0.0)) * 0.10)
+            )
+            _emit_signal(
+                "auto_trainer.sql_training_super",
+                sql_super_training,
+                {
+                    "cycle": _cycle,
+                    "specialty": dynamic_specialty,
+                    "sql_training_super": sql_super_training,
+                    "super_training": super_training,
                     "volume_pressure": volume_pressure,
                     "sql_health": sql_health,
                 },
@@ -1452,13 +1474,15 @@ def run_cycle() -> None:
                 timeout=30,
             )
             aihub_brain_learning = _clamp01(
-                (float(sql_intel.get("pattern_score", 0.5)) * 0.30)
-                + (max(0.0, float(sql_intel.get("trend", 0.0))) * 0.14)
-                + (float(training_variables.get("watch_efficiency", 0.5)) * 0.18)
-                + (float(training_variables.get("signal_stability", 0.5)) * 0.14)
-                + (float(training_variables.get("conscious_efficiency", 0.5)) * 0.12)
-                + (float(training_variables.get("conscious_resilience", 0.5)) * 0.06)
-                + (_clamp01(float(super_plan.get("optimizer_force", 0.5))) * 0.06)
+                (float(sql_intel.get("pattern_score", 0.5)) * 0.27)
+                + (max(0.0, float(sql_intel.get("trend", 0.0))) * 0.12)
+                + (float(training_variables.get("watch_efficiency", 0.5)) * 0.16)
+                + (float(training_variables.get("signal_stability", 0.5)) * 0.12)
+                + (float(training_variables.get("conscious_efficiency", 0.5)) * 0.11)
+                + (float(training_variables.get("conscious_resilience", 0.5)) * 0.05)
+                + (_clamp01(float(super_plan.get("optimizer_force", 0.5))) * 0.05)
+                + (float(super_training.get("score", 0.0)) * 0.07)
+                + (float(super_training.get("health_score", 0.0)) * 0.05)
             )
             _emit_signal(
                 "auto_trainer.aihub_brain_learning",
@@ -1474,6 +1498,8 @@ def run_cycle() -> None:
                     "conscious_efficiency": float(training_variables.get("conscious_efficiency", 0.5)),
                     "conscious_resilience": float(training_variables.get("conscious_resilience", 0.5)),
                     "optimizer_force": float(super_plan.get("optimizer_force", 0.5)),
+                    "sql_super_score": float(super_training.get("score", 0.0)),
+                    "sql_health_score": float(super_training.get("health_score", 0.0)),
                     "training_variables": training_variables,
                 },
                 timeout=30,
