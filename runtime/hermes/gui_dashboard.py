@@ -152,6 +152,20 @@ def _initialize_session_state() -> None:
             st.session_state[key] = value
 
 
+def inject_majestic_theme() -> None:
+    st.markdown(
+        """
+<style>
+.stApp {background: radial-gradient(circle at 18% -12%, rgba(90,130,255,0.12), rgba(12,13,26,0.96) 42%), radial-gradient(circle at 88% 0%, rgba(120,70,180,0.10), rgba(10,10,20,0.0) 48%);}
+[data-testid="stMetricValue"] {color: #e9f4ff;}
+[data-testid="stSidebar"] {background: linear-gradient(180deg, rgba(12,16,32,0.98), rgba(10,13,26,0.95));}
+div.stButton > button {border-radius: 10px; border: 1px solid rgba(120,205,255,0.35); box-shadow: 0 0 10px rgba(101,198,255,0.15);}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
 def render_variable_guide() -> None:
     st.caption("Variable guide")
     st.markdown(
@@ -316,6 +330,7 @@ def deep_auto_learning_zone(max_mode: bool, study_areas: List[str], rounds: int,
 
 
 st.set_page_config(page_title="Hermes Control Dashboard", page_icon="🧠", layout="wide")
+inject_majestic_theme()
 st.title("Hermes Fleet Control Dashboard")
 st.caption("Clear control view: runtime status, SQL intelligence, and one-click fleet actions.")
 
@@ -454,6 +469,7 @@ render_next_level_control_center(
     watch_payload=watch_payload if isinstance(watch_payload, dict) else {},
     unified=unified if isinstance(unified, dict) else {},
     cpp_kernel=cpp_kernel if isinstance(cpp_kernel, dict) else {},
+    ultimate_entrance=ultimate_entrance if isinstance(ultimate_entrance, dict) else {},
     volume_root=live_volume_root,
     run_logged_post_action=run_logged_post_action,
 )

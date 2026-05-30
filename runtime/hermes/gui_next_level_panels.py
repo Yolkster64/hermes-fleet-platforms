@@ -1,4 +1,5 @@
 import json
+import os
 import time
 from typing import Any, Callable, Dict, List
 
@@ -48,6 +49,7 @@ def render_next_level_control_center(
     watch_payload: Dict[str, Any],
     unified: Dict[str, Any],
     cpp_kernel: Dict[str, Any],
+    ultimate_entrance: Dict[str, Any],
     volume_root: str,
     run_logged_post_action: Callable[..., None],
 ) -> None:
@@ -55,7 +57,7 @@ def render_next_level_control_center(
     st.markdown("### Next-Level AIHub + SQL Command Center")
     st.markdown('<div class="hermes-glow"><span class="recommended-pill">RECOMMENDED</span> <span class="cool-title">Lighter visual mode + richer data controls + instant reports</span></div>', unsafe_allow_html=True)
 
-    tabs = st.tabs(["SQL Center", "AIHub Lab", "Fleet Map", "Security + Benchmark", "Clock + Style"])
+    tabs = st.tabs(["SQL Center", "AIHub Lab", "Fleet Map", "Evidence Advisor", "Security + Benchmark", "Clock + Style"])
     sql_health = sql_intel.get("sql_health", {}) if isinstance(sql_intel, dict) else {}
     if not isinstance(sql_health, dict):
         sql_health = {}
@@ -100,6 +102,14 @@ def render_next_level_control_center(
         p1.metric("ETA seconds", f"{calc_seconds:.1f}")
         p2.metric("Estimated cost", f"${calc_cost:.4f}")
         p3.metric("AIBox score", f"{_clamp01(aibox) * 100:.1f}%")
+        growth = float(growth_data.get("growth_index", 0.0)) if isinstance(growth_data, dict) else 0.0
+        maturity = float(growth_data.get("maturity_index", 0.0)) if isinstance(growth_data, dict) else 0.0
+        teamwork = _clamp01((growth * 0.40) + (maturity * 0.35) + (float(training_status.get("active_agents", 0.0)) / max(1.0, float(training_status.get("agent_count", 1.0))) * 0.25))
+        growth_gain = _clamp01((_clamp01(aibox) * 0.44) + (teamwork * 0.38) + (float(evidence.get("score", 0.0)) * 0.18))
+        g1, g2, g3 = st.columns(3)
+        g1.metric("Teamwork multiplier", f"x{1.0 + (teamwork * 0.45):.3f}")
+        g2.metric("Projected growth gain", f"+{growth_gain * 100:.1f}%")
+        g3.metric("Collab readiness", f"{teamwork * 100:.1f}%")
         if st.button("Run AIHub Next-Level Upgrade", use_container_width=True):
             run_logged_post_action(
                 label="aihub-next-level-upgrade",
@@ -142,8 +152,53 @@ def render_next_level_control_center(
         if isinstance(github_ctx, dict):
             st.markdown("#### GitHub CLI/Data Snapshot")
             st.json(github_ctx, expanded=False)
+        st.markdown("#### Entrance + Building Nexus")
+        entrance = ultimate_entrance if isinstance(ultimate_entrance, dict) else {}
+        b1, b2, b3, b4 = st.columns(4)
+        b1.metric("Entrance Integration", f"{float(entrance.get('integration_score', 0.0)) * 100:.1f}%")
+        b2.metric("Gateway Reliability", f"{float(entrance.get('reliability', 0.0)) * 100:.1f}%")
+        b3.metric("Gateway Responsiveness", f"{float(entrance.get('responsiveness', 0.0)) * 100:.1f}%")
+        b4.metric("Route Diversity", f"{float(entrance.get('route_diversity', 0.0)) * 100:.1f}%")
+        volume_ok = os.path.isdir(volume_root)
+        file_count = 0
+        if volume_ok:
+            try:
+                file_count = sum(len(files) for _, _, files in os.walk(volume_root))
+            except OSError:
+                file_count = 0
+        st.caption(f"Volume setup: {'ready' if volume_ok else 'missing'} | root={volume_root} | files={file_count}")
 
     with tabs[3]:
+        st.markdown("#### Evidence Advisor + Pattern Guide")
+        evidence_score = float(evidence.get("score", 0.0))
+        evidence_rows = int(evidence.get("rows", sql_health.get("total_evidence_rows", 0)))
+        trend = float(sql_intel.get("trend", 0.0)) if isinstance(sql_intel, dict) else 0.0
+        watch_eff = float(sql_intel.get("variable_means", {}).get("watch_efficiency", 0.5)) if isinstance(sql_intel, dict) else 0.5
+        e1, e2, e3, e4 = st.columns(4)
+        e1.metric("Evidence confidence", f"{evidence_score * 100:.1f}%")
+        e2.metric("Evidence rows", str(evidence_rows))
+        e3.metric("Pattern trend", f"{trend:+.4f}")
+        e4.metric("Watch efficiency", f"{watch_eff * 100:.1f}%")
+        guide_rows = [
+            {"Pattern": "Growth Lane", "Condition": "trend >= 0.03 and evidence >= 0.60", "Guide": "Push AIHub max-upgrade and increase steps."},
+            {"Pattern": "Stability Lane", "Condition": "watch_eff >= 0.58 and trend around 0", "Guide": "Keep balanced blend; focus on consistency."},
+            {"Pattern": "Recovery Lane", "Condition": "trend < 0 or evidence < 0.45", "Guide": "Run evidence-heavy learning pulse + SQL optimize."},
+        ]
+        st.dataframe(guide_rows, use_container_width=True, hide_index=True)
+        advice: List[str] = []
+        if trend < 0:
+            advice.append("Trend is negative: increase stability_bias and run optimizer first.")
+        if evidence_score < 0.50:
+            advice.append("Evidence confidence is low: prioritize SQL/evidence ingestion before aggressive upgrades.")
+        if watch_eff < 0.55:
+            advice.append("Watch efficiency is low: tune monitor coverage and reduce noisy candidate bursts.")
+        if not advice:
+            advice.append("Signals look healthy: run full AIHub next-level plan with higher candidates.")
+        st.markdown("**Advice for you**")
+        for line in advice:
+            st.markdown(f"- {line}")
+
+    with tabs[4]:
         st.markdown("#### Security Area")
         s1, s2, s3 = st.columns(3)
         block_remote = s1.toggle("Block remote control", value=True)
@@ -176,7 +231,7 @@ def render_next_level_control_center(
         for r in recs:
             st.markdown(f"- {r}")
 
-    with tabs[4]:
+    with tabs[5]:
         now_struct = time.localtime()
         hhmmss = time.strftime("%H:%M:%S", now_struct)
         st.markdown('<div class="clock-wrap"><h2 style="margin:0;">⏱️ ' + hhmmss + "</h2></div>", unsafe_allow_html=True)

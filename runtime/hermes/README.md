@@ -127,6 +127,7 @@ This runtime enables:
   - Decision brain now blends `ultimate_super_plan` + entrance signals into adaptive confidence/pivot dynamics for more stable final-step routing
   - GUI now includes an **Ultimate Fleet Arena** with tiny bot avatars, unique design packs, role mapping, setup/upgrade guide, per-bot XP/level bars, and ETA forecasting with C++ acceleration awareness
   - GUI now includes a **Next-Level Control Center**: SQL command center (instant reports), AIBox calculator, fleet area map, security shield panel, benchmark button, animated clock, and glow-styled recommended actions
+  - GUI now includes a **cosmic fleet row carousel** (majestic Hermes personas by characteristics/tool subsets), **growth/teamwork calculator**, **evidence advisor guides**, and **entrance+building nexus with volume readiness**
   - SQL center now supports one-click Hermes snapshot save directly from dashboard for fast persistence handoff
   - Docker services now explicitly set `HERMES_VOLUME_DATA_PATH=/workspace/runtime/hermes_persist` so SQL setup is auto-initialized in the mounted volume
   - GUI now shows per-Hermes level/XP/speed bonus/token gain bars, GitHub CLI connection panel, and fleet lock/unlock controls for hard-problem mode
