@@ -70,6 +70,7 @@ FIELD_ADAPTATION_WEIGHT = max(0.0, min(1.0, float(os.getenv("HERMES_FIELD_ADAPTA
 SQL_MAX_CYCLE_ROWS = int(os.getenv("HERMES_SQL_MAX_CYCLE_ROWS", "6000"))
 SQL_MAX_AGENT_ROWS = int(os.getenv("HERMES_SQL_MAX_AGENT_ROWS", "24000"))
 SQL_MAX_GITHUB_ROWS = int(os.getenv("HERMES_SQL_MAX_GITHUB_ROWS", "4000"))
+SQL_MAX_PROFILE_ROWS = int(os.getenv("HERMES_SQL_MAX_PROFILE_ROWS", "3000"))
 SPECIALIST_MODES = [m.strip() for m in os.getenv("HERMES_SPECIALIST_MODES", "swarm,mesh,multipolar,specialist-mix").split(",") if m.strip()]
 AGENT_WORK_STYLES = [s.strip() for s in os.getenv("HERMES_AGENT_WORK_STYLES", "fast_micro,deep_specialist,balanced_hybrid").split(",") if s.strip()]
 AGENT_SKILLS_25 = [
@@ -896,6 +897,7 @@ def run_cycle() -> None:
                     max_cycles=SQL_MAX_CYCLE_ROWS,
                     max_agent_rows=SQL_MAX_AGENT_ROWS,
                     max_github_rows=SQL_MAX_GITHUB_ROWS,
+                    max_profile_rows=SQL_MAX_PROFILE_ROWS,
                 )
                 _emit_signal(
                     "auto_trainer.sql_maintenance",

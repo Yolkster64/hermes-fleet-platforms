@@ -70,11 +70,31 @@ def ensure_training_sql(volume_root: str) -> str:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS hermes_agent_profiles (
+                hermes_id TEXT PRIMARY KEY,
+                specialty TEXT NOT NULL,
+                signal_score REAL NOT NULL,
+                art_pattern_score REAL NOT NULL,
+                experience_xp REAL NOT NULL,
+                level INTEGER NOT NULL,
+                speed_bonus REAL NOT NULL,
+                token_power_gain REAL NOT NULL,
+                size_mode TEXT NOT NULL,
+                specialties_json TEXT NOT NULL,
+                tools_json TEXT NOT NULL,
+                variables_json TEXT NOT NULL,
+                updated_unix REAL NOT NULL
+            )
+            """
+        )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_training_cycles_cycle ON training_cycles(cycle)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_training_cycles_created ON training_cycles(created_unix)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_vars_cycle ON hermes_agent_variables(cycle)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_vars_created ON hermes_agent_variables(created_unix)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_vars_hermes ON hermes_agent_variables(hermes_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_profiles_updated ON hermes_agent_profiles(updated_unix)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_github_context_created ON github_context(created_unix)")
         conn.commit()
     _SCHEMA_READY.add(db)
@@ -86,9 +106,10 @@ def prune_training_sql(
     max_cycles: int = 6000,
     max_agent_rows: int = 24000,
     max_github_rows: int = 4000,
+    max_profile_rows: int = 3000,
 ) -> Dict[str, int]:
     db = ensure_training_sql(volume_root)
-    pruned = {"training_cycles": 0, "hermes_agent_variables": 0, "github_context": 0}
+    pruned = {"training_cycles": 0, "hermes_agent_variables": 0, "github_context": 0, "hermes_agent_profiles": 0}
     with _connect(db) as conn:
         conn.execute(
             """
@@ -138,6 +159,21 @@ def prune_training_sql(
             (max(0, int(max_github_rows) - 1),),
         )
         pruned["github_context"] = int(conn.total_changes) - pruned["training_cycles"] - pruned["hermes_agent_variables"]
+        conn.execute(
+            """
+            DELETE FROM hermes_agent_profiles
+            WHERE hermes_id NOT IN (
+                SELECT hermes_id
+                FROM hermes_agent_profiles
+                ORDER BY updated_unix DESC
+                LIMIT ?
+            )
+            """,
+            (int(max_profile_rows),),
+        )
+        pruned["hermes_agent_profiles"] = (
+            int(conn.total_changes) - pruned["training_cycles"] - pruned["hermes_agent_variables"] - pruned["github_context"]
+        )
         conn.commit()
     return pruned
 
@@ -241,17 +277,14 @@ def _art_pattern_metrics(variable_means: Dict[str, float]) -> Dict[str, float]:
     }
 
 
-def _build_recent_hermes_profile(row: tuple) -> Dict[str, object]:
-    vars_payload = json.loads(row[4]) if isinstance(row[4], str) and row[4] else {}
-    if not isinstance(vars_payload, dict):
-        vars_payload = {}
+def _derive_hermes_profile_fields(signal_score: float, art_pattern_score: float, vars_payload: Dict[str, object]) -> Dict[str, object]:
     xp = max(
         0.0,
         min(
             10000.0,
             (
-                float(row[2]) * 2200.0
-                + float(row[3]) * 1800.0
+                float(signal_score) * 2200.0
+                + float(art_pattern_score) * 1800.0
                 + float(vars_payload.get("retention_strength", 0.5)) * 1600.0
                 + float(vars_payload.get("knowledge_transfer", 0.5)) * 1400.0
             ),
@@ -259,7 +292,7 @@ def _build_recent_hermes_profile(row: tuple) -> Dict[str, object]:
     )
     level = max(1, min(99, int(1 + (xp / 140.0))))
     speed_bonus = _clamp01(float(vars_payload.get("speed_efficiency", 0.5)) * 0.8 + float(vars_payload.get("position_score", 0.5)) * 0.2)
-    token_power_gain = _clamp01(float(vars_payload.get("yield_efficiency", 0.5)) * 0.7 + float(row[3]) * 0.3)
+    token_power_gain = _clamp01(float(vars_payload.get("yield_efficiency", 0.5)) * 0.7 + float(art_pattern_score) * 0.3)
     size_mode = "mini" if float(vars_payload.get("size_factor", 0.5)) < 0.45 else ("full" if float(vars_payload.get("size_factor", 0.5)) > 0.70 else "mid")
     specialties = [
         "pattern-hunter",
@@ -268,10 +301,6 @@ def _build_recent_hermes_profile(row: tuple) -> Dict[str, object]:
     ]
     tools = ["compression", "3d-overlap", "xp-memory", "token-optimizer"]
     return {
-        "hermes_id": row[0],
-        "specialty": row[1],
-        "signal_score": float(row[2]),
-        "art_pattern_score": float(row[3]),
         "experience_xp": float(xp),
         "level": int(level),
         "speed_bonus": float(speed_bonus),
@@ -279,7 +308,53 @@ def _build_recent_hermes_profile(row: tuple) -> Dict[str, object]:
         "size_mode": size_mode,
         "specialties": specialties,
         "tools": tools,
+    }
+
+
+def _build_recent_hermes_profile(row: tuple) -> Dict[str, object]:
+    vars_payload = json.loads(row[4]) if isinstance(row[4], str) and row[4] else {}
+    if not isinstance(vars_payload, dict):
+        vars_payload = {}
+    profile_fields = _derive_hermes_profile_fields(float(row[2]), float(row[3]), vars_payload)
+    return {
+        "hermes_id": row[0],
+        "specialty": row[1],
+        "signal_score": float(row[2]),
+        "art_pattern_score": float(row[3]),
+        "experience_xp": profile_fields["experience_xp"],
+        "level": profile_fields["level"],
+        "speed_bonus": profile_fields["speed_bonus"],
+        "token_power_gain": profile_fields["token_power_gain"],
+        "size_mode": profile_fields["size_mode"],
+        "specialties": profile_fields["specialties"],
+        "tools": profile_fields["tools"],
         "variables": vars_payload,
+    }
+
+
+def _build_saved_hermes_profile(row: tuple) -> Dict[str, object]:
+    specialties = json.loads(row[9]) if isinstance(row[9], str) and row[9] else []
+    tools = json.loads(row[10]) if isinstance(row[10], str) and row[10] else []
+    variables = json.loads(row[11]) if isinstance(row[11], str) and row[11] else {}
+    if not isinstance(specialties, list):
+        specialties = []
+    if not isinstance(tools, list):
+        tools = []
+    if not isinstance(variables, dict):
+        variables = {}
+    return {
+        "hermes_id": str(row[0]),
+        "specialty": str(row[1]),
+        "signal_score": float(row[2]),
+        "art_pattern_score": float(row[3]),
+        "experience_xp": float(row[4]),
+        "level": int(row[5]),
+        "speed_bonus": float(row[6]),
+        "token_power_gain": float(row[7]),
+        "size_mode": str(row[8]),
+        "specialties": specialties,
+        "tools": tools,
+        "variables": variables,
     }
 
 
@@ -332,6 +407,16 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
             LIMIT 30
             """
         ).fetchall()
+        saved_profiles = conn.execute(
+            """
+            SELECT
+                hermes_id, specialty, signal_score, art_pattern_score, experience_xp,
+                level, speed_bonus, token_power_gain, size_mode, specialties_json, tools_json, variables_json
+            FROM hermes_agent_profiles
+            ORDER BY updated_unix DESC
+            LIMIT 30
+            """
+        ).fetchall()
 
     if not rows:
         return {"rows": 0, "pattern_score": 0.0, "trend": 0.0, "variable_means": {}, "latest_github": {}}
@@ -376,7 +461,10 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
             "changed_files": int(latest_github[3]),
             "created_unix": float(latest_github[4]),
         }
-    recent_hermes_profiles = [_build_recent_hermes_profile(row) for row in latest_agents]
+    if saved_profiles:
+        recent_hermes_profiles = [_build_saved_hermes_profile(row) for row in saved_profiles]
+    else:
+        recent_hermes_profiles = [_build_recent_hermes_profile(row) for row in latest_agents]
     benefits, ideas = _benefits_and_ideas(art_pattern, trend)
     return {
         "rows": len(rows),
@@ -450,6 +538,7 @@ def record_hermes_agent_variables(
     count = max(6, min(24, int(micro_agents // 12)))
     base = {k: float(v) for k, v in training_variables.items() if isinstance(v, (int, float))}
     rows = []
+    profile_rows = []
     now = time.time()
     for idx in range(count):
         ratio = (idx + 1) / max(1.0, float(count))
@@ -478,6 +567,24 @@ def record_hermes_agent_variables(
                 now,
             )
         )
+        profile = _derive_hermes_profile_fields(float(signal_score), float(art_pattern_score), agent_vars)
+        profile_rows.append(
+            (
+                f"hermes-{idx + 1:03d}",
+                str(specialty),
+                float(signal_score),
+                float(art_pattern_score),
+                float(profile["experience_xp"]),
+                int(profile["level"]),
+                float(profile["speed_bonus"]),
+                float(profile["token_power_gain"]),
+                str(profile["size_mode"]),
+                json.dumps(profile["specialties"]),
+                json.dumps(profile["tools"]),
+                json.dumps(agent_vars),
+                now,
+            )
+        )
     with _connect(db) as conn:
         conn.executemany(
             """
@@ -486,5 +593,27 @@ def record_hermes_agent_variables(
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
+        )
+        conn.executemany(
+            """
+            INSERT INTO hermes_agent_profiles (
+                hermes_id, specialty, signal_score, art_pattern_score, experience_xp,
+                level, speed_bonus, token_power_gain, size_mode, specialties_json, tools_json, variables_json, updated_unix
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(hermes_id) DO UPDATE SET
+                specialty=excluded.specialty,
+                signal_score=excluded.signal_score,
+                art_pattern_score=excluded.art_pattern_score,
+                experience_xp=excluded.experience_xp,
+                level=excluded.level,
+                speed_bonus=excluded.speed_bonus,
+                token_power_gain=excluded.token_power_gain,
+                size_mode=excluded.size_mode,
+                specialties_json=excluded.specialties_json,
+                tools_json=excluded.tools_json,
+                variables_json=excluded.variables_json,
+                updated_unix=excluded.updated_unix
+            """,
+            profile_rows,
         )
         conn.commit()
