@@ -1129,6 +1129,48 @@ st.dataframe(mix_rows, use_container_width=True, hide_index=True)
 st.caption(
     "Optimal practical flow: pick mode -> pick type -> apply deck type -> run one-click SQL/training setup in center SQL tab -> run Ultimate Hermes + AIHub upgrade."
 )
+st.markdown("#### Full Hermes Table + Best Bonus Guide")
+all_type_rows: List[Dict[str, str]] = []
+for type_key, preset in _all_hermes_presets().items():
+    if not isinstance(preset, dict):
+        continue
+    techniques_text = ", ".join([str(t) for t in preset.get("techniques", [])[:4]])
+    title = str(preset.get("title", type_key))
+    best_mode = "Programming + C++" if ("Deep" in title or "Ultimate" in title) else ("GUI + Visual" if ("Mesh" in title or "Creative" in title) else ("Learning Depth" if ("Gaussian" in title or "Idealist" in title) else "Intensive Throughput"))
+    best_action = "Deploy + optimize continuously" if best_mode in ("Intensive Throughput", "Programming + C++") else "Run guided learning + profile sync"
+    bonus_hint = "Use AIHub routing optimizer + brain fusion monitor for max bonus."
+    all_type_rows.append(
+        {
+            "Hermes Type": title,
+            "Group": str(preset.get("group", "Custom")),
+            "Best Mode": best_mode,
+            "Best Action": best_action,
+            "Bonus Guide": bonus_hint,
+            "Core Techniques": techniques_text,
+            "Agents/Gaussian/Learning": f"{int(preset.get('micro_agents', 0))} / {float(preset.get('gaussian_pressure', 0.0)):.2f} / {float(preset.get('high_level_learning', 0.0)):.2f}",
+        }
+    )
+st.dataframe(all_type_rows, use_container_width=True, hide_index=True)
+fleet_preset = st.selectbox(
+    "Fleet customization preset",
+    ["Balanced Ops", "C++ Forge", "UI Studio", "Security Guard", "Throughput Storm", "Learning Lab"],
+    index=0,
+)
+if st.button("Apply Fleet Customization Preset", use_container_width=True):
+    preset_map = {
+        "Balanced Ops": {"mode": "Programming + C++", "type": "hybrid-core", "tools": ["code-analysis", "fleet-deploy-ops", "brain-fusion-monitor"]},
+        "C++ Forge": {"mode": "Programming + C++", "type": "deep-thinker", "tools": ["code-analysis", "cpp-compile-advisor", "split-merge-planner"]},
+        "UI Studio": {"mode": "GUI + Visual", "type": "mesh-swarm", "tools": ["ui-polish-engine", "multi-parallel-orchestrator", "network-signal-fuser"]},
+        "Security Guard": {"mode": "Learning Depth", "type": "idealist-strategist", "tools": ["security-threat-modeler", "truth-shield-guardian", "idealist-policy-guard"]},
+        "Throughput Storm": {"mode": "Intensive Throughput", "type": "legacy-parallel-swarm", "tools": ["multi-parallel-orchestrator", "efficiency-tuner", "fleet-deploy-ops"]},
+        "Learning Lab": {"mode": "Learning Depth", "type": "ultimate-ml-x5", "tools": ["adaptive-memory-weaver", "x6-learning-extender", "brain-fusion-monitor"]},
+    }
+    chosen = preset_map.get(fleet_preset, preset_map["Balanced Ops"])
+    st.session_state["ctl_operation_mode"] = str(chosen["mode"])
+    st.session_state["ctl_hermes_type"] = str(chosen["type"])
+    st.session_state["ctl_smart_tools"] = list(chosen["tools"])
+    st.success(f"Applied preset: {fleet_preset}")
+    st.rerun()
 with st.expander("Hermes Type Catalog + Optimization Tips", expanded=False):
     catalog_presets = _active_hermes_presets()
     st.dataframe(
@@ -1987,9 +2029,21 @@ else:
             st.text_area("Special Training Result", value=json.dumps(special, indent=2), height=260)
 
 st.subheader("Automatic Learning Zone")
+st.markdown(
+    "Use this section for the easiest always-on training path: enable auto learning, keep intelligent shuffle on, and use 35-60s interval for stable growth."
+)
 auto_enabled = st.checkbox("Always run automatic smart learning", value=True)
 auto_interval = st.slider("Auto interval (seconds)", min_value=20, max_value=300, value=45, step=5)
 intelligent_shuffle = st.checkbox("Intelligent shuffle + adaptive profile each cycle", value=True)
+if st.button("Apply Easy Auto Training Profile", use_container_width=True):
+    st.session_state["ctl_operation_mode"] = "Learning Depth"
+    st.session_state["ctl_x5_brain_pack"] = True
+    st.session_state["ctl_x6_learning_pack"] = True
+    st.session_state["ctl_auto_x10_setup"] = True
+    st.session_state["ctl_both_sides_training"] = True
+    st.session_state["ctl_hermes_type"] = "ultimate-ml-x5"
+    st.success("Easy auto training profile applied.")
+    st.rerun()
 if "last_auto_run_ts" not in st.session_state:
     st.session_state["last_auto_run_ts"] = 0.0
 now_ts = time.time()
