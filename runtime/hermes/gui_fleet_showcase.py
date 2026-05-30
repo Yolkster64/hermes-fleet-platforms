@@ -13,12 +13,34 @@ def _tiny_avatar(index: int, size_mode: str) -> str:
     return avatars[index % len(avatars)]
 
 
-def _design_pack(size_mode: str) -> str:
+def _design_pack(size_mode: str, specialty: str) -> str:
+    s = specialty.lower()
     if size_mode == "mini":
         return "Neon Scout • ultra-light shell"
     if size_mode == "full":
         return "Titan Core • reinforced reasoning"
+    if "security" in s:
+        return "Aegis Shade • hardened defensive shell"
+    if "gui" in s or "ux" in s:
+        return "Prism Shade • creative visual shell"
+    if "sql" in s or "data" in s:
+        return "Obsidian Shade • data-signal shell"
+    if "training" in s or "learning" in s:
+        return "Aurora Shade • memory-growth shell"
     return "Balanced Prism • adaptive shell"
+
+
+def _shade_for_specialty(specialty: str) -> str:
+    s = specialty.lower()
+    if "security" in s:
+        return "linear-gradient(145deg, rgba(32,25,46,0.92), rgba(15,18,35,0.92))"
+    if "gui" in s or "ux" in s:
+        return "linear-gradient(145deg, rgba(18,38,62,0.92), rgba(20,26,40,0.92))"
+    if "sql" in s or "data" in s:
+        return "linear-gradient(145deg, rgba(19,42,46,0.92), rgba(16,22,34,0.92))"
+    if "training" in s or "learning" in s:
+        return "linear-gradient(145deg, rgba(42,33,56,0.92), rgba(16,20,33,0.92))"
+    return "linear-gradient(145deg, rgba(18,22,34,0.90), rgba(16,18,28,0.90))"
 
 
 def _role_for_specialty(specialty: str) -> str:
@@ -108,6 +130,22 @@ def _tool_subset(row: Dict[str, Any], fallback_index: int) -> str:
     return presets[fallback_index % len(presets)]
 
 
+def _thinking_for_row(row: Dict[str, Any]) -> str:
+    specialty = str(row.get("specialty", "fleet")).lower()
+    interaction = str(row.get("interaction", "hybrid")).lower()
+    if "security" in specialty:
+        return "Threat checks + policy guard"
+    if "sql" in specialty or "data" in specialty:
+        return "Pattern mining + SQL signal merge"
+    if "gui" in specialty or "ux" in specialty:
+        return "Visual clarity + interaction smoothness"
+    if "training" in specialty or "learning" in specialty:
+        return "Retention growth + adaptive memory"
+    if interaction in ("mesh", "swarm"):
+        return "Parallel coordination + fleet sync"
+    return "Balanced optimization + task execution"
+
+
 def _render_cosmic_scroll(cards: List[Dict[str, Any]]) -> None:
     rows: List[str] = []
     for i, row in enumerate(cards):
@@ -127,7 +165,7 @@ def _render_cosmic_scroll(cards: List[Dict[str, Any]]) -> None:
         accessory = _accessories_for_role(role)
         rows.append(
             (
-                f"<div class='hf-card'>"
+                f"<div class='hf-card' style='background:{_shade_for_specialty(specialty)};'>"
                 f"<div class='hf-head'><span class='hf-avatar'>{html.escape(avatar)}</span><span>{html.escape(bot_name)}</span></div>"
                 f"<div class='hf-god'>{html.escape(profile_name)}</div>"
                 f"<div class='hf-meta'>{html.escape(role)} • {html.escape(specialty)}</div>"
@@ -271,6 +309,22 @@ def render_fleet_showcase_panels(
     if eta_rows:
         st.caption("Detailed ETA by role / area")
         st.dataframe(eta_rows, use_container_width=True, hide_index=True)
+    thought_rows = []
+    for i, row in enumerate(cards[:20]):
+        specialty = str(row.get("specialty", "fleet"))
+        role = _role_for_specialty(specialty)
+        thought_rows.append(
+            {
+                "Robot": _stable_bot_name(i, row),
+                "Where": str(row.get("zone", "Fleet Area")),
+                "Specialized In": specialty,
+                "Good At": role,
+                "Thinking": _thinking_for_row(row),
+            }
+        )
+    if thought_rows:
+        st.caption("Robot thinking/specialization table")
+        st.dataframe(thought_rows, use_container_width=True, hide_index=True)
 
     if not cards:
         st.caption("No saved Hermes profiles yet — run training to populate the fleet arena cards.")
@@ -294,7 +348,7 @@ def render_fleet_showcase_panels(
                 role = _role_for_specialty(specialty)
                 st.markdown(f"**{tiny} {bot_name}**")
                 st.caption(f"{role} • {specialty}")
-                st.caption(f"Design: {_design_pack(size_mode)}")
+                st.caption(f"Design: {_design_pack(size_mode, specialty)}")
                 xp_ratio = min(1.0, xp / 10000.0)
                 level_ratio = min(1.0, level / 120.0)
                 synergy_ratio = min(1.0, (xp_ratio * 0.45) + (level_ratio * 0.35) + (speed * 0.20))

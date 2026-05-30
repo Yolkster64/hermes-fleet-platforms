@@ -2279,6 +2279,16 @@ else:
                 "Interaction": a["interaction"],
                 "Zone": a["zone"],
                 "Specialty": a["specialty"],
+                "Thinking": (
+                    "Pattern + SQL reasoning"
+                    if "sql" in str(a["specialty"]).lower()
+                    else ("Visual flow + clarity" if "gui" in str(a["specialty"]).lower() else ("Security guardrails" if "security" in str(a["specialty"]).lower() else "Adaptive fleet planning"))
+                ),
+                "Good At": (
+                    "Data optimization"
+                    if "sql" in str(a["specialty"]).lower()
+                    else ("UI/UX polish" if "gui" in str(a["specialty"]).lower() else ("Defense + hardening" if "security" in str(a["specialty"]).lower() else "Orchestration + deployment"))
+                ),
                 "Skills(3)": ", ".join(a["skills"]),
                 "Active": "Yes" if a["active"] else "No",
             }

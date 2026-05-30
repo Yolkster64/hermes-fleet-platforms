@@ -21,6 +21,8 @@ def _inject_next_level_theme() -> None:
 .recommended-pill {display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; color: #00101a; background: linear-gradient(90deg, #00f0ff, #7dffb3); font-weight: 700; box-shadow: 0 0 12px rgba(0, 240, 255, 0.45);}
 .cool-title {font-size: 1.1rem; font-weight: 700; letter-spacing: 0.3px;}
 .clock-wrap {display:flex; justify-content:center; align-items:center; height:96px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); background: radial-gradient(circle at 50% 20%, rgba(0,255,220,0.15), rgba(20,20,40,0.65));}
+.clock-glow {animation: pulseGlow 1.8s ease-in-out infinite; font-family: 'Segoe UI', Inter, Arial;}
+@keyframes pulseGlow {0% {transform: scale(1.0); text-shadow: 0 0 8px rgba(120,220,255,0.35);} 50% {transform: scale(1.03); text-shadow: 0 0 16px rgba(120,220,255,0.75);} 100% {transform: scale(1.0); text-shadow: 0 0 8px rgba(120,220,255,0.35);}}
 </style>
 """,
         unsafe_allow_html=True,
@@ -137,8 +139,8 @@ def render_next_level_control_center(
     show_center_nexus: bool = False,
 ) -> None:
     _inject_next_level_theme()
-    st.markdown("### Level 4 AIHub + SQL Command Center")
-    st.markdown('<div class="hermes-glow"><span class="recommended-pill">LEVEL 4</span> <span class="cool-title">Smarter visuals, center SQL controls, deployment actions, and hub/map guidance</span></div>', unsafe_allow_html=True)
+    st.markdown("### Level 5 AIHub + SQL Command Center")
+    st.markdown('<div class="hermes-glow"><span class="recommended-pill">LEVEL 5</span> <span class="cool-title">Enhanced visuals, center SQL design, richer bars/animations, fleet styling, and guided deployment</span></div>', unsafe_allow_html=True)
 
     tabs = st.tabs(["SQL Center", "AIHub Lab", "Fleet Table", "Evidence Advisor", "Security + Benchmark", "Clock + Style"])
     sql_health = sql_intel.get("sql_health", {}) if isinstance(sql_intel, dict) else {}
@@ -155,6 +157,9 @@ def render_next_level_control_center(
         c2.metric("Training Dir MB", f"{float(sql_health.get('training_dir_mb', 0.0)):.2f}")
         c3.metric("Evidence Rows", str(int(sql_health.get("total_evidence_rows", 0))))
         c4.metric("Snapshot Age (min)", f"{float(sql_health.get('snapshot_age_minutes', -1.0)):.1f}")
+        st.progress(_clamp01(float(sql_health.get("db_mb", 0.0)) / 1024.0), text="SQL Design Bar • Storage")
+        st.progress(_clamp01(float(sql_health.get("wal_mb", 0.0)) / 256.0), text="SQL Design Bar • Write Flow")
+        st.progress(_clamp01(float(evidence.get("score", 0.0))), text="SQL Design Bar • Pattern Confidence")
 
         report_scope = st.selectbox("Instant report scope", ["overview", "sql-health", "evidence", "github-context", "aihub"])
         report_payload = {
@@ -257,6 +262,16 @@ def render_next_level_control_center(
         g1.metric("Teamwork multiplier", f"x{1.0 + (teamwork * 0.45):.3f}")
         g2.metric("Projected growth gain", f"+{growth_gain * 100:.1f}%")
         g3.metric("Collab readiness", f"{teamwork * 100:.1f}%")
+        st.markdown("#### AIHub Idea Engine")
+        st.dataframe(
+            [
+                {"Idea": "C++ Turbo Loop", "Use when": "heavy compile + optimization", "Expected gain": "higher throughput + lower decision lag"},
+                {"Idea": "Visual Harmony Loop", "Use when": "UI/UX polish and readability", "Expected gain": "cleaner UX + faster iteration"},
+                {"Idea": "Security Fortress Loop", "Use when": "hardening and trust controls", "Expected gain": "safer autonomous actions"},
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
         if st.button("Run AIHub Next-Level Upgrade", use_container_width=True):
             run_logged_post_action(
                 label="aihub-next-level-upgrade",
@@ -298,6 +313,8 @@ def render_next_level_control_center(
                     "level": int(float(item.get("level", 1.0))),
                     "xp": int(float(item.get("experience_xp", 0.0))),
                     "size_mode": item.get("size_mode", "mid"),
+                    "thinking": "Pattern synthesis + role optimization" if "sql" in str(item.get("specialty", "")).lower() else "Task execution + adaptive planning",
+                    "good_at": "Data reasoning" if "sql" in str(item.get("specialty", "")).lower() else ("Security hardening" if "security" in str(item.get("specialty", "")).lower() else "Fleet coordination"),
                 }
             )
         map_rows = _sort_map_rows(map_rows)
@@ -391,5 +408,5 @@ def render_next_level_control_center(
     with tabs[5]:
         now_struct = time.localtime()
         hhmmss = time.strftime("%H:%M:%S", now_struct)
-        st.markdown('<div class="clock-wrap"><h2 style="margin:0;">⏱️ ' + hhmmss + "</h2></div>", unsafe_allow_html=True)
-        st.caption("Animated clock refreshes with dashboard auto-refresh for live training watch mode.")
+        st.markdown('<div class="clock-wrap"><h2 class="clock-glow" style="margin:0;">⏱️ ' + hhmmss + "</h2></div>", unsafe_allow_html=True)
+        st.caption("Animated Level 5 clock pulse tracks live training watch mode.")
