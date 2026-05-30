@@ -251,10 +251,13 @@ def inject_majestic_theme() -> None:
     st.markdown(
         """
 <style>
-.stApp {background: radial-gradient(circle at 18% -12%, rgba(90,130,255,0.12), rgba(12,13,26,0.96) 42%), radial-gradient(circle at 88% 0%, rgba(120,70,180,0.10), rgba(10,10,20,0.0) 48%);}
+.stApp {background: radial-gradient(circle at 10% -12%, rgba(92,126,255,0.11), rgba(12,14,24,0.96) 42%), radial-gradient(circle at 92% 0%, rgba(94,166,255,0.08), rgba(10,10,20,0.0) 50%);}
+.block-container {max-width: 1650px; padding-top: 1.4rem; padding-bottom: 2.2rem;}
 [data-testid="stMetricValue"] {color: #e9f4ff;}
 [data-testid="stSidebar"] {background: linear-gradient(180deg, rgba(12,16,32,0.98), rgba(10,13,26,0.95));}
-div.stButton > button {border-radius: 10px; border: 1px solid rgba(120,205,255,0.35); box-shadow: 0 0 10px rgba(101,198,255,0.15);}
+div.stButton > button {border-radius: 10px; border: 1px solid rgba(120,205,255,0.30); box-shadow: none;}
+[data-testid="stHorizontalBlock"] {gap: 1rem;}
+.stProgress > div > div {height: 0.72rem; border-radius: 999px;}
 </style>
 """,
         unsafe_allow_html=True,

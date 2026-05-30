@@ -5,6 +5,8 @@
    - or one-command advanced fleet startup: `pwsh ./runtime/hermes/scripts/startup/start_runtime.ps1 -Mode super`
    - default runtime image is `docker.io/yolkster1/dev_workflow:latest` (override with `HERMES_RUNTIME_IMAGE` and `HERMES_GATEWAY_IMAGE` before startup)
    - startup scripts auto-enable `docker-compose.intel.yml` when `/dev/dri` is detected for Intel Arc/NPU acceleration
+   - one-time auto-start setup (so MCP/runtime starts itself): `pwsh ./runtime/hermes/scripts/startup/enable_hermes_autostart.ps1 -Trigger AtLogon`
+   - disable auto-start later if needed: `pwsh ./runtime/hermes/scripts/startup/disable_hermes_autostart.ps1`
 2. MCP Docker gateway (primary entry):
    - `http://localhost:${MCP_DOCKER_PORT:-8788}`
 3. GUI:

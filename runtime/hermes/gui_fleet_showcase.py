@@ -142,13 +142,13 @@ def _render_cosmic_scroll(cards: List[Dict[str, Any]]) -> None:
     st.markdown(
         """
 <style>
-.hf-scroll {display:flex; gap:10px; overflow-x:auto; padding-bottom:8px;}
-.hf-card {min-width:240px; max-width:240px; border:1px solid rgba(145,160,190,0.35); border-radius:12px; padding:10px; background:linear-gradient(145deg, rgba(18,22,34,0.90), rgba(16,18,28,0.90)); box-shadow:none;}
+.hf-scroll {display:flex; gap:14px; overflow-x:auto; padding-bottom:10px;}
+.hf-card {min-width:260px; max-width:260px; border:1px solid rgba(145,160,190,0.35); border-radius:12px; padding:12px; background:linear-gradient(145deg, rgba(18,22,34,0.90), rgba(16,18,28,0.90)); box-shadow:none;}
 .hf-head {display:flex; align-items:center; gap:8px; font-weight:700; color:#e6f5ff; margin-bottom:2px;}
 .hf-avatar {font-size:1rem;}
 .hf-god {font-size:0.82rem; color:#b9d5ff; margin-bottom:2px;}
 .hf-meta {font-size:0.76rem; color:#c9d8ee; margin-top:2px;}
-.hf-bar {height:6px; border-radius:8px; background:rgba(255,255,255,0.12); margin-top:6px; overflow:hidden;}
+.hf-bar {height:7px; border-radius:8px; background:rgba(255,255,255,0.12); margin-top:6px; overflow:hidden;}
 .hf-bar span {display:block; height:100%; border-radius:8px; background:linear-gradient(90deg, #5ac7ff, #7f9bff);}
 .hf-txt {font-size:0.72rem; color:#b8cff0;}
 </style>
@@ -156,6 +156,26 @@ def _render_cosmic_scroll(cards: List[Dict[str, Any]]) -> None:
         unsafe_allow_html=True,
     )
     st.markdown("<div class='hf-scroll'>" + "".join(rows) + "</div>", unsafe_allow_html=True)
+
+
+def _progress_variant(label: str, value: float, tone: str) -> None:
+    palette = {
+        "xp": ("#45c0ff", "#79d2ff"),
+        "level": ("#7a86ff", "#9d8fff"),
+        "synergy": ("#44d3a2", "#7ce4bc"),
+    }
+    left, right = palette.get(tone, ("#45c0ff", "#79d2ff"))
+    pct = max(0.0, min(1.0, value)) * 100.0
+    st.markdown(
+        (
+            "<div style='margin-top:0.18rem;'>"
+            f"<div style='display:flex;justify-content:space-between;font-size:0.76rem;color:#cfdef5;'><span>{html.escape(label)}</span><span>{pct:.1f}%</span></div>"
+            "<div style='height:8px;background:rgba(255,255,255,0.12);border-radius:999px;overflow:hidden;'>"
+            f"<div style='width:{pct:.1f}%;height:100%;background:linear-gradient(90deg,{left},{right});'></div>"
+            "</div></div>"
+        ),
+        unsafe_allow_html=True,
+    )
 
 
 def render_fleet_showcase_panels(
@@ -243,7 +263,11 @@ def render_fleet_showcase_panels(
                 st.markdown(f"**{tiny} {bot_name}**")
                 st.caption(f"{role} • {specialty}")
                 st.caption(f"Design: {_design_pack(size_mode)}")
-                st.progress(min(1.0, xp / 10000.0), text=f"XP {int(xp)}")
-                st.progress(min(1.0, level / 120.0), text=f"Level {level}")
+                xp_ratio = min(1.0, xp / 10000.0)
+                level_ratio = min(1.0, level / 120.0)
+                synergy_ratio = min(1.0, (xp_ratio * 0.45) + (level_ratio * 0.35) + (speed * 0.20))
+                _progress_variant("XP", xp_ratio, "xp")
+                _progress_variant("Level", level_ratio, "level")
+                _progress_variant("Synergy", synergy_ratio, "synergy")
                 st.caption(f"Accessories: {_accessories_for_role(role)}")
                 st.caption(f"Boosts: speed +{speed * 100:.1f}% • token +{token * 100:.1f}%")

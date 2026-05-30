@@ -118,9 +118,16 @@ def render_sql_intelligence_panels(
         st.caption("Hermes XP and bonus bars")
         for row in [r for r in recent_profiles[:6] if isinstance(r, dict)]:
             hid = str(row.get("hermes_id", "hermes"))
-            render_xp_bar(f"{hid} XP", min(1.0, float(row.get("experience_xp", 0.0)) / 10000.0), "#52BE80")
-            render_xp_bar(f"{hid} Speed Bonus", float(row.get("speed_bonus", 0.0)), "#5DADE2")
-            render_xp_bar(f"{hid} Token Power Gain", float(row.get("token_power_gain", 0.0)), "#AF7AC5")
+            xp_ratio = min(1.0, float(row.get("experience_xp", 0.0)) / 10000.0)
+            level_ratio = min(1.0, float(row.get("level", 1.0)) / 120.0)
+            speed_ratio = min(1.0, max(0.0, float(row.get("speed_bonus", 0.0))))
+            token_ratio = min(1.0, max(0.0, float(row.get("token_power_gain", 0.0))))
+            synergy_ratio = min(1.0, (xp_ratio * 0.35) + (level_ratio * 0.35) + (speed_ratio * 0.15) + (token_ratio * 0.15))
+            render_xp_bar(f"{hid} XP", xp_ratio, "#52BE80")
+            render_xp_bar(f"{hid} Level", level_ratio, "#6FA8FF")
+            render_xp_bar(f"{hid} Speed", speed_ratio, "#5DADE2")
+            render_xp_bar(f"{hid} Token", token_ratio, "#AF7AC5")
+            render_xp_bar(f"{hid} Synergy", synergy_ratio, "#F4D03F")
 
     lf1, lf2 = st.columns([1, 1])
     with lf1:
