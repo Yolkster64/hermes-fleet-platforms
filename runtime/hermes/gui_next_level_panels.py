@@ -547,6 +547,26 @@ def render_next_level_control_center(
                 error_prefix="Max power profile failed",
                 timeout=90,
             )
+        if st.button("Enable GPU Turbo (All Available)", use_container_width=True):
+            run_logged_post_action(
+                label="runtime-gpu-turbo",
+                path="/runtime-orchestrate/deploy",
+                payload={
+                    "specialty": "fleet:gpu-turbo",
+                    "mode": "deploy-gpu-turbo",
+                    "cpu_target_utilization": max(0.85, cpu_target),
+                    "memory_target_utilization": max(0.90, memory_target),
+                    "gpu_target_utilization": 1.00,
+                    "gpu_mode": "all-available",
+                    "x5_brain_pack": x5_brain_pack,
+                    "x6_learning_pack": x6_learning_pack,
+                    "smart_tools": smart_tools,
+                },
+                success_message="GPU turbo profile applied (all available GPUs).",
+                error_prefix="GPU turbo apply failed",
+                timeout=90,
+            )
+        st.caption("GPU Turbo needs a host GPU runtime (NVIDIA Container Toolkit / Docker GPU support) to deliver gains.")
 
         st.markdown("#### Benchmark")
         if st.button("Run Benchmark", use_container_width=True):
