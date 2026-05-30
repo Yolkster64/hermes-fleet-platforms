@@ -3,6 +3,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pandas as pd
 import requests
 import streamlit as st
 
@@ -232,7 +233,7 @@ def _llm_optimization_factor(
 
 st.set_page_config(page_title="Hermes Simple GUI", layout="centered")
 st.title("Hermes Simple GUI")
-st.caption("Simple mode: Ultimate X only, fewer choices, fast deploy.")
+st.caption("Simple mode: Hermes or X, clear choices, fast deploy.")
 
 if "api_key" not in st.session_state:
     st.session_state["api_key"] = _load_saved_key() or "local-hermes-ui-key"
@@ -265,173 +266,367 @@ with c2:
             st.error(f"Login failed: {err}")
 
 st.divider()
-st.subheader("Ultimate X Agent")
-agent_name = st.text_input("Agent Name", value="ultimate-x")
-setup_combo = st.selectbox(
-    "Setup Combo",
-    options=[
-        "Nova Starter - simple daily driver",
-        "Velocity Forge - fastest ship path",
-        "DeepSight Scholar - strongest analysis + SQL",
-        "Aegis Guardian - safest production setup",
-        "Titan Mesh Max - highest overall power",
-    ],
+st.subheader("Agent / X Builder")
+agent_name = st.text_input("Agent Name", value="agent-01")
+family_pick = st.radio("Step 1: Pick Family", options=["Hermes", "X"], horizontal=True)
+hermes_four = ["Hermes Core", "Hermes Builder", "Hermes Analyst", "Hermes Guardian"]
+ultimate_three = ["X (auto)", "X Core", "X5", "X6"]
+hermes_variant = st.selectbox("Step 2A: Hermes Type (4 options)", options=hermes_four, index=0, disabled=(family_pick != "Hermes"))
+ultimate_variant = st.selectbox("Step 2B: X Selection (4 options)", options=ultimate_three, index=0, disabled=(family_pick != "X"))
+profile = st.selectbox("Step 3: Mission Profile", options=["balanced", "deep-analysis", "rapid-deploy", "safe-production"], index=0)
+variable_set_one = st.selectbox(
+    "Variable Set 1 (required)",
+    options=["adaptive-routing", "precision-mode", "burst-mode", "safe-guarded"],
     index=0,
 )
-combo_defaults = {
-    "Nova Starter - simple daily driver": {
-        "hermes_type": "Hermes",
-        "variation": "Normal",
-        "x_choice": "Ultimate X (auto choose)",
-        "profile": "balanced",
-        "subagents": ["planner", "coder", "deployer"],
-    },
-    "Velocity Forge - fastest ship path": {
-        "hermes_type": "Hermes",
-        "variation": "Hybrid",
-        "x_choice": "Ultimate X5",
-        "profile": "rapid-deploy",
-        "subagents": ["planner", "coder", "deployer", "observer"],
-    },
-    "DeepSight Scholar - strongest analysis + SQL": {
-        "hermes_type": "Ultimate X",
-        "variation": "Deep Thinker",
-        "x_choice": "Ultimate X6",
-        "profile": "deep-analysis",
-        "subagents": ["planner", "researcher", "sql-engineer", "observer"],
-    },
-    "Aegis Guardian - safest production setup": {
-        "hermes_type": "Ultimate X",
-        "variation": "Mesh",
-        "x_choice": "Ultimate X6",
-        "profile": "safe-production",
-        "subagents": ["planner", "guardian", "deployer", "observer"],
-    },
-    "Titan Mesh Max - highest overall power": {
-        "hermes_type": "Ultimate X",
-        "variation": "Mesh",
-        "x_choice": "Ultimate X6",
-        "profile": "balanced",
-        "subagents": ["planner", "researcher", "coder", "sql-engineer", "deployer"],
-    },
-}
-combo = combo_defaults[setup_combo]
-hermes_type_options = ["Hermes", "Ultimate X"]
-variation_options = ["Normal", "Hybrid", "Mesh", "Deep Thinker"]
-x_options = ["Ultimate X (auto choose)", "Ultimate X5", "Ultimate X6"]
-profile_options = ["balanced", "deep-analysis", "rapid-deploy", "safe-production"]
-hermes_type = st.selectbox("Hermes Type", options=hermes_type_options, index=hermes_type_options.index(combo["hermes_type"]))
-hermes_variation = st.selectbox("Hermes Variation", options=variation_options, index=variation_options.index(combo["variation"]))
-x_choice = st.selectbox("X Family", options=x_options, index=x_options.index(combo["x_choice"]))
-profile = st.selectbox("Profile", options=profile_options, index=profile_options.index(combo["profile"]))
-subagents = st.multiselect(
-    "Subagents",
-    options=["planner", "researcher", "coder", "sql-engineer", "deployer", "guardian", "observer"],
-    default=combo["subagents"],
+variable_set_two = st.selectbox(
+    "Variable Set 2 (required)",
+    options=["sql-focus", "code-focus", "ops-focus", "research-focus"],
+    index=0,
 )
-deploy_mode = st.selectbox("Deploy", options=["single-agent", "deploy-10-agents"], index=0)
-saved_agent_names = [str(a.get("name", "")).strip() for a in st.session_state["agents"] if str(a.get("name", "")).strip()]
-deploy_10 = st.multiselect("Choose up to 10 agents", options=saved_agent_names, default=saved_agent_names[:10], max_selections=10)
-resource_policy = st.selectbox("System Resource Policy", options=["Recommended Max", "Custom"], index=0)
-if resource_policy == "Recommended Max":
-    max_cpu = 99
-    max_gpu = 99
-    max_ram = 98
-    st.caption("Recommended max system attributes applied: CPU 99, GPU 99, Memory 98.")
-else:
-    c_cpu, c_gpu = st.columns(2)
-    with c_cpu:
-        max_cpu = st.slider("Max CPU", 50, 100, 92)
-    with c_gpu:
-        max_gpu = st.slider("Max GPU", 50, 100, 94)
-    max_ram = st.slider("Max Memory", 50, 100, 92)
-
-profile_map = {
-    "balanced": {"xp": 78, "sql": 82, "steps": 240, "candidates": 130, "stability": 0.86},
-    "deep-analysis": {"xp": 90, "sql": 96, "steps": 380, "candidates": 180, "stability": 0.90},
-    "rapid-deploy": {"xp": 84, "sql": 76, "steps": 220, "candidates": 200, "stability": 0.82},
-    "safe-production": {"xp": 80, "sql": 88, "steps": 260, "candidates": 150, "stability": 0.94},
+subagent_count = st.slider("Step 4: Subagent Number", 1, 10, 4)
+recommended_subagents = {
+    "balanced": ["planner", "coder", "deployer", "observer"],
+    "deep-analysis": ["planner", "researcher", "sql-engineer", "observer"],
+    "rapid-deploy": ["planner", "coder", "deployer", "guardian"],
+    "safe-production": ["planner", "guardian", "deployer", "observer"],
 }
-p = profile_map[profile]
-if x_choice == "Ultimate X5":
-    x_tier = "ultimate-x5"
-elif x_choice == "Ultimate X6":
-    x_tier = "ultimate-x6"
+subagents = st.multiselect(
+    "Step 5: Subagent Roles",
+    options=["planner", "researcher", "coder", "sql-engineer", "deployer", "guardian", "observer"],
+    default=recommended_subagents[profile][:subagent_count],
+)
+if len(subagents) > subagent_count:
+    st.warning(f"You selected {len(subagents)} roles. Recommended max for this run: {subagent_count}.")
+
+attribute_defaults = {
+    ("Hermes", "balanced"): {"speed": 78, "intelligence": 76, "stability": 84, "memory": 82, "power": 80},
+    ("Hermes", "deep-analysis"): {"speed": 72, "intelligence": 90, "stability": 86, "memory": 92, "power": 82},
+    ("Hermes", "rapid-deploy"): {"speed": 90, "intelligence": 74, "stability": 78, "memory": 76, "power": 88},
+    ("Hermes", "safe-production"): {"speed": 74, "intelligence": 82, "stability": 94, "memory": 88, "power": 80},
+    ("X", "balanced"): {"speed": 88, "intelligence": 90, "stability": 90, "memory": 90, "power": 92},
+    ("X", "deep-analysis"): {"speed": 84, "intelligence": 98, "stability": 92, "memory": 98, "power": 94},
+    ("X", "rapid-deploy"): {"speed": 98, "intelligence": 86, "stability": 86, "memory": 88, "power": 96},
+    ("X", "safe-production"): {"speed": 86, "intelligence": 92, "stability": 99, "memory": 94, "power": 90},
+}
+defaults = attribute_defaults[(family_pick, profile)]
+if st.button("Apply Recommended 5 Attributes", use_container_width=True):
+    st.session_state["attr_speed"] = defaults["speed"]
+    st.session_state["attr_intelligence"] = defaults["intelligence"]
+    st.session_state["attr_stability"] = defaults["stability"]
+    st.session_state["attr_memory"] = defaults["memory"]
+    st.session_state["attr_power"] = defaults["power"]
+if "attr_speed" not in st.session_state:
+    st.session_state["attr_speed"] = defaults["speed"]
+if "attr_intelligence" not in st.session_state:
+    st.session_state["attr_intelligence"] = defaults["intelligence"]
+if "attr_stability" not in st.session_state:
+    st.session_state["attr_stability"] = defaults["stability"]
+if "attr_memory" not in st.session_state:
+    st.session_state["attr_memory"] = defaults["memory"]
+if "attr_power" not in st.session_state:
+    st.session_state["attr_power"] = defaults["power"]
+
+st.markdown("**Step 6: 5 Attributes (recommended for your selected type)**")
+c1, c2, c3, c4, c5 = st.columns(5)
+with c1:
+    speed_attr = st.slider("Speed", 50, 100, int(st.session_state["attr_speed"]), key="attr_speed")
+with c2:
+    intelligence_attr = st.slider("Intelligence", 50, 100, int(st.session_state["attr_intelligence"]), key="attr_intelligence")
+with c3:
+    stability_attr = st.slider("Stability", 50, 100, int(st.session_state["attr_stability"]), key="attr_stability")
+with c4:
+    memory_attr = st.slider("Memory", 50, 100, int(st.session_state["attr_memory"]), key="attr_memory")
+with c5:
+    power_attr = st.slider("Power", 50, 100, int(st.session_state["attr_power"]), key="attr_power")
+
+if family_pick == "X":
+    if ultimate_variant == "X5":
+        x_tier = "ultimate-x5"
+    elif ultimate_variant == "X6":
+        x_tier = "ultimate-x6"
+    elif ultimate_variant == "X Core":
+        x_tier = "ultimate-x5"
+    else:
+        x_tier = "ultimate-x6" if profile in {"deep-analysis", "safe-production"} else "ultimate-x5"
+    type_label = ultimate_variant
 else:
     x_tier = "ultimate-x6" if profile in {"deep-analysis", "safe-production"} else "ultimate-x5"
-xp_boost = 98 if x_tier == "ultimate-x6" else p["xp"]
-sql_level = 97 if x_tier == "ultimate-x6" else p["sql"]
-steps = min(560, p["steps"] + (70 if x_tier == "ultimate-x6" else 35))
-candidates = min(240, p["candidates"] + (35 if x_tier == "ultimate-x6" else 20))
+    type_label = hermes_variant
+
+max_cpu = min(99, int((power_attr + stability_attr) / 2))
+max_gpu = min(99, int((speed_attr + power_attr) / 2))
+max_ram = min(99, int((memory_attr + intelligence_attr) / 2))
+xp_boost = min(99, int((speed_attr + intelligence_attr + stability_attr + memory_attr + power_attr) / 5))
+sql_level = min(99, int((memory_attr + intelligence_attr) / 2))
+profile_map = {
+    "balanced": {"steps": 250, "candidates": 150, "stability": 0.86},
+    "deep-analysis": {"steps": 390, "candidates": 190, "stability": 0.90},
+    "rapid-deploy": {"steps": 220, "candidates": 210, "stability": 0.82},
+    "safe-production": {"steps": 280, "candidates": 160, "stability": 0.95},
+}
+p = profile_map[profile]
+steps = min(560, p["steps"] + int(memory_attr / 4))
+candidates = min(240, p["candidates"] + int(speed_attr / 6))
 llm_mesh = ["openai", "anthropic", "gemini", "mistral", "deepseek", "llama", "qwen"]
 llm_signal = _llm_optimization_factor(
     mesh_size=len(llm_mesh),
-    cost_bias=12,
-    power_bias=98,
-    perf_bias=98,
+    cost_bias=max(5, 100 - power_attr),
+    power_bias=power_attr,
+    perf_bias=intelligence_attr,
     profile="throughput-max",
-    force_ultimate=True,
+    force_ultimate=(family_pick == "X"),
 )
-llm_signal = min(0.99, llm_signal + ((max_gpu - 85) / 1000.0))
 
-st.progress(int(xp_boost) / 100.0)
-st.caption(f"XP: {int(xp_boost)} | SQL data: {int(sql_level)} | LLM mode: automatic ultimate")
-st.caption(f"Resolved tier: **{x_tier}** (auto-picked from your profile when using 'Ultimate X (auto choose)').")
-st.caption(f"Combo: **{setup_combo}**")
+st.caption(
+    f"Auto resources from attributes -> CPU {max_cpu}, GPU {max_gpu}, Memory {max_ram} | "
+    f"Resolved tier: {x_tier} | XP {xp_boost}"
+)
 
-if st.button("Save + Deploy", use_container_width=True):
-    if not st.session_state["login_ok"]:
-        st.error("Log in first, then deploy.")
-    else:
-        chosen = agent_name.strip() or "ultimate-x"
-        agents = [a for a in st.session_state["agents"] if a.get("name") != chosen]
-        agents.append(
+
+def _upsert_agent(entry: dict) -> None:
+    agents = [a for a in st.session_state["agents"] if a.get("name") != entry.get("name")]
+    agents.append(entry)
+    st.session_state["agents"] = agents
+
+
+def _save_agent_state() -> None:
+    saved, save_err = _save_agents(st.session_state["agents"])
+    if not saved:
+        st.error(f"Save failed: {save_err}")
+
+
+def _build_agent(name: str, family: str, type_name: str) -> dict:
+    return {
+        "name": name,
+        "family": family,
+        "type": type_name,
+        "tier": x_tier,
+        "profile": profile,
+        "variable_set_one": variable_set_one,
+        "variable_set_two": variable_set_two,
+        "subagents": subagents[:subagent_count] if subagents else recommended_subagents[profile][:subagent_count],
+        "subagent_count": subagent_count,
+        "speed": speed_attr,
+        "intelligence": intelligence_attr,
+        "stability": stability_attr,
+        "memory": memory_attr,
+        "power": power_attr,
+        "xp_boost": xp_boost,
+        "sql_level": sql_level,
+        "max_cpu": max_cpu,
+        "max_gpu": max_gpu,
+        "max_ram": max_ram,
+        "deployed": False,
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+b1, b2, b3, b4 = st.columns(4)
+with b1:
+    if st.button("Buy 10 Hermes", use_container_width=True):
+        for i in range(1, 11):
+            _upsert_agent(_build_agent(f"hermes-{i:02d}", "Hermes", hermes_variant))
+        _save_agent_state()
+        st.success("Added 10 Hermes agents.")
+with b2:
+    if st.button("Buy 10 X", use_container_width=True):
+        for i in range(1, 11):
+            _upsert_agent(_build_agent(f"x-{i:02d}", "X", ultimate_variant))
+        _save_agent_state()
+        st.success("Added 10 X agents.")
+with b3:
+    if st.button("Buy 1 Hermes + 1 X", use_container_width=True):
+        _upsert_agent(_build_agent("hermes-01", "Hermes", hermes_variant))
+        _upsert_agent(_build_agent("x-01", "X", ultimate_variant))
+        _save_agent_state()
+        st.success("Added 1 Hermes and 1 X agent.")
+with b4:
+    if st.button("Save Selected Build", use_container_width=True):
+        selected_family = "X" if family_pick == "X" else "Hermes"
+        selected_type = ultimate_variant if family_pick == "X" else hermes_variant
+        _upsert_agent(_build_agent(agent_name.strip() or "agent-01", selected_family, selected_type))
+        _save_agent_state()
+        st.success("Saved selected build.")
+
+saved_agent_names = [str(a.get("name", "")).strip() for a in st.session_state["agents"] if str(a.get("name", "")).strip()]
+deploy_selected = st.multiselect("Deploy these saved agents", options=saved_agent_names, default=saved_agent_names[:1])
+d1, d2 = st.columns(2)
+with d1:
+    if st.button("Deploy Selected", use_container_width=True):
+        if not st.session_state["login_ok"]:
+            st.error("Log in first, then deploy.")
+        elif not deploy_selected:
+            st.warning("Select at least one saved agent.")
+        else:
+            ok_count = 0
+            deployed_names = set(deploy_selected)
+            for agent in st.session_state["agents"]:
+                if str(agent.get("name", "")) not in deployed_names:
+                    continue
+                specialty = (
+                    f"{str(agent.get('family', 'Hermes')).lower()}-{str(agent.get('type', 'core')).lower().replace(' ', '-')}-"
+                    f"{agent.get('tier', 'ultimate-x5')}-{agent.get('profile', 'balanced')}-"
+                    f"subs-{str(agent.get('subagent_count', 3))}-cpu{agent.get('max_cpu', 90)}-gpu{agent.get('max_gpu', 90)}-mem{agent.get('max_ram', 90)}"
+                )
+                ok, _ = _deploy_agent(
+                    st.session_state["api_key"],
+                    specialty=specialty,
+                    steps=steps,
+                    candidates=candidates,
+                    sql_signal=max(0.70, float(agent.get("sql_level", 80)) / 100.0),
+                    internet_signal=max(0.60, float(agent.get("max_ram", 85)) / 100.0),
+                    llm_signal=llm_signal,
+                    stability_bias=min(0.99, p["stability"] + (float(agent.get("stability", 85)) / 1000.0)),
+                )
+                if ok:
+                    ok_count += 1
+                    agent["deployed"] = True
+                    agent["deployed_utc"] = datetime.now(timezone.utc).isoformat()
+            _save_agent_state()
+            st.success(f"Deployed {ok_count}/{len(deploy_selected)} selected agents.")
+with d2:
+    if st.button("Deploy All", use_container_width=True):
+        if not st.session_state["login_ok"]:
+            st.error("Log in first, then deploy.")
+        else:
+            ok_count = 0
+            total = len(st.session_state["agents"])
+            families = {str(a.get("family", "Hermes")) for a in st.session_state["agents"]}
+            for agent in st.session_state["agents"]:
+                specialty = (
+                    f"{str(agent.get('family', 'Hermes')).lower()}-{str(agent.get('type', 'core')).lower().replace(' ', '-')}-"
+                    f"{agent.get('tier', 'ultimate-x5')}-{agent.get('profile', 'balanced')}-"
+                    f"smart-swarm-{len(families)}-subs-{str(agent.get('subagent_count', 3))}"
+                )
+                ok, _ = _deploy_agent(
+                    st.session_state["api_key"],
+                    specialty=specialty,
+                    steps=steps,
+                    candidates=candidates,
+                    sql_signal=max(0.70, float(agent.get("sql_level", 80)) / 100.0),
+                    internet_signal=max(0.60, float(agent.get("max_ram", 85)) / 100.0),
+                    llm_signal=llm_signal,
+                    stability_bias=min(0.99, p["stability"] + (float(agent.get("stability", 85)) / 1000.0)),
+                )
+                if ok:
+                    ok_count += 1
+                    agent["deployed"] = True
+                    agent["deployed_utc"] = datetime.now(timezone.utc).isoformat()
+            _save_agent_state()
+            st.success(f"Deploy all completed: {ok_count}/{total}")
+
+guide_rows = [
+    {
+        "Family": "Hermes",
+        "Option": "Hermes Core",
+        "Best For": "Daily balanced workloads",
+        "Recommendation": "Use with balanced profile and 3-4 subagents",
+    },
+    {
+        "Family": "Hermes",
+        "Option": "Hermes Builder",
+        "Best For": "Shipping features quickly",
+        "Recommendation": "Use rapid-deploy with higher speed/power",
+    },
+    {
+        "Family": "Hermes",
+        "Option": "Hermes Analyst",
+        "Best For": "Reasoning and SQL deep dives",
+        "Recommendation": "Use deep-analysis with higher intelligence/memory",
+    },
+    {
+        "Family": "Hermes",
+        "Option": "Hermes Guardian",
+        "Best For": "Stable production operations",
+        "Recommendation": "Use safe-production with high stability",
+    },
+    {
+        "Family": "X",
+        "Option": "X (auto)",
+        "Best For": "Adaptive strongest default",
+        "Recommendation": "Auto-picks X5/X6 based on mission profile",
+    },
+    {
+        "Family": "X",
+        "Option": "X Core",
+        "Best For": "General X orchestration",
+        "Recommendation": "Balanced X mode between speed and depth",
+    },
+    {
+        "Family": "X",
+        "Option": "X5",
+        "Best For": "Fastest deployment throughput",
+        "Recommendation": "Use for speed-first rollouts",
+    },
+    {
+        "Family": "X",
+        "Option": "X6",
+        "Best For": "Maximum depth and reliability",
+        "Recommendation": "Use for deep-analysis and safe-production",
+    },
+]
+with st.expander("Super Detailed Guide + Recommendations Table", expanded=False):
+    st.markdown(
+        "**How to pick quickly**\n"
+        "1. Pick `Hermes` or `X`.\n"
+        "2. If Hermes: choose one of 4 types.\n"
+        "3. If X: choose one of 4 (`X auto`, `X Core`, `X5`, `X6`).\n"
+        "4. Pick both required variable sets (4 options each).\n"
+        "5. Set subagent number, then roles.\n"
+        "6. Apply recommended 5 attributes, then fine-tune.\n"
+        "7. Buy/save builds, then deploy selected or deploy all.\n\n"
+        "**Mixing strategy**\n"
+        "- Use `Buy 1 Hermes + 1 X` for mixed swarm testing.\n"
+        "- Use `Buy 10 Hermes` for stable broad operations.\n"
+        "- Use `Buy 10 X` for max-performance campaigns.\n"
+    )
+    st.table(pd.DataFrame(guide_rows))
+
+if st.session_state["agents"]:
+    display_rows: list[dict] = []
+    for a in st.session_state["agents"]:
+        display_rows.append(
             {
-                "name": chosen,
-                "type": hermes_type,
-                "variation": hermes_variation,
-                "tier": x_tier,
-                "profile": profile,
-                "subagents": subagents,
-                "setup_combo": setup_combo,
-                "xp_boost": xp_boost,
-                "sql_level": sql_level,
-                "max_cpu": max_cpu,
-                "max_gpu": max_gpu,
-                "max_ram": max_ram,
-                "created_utc": datetime.now(timezone.utc).isoformat(),
+                "name": a.get("name"),
+                "family": a.get("family", a.get("type", "Hermes")),
+                "type": a.get("type", ""),
+                "tier": a.get("tier", ""),
+                "profile": a.get("profile", ""),
+                "xp": int(a.get("xp_boost", 0)),
+                "speed": int(a.get("speed", 0)),
+                "intelligence": int(a.get("intelligence", 0)),
+                "stability": int(a.get("stability", 0)),
+                "memory": int(a.get("memory", a.get("max_ram", 0))),
+                "power": int(a.get("power", 0)),
+                "deployed": bool(a.get("deployed", False)),
             }
         )
-        st.session_state["agents"] = agents
-        saved, save_err = _save_agents(agents)
-        if not saved:
-            st.error(f"Save failed: {save_err}")
-        targets = deploy_10[:10] if deploy_mode == "deploy-10-agents" else [chosen]
-        if not targets:
-            targets = [chosen]
-        ok_count = 0
-        for target in targets:
-            ok, _err = _deploy_agent(
-                st.session_state["api_key"],
-                specialty=(
-                    f"{hermes_type.lower().replace(' ', '-')}-{hermes_variation.lower().replace(' ', '-')}-"
-                    f"{x_tier}-{profile}-combo-{setup_combo.lower().replace(' ', '-').replace('+', 'plus')}"
-                    f"-subs-{'-'.join(subagents[:4]) or 'default'}"
-                    f"-cpu{max_cpu}-gpu{max_gpu}-mem{max_ram}-agent-{target}"
-                ),
-                steps=min(560, steps + int(max_ram / 8)),
-                candidates=min(240, candidates + int(max_gpu / 6)),
-                sql_signal=max(0.70, sql_level / 100.0),
-                internet_signal=max(0.60, max_ram / 100.0),
-                llm_signal=llm_signal,
-                stability_bias=min(0.99, p["stability"] + (max_ram / 1000.0)),
-            )
-            if ok:
-                ok_count += 1
-        if ok_count == len(targets):
-            st.success(f"Saved and deployed {ok_count} agent(s).")
-        else:
-            st.warning(f"Partial deploy success: {ok_count}/{len(targets)}")
+    st.subheader("Agent Board")
+    st.dataframe(pd.DataFrame(display_rows), use_container_width=True, hide_index=True)
+    st.subheader("Detailed Graph (team averages)")
+    avg_df = pd.DataFrame(display_rows)[["xp", "speed", "intelligence", "stability", "memory", "power"]].mean().to_frame(name="avg").T
+    st.bar_chart(avg_df)
+    st.subheader("XP + Stats by Agent")
+    for row in display_rows[:20]:
+        state_icon = "🟢" if row["deployed"] else "⚪"
+        st.markdown(f"{state_icon} **{row['name']}** ({row['family']} / {row['type']})")
+        col_a, col_b, col_c = st.columns(3)
+        with col_a:
+            st.caption(f"XP {row['xp']}")
+            st.progress(row["xp"] / 100.0)
+            st.caption(f"Speed {row['speed']}")
+            st.progress(row["speed"] / 100.0)
+        with col_b:
+            st.caption(f"Intelligence {row['intelligence']}")
+            st.progress(row["intelligence"] / 100.0)
+            st.caption(f"Stability {row['stability']}")
+            st.progress(row["stability"] / 100.0)
+        with col_c:
+            st.caption(f"Memory {row['memory']}")
+            st.progress(row["memory"] / 100.0)
+            st.caption(f"Power {row['power']}")
+            st.progress(row["power"] / 100.0)
 
 st.divider()
 st.subheader("Automatic Backend Upgrades")
@@ -464,43 +659,6 @@ if st.session_state["login_ok"]:
         st.session_state["last_auto_upgrade_ts"] = now_ts
         if aihub_ok and learn_ok:
             st.success("Automatic backend upgrades completed.")
-
-with st.expander("Deep Guide: what to pick", expanded=False):
-    st.markdown(
-        "**What is Ultimate X vs X5 vs X6?**\n"
-        "- `Ultimate X` means the family; if you choose **auto**, the app picks X5 or X6 for you.\n"
-        "- `Ultimate X5` is faster and lighter (good for speed/deploy).\n"
-        "- `Ultimate X6` is deeper and stronger (good for learning/safety/analysis).\n\n"
-        "**Detailed combo names and best use:**\n"
-        "- `Nova Starter - simple daily driver`: easiest default.\n"
-        "- `Velocity Forge - fastest ship path`: fastest deploy loop.\n"
-        "- `DeepSight Scholar - strongest analysis + SQL`: best for data-heavy reasoning.\n"
-        "- `Aegis Guardian - safest production setup`: strongest safety/stability profile.\n"
-        "- `Titan Mesh Max - highest overall power`: max capability setup.\n\n"
-        "**Who to pick for what:**\n"
-        "- Need fastest shipping: `Velocity Forge`.\n"
-        "- Need deep reasoning/SQL: `DeepSight Scholar`.\n"
-        "- Need safest production: `Aegis Guardian`.\n"
-        "- Need daily default: `Nova Starter`.\n"
-        "- Need maximum power: `Titan Mesh Max`.\n\n"
-        "**Subagent presets:**\n"
-        "- `planner + coder + deployer`: build and ship.\n"
-        "- `planner + researcher + sql-engineer`: analysis and data comprehension.\n"
-        "- `planner + guardian + deployer`: stable production.\n\n"
-        "**System attributes (few choices):**\n"
-        "- Keep `System Resource Policy = Recommended Max` for auto CPU/GPU/Memory high-performance values.\n"
-        "- Use `Custom` only when you need to cap resources.\n\n"
-        "**Simple steps:**\n"
-        "1. Pick a Setup Combo.\n"
-        "2. Keep Resource Policy on Recommended Max.\n"
-        "3. Adjust subagents only if needed.\n"
-        "4. Keep X Family on auto unless you need forced X5/X6.\n"
-        "5. Click Save + Deploy."
-    )
-
-if st.session_state["agents"]:
-    st.caption(f"Saved agents: {len(st.session_state['agents'])}")
-    st.dataframe(st.session_state["agents"], use_container_width=True, hide_index=True)
 
 st.divider()
 st.subheader("Status")
