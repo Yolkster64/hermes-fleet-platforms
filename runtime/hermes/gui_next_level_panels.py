@@ -1,0 +1,183 @@
+import json
+import time
+from typing import Any, Callable, Dict, List
+
+import streamlit as st
+
+from training_sql_intel import export_hermes_profiles_snapshot
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def _inject_next_level_theme() -> None:
+    st.markdown(
+        """
+<style>
+.hermes-glow {border: 1px solid rgba(0, 230, 255, 0.45); border-radius: 14px; padding: 12px; background: linear-gradient(120deg, rgba(10,20,40,0.8), rgba(25,25,45,0.65)); box-shadow: 0 0 16px rgba(0, 210, 255, 0.25);}
+.recommended-pill {display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; color: #00101a; background: linear-gradient(90deg, #00f0ff, #7dffb3); font-weight: 700; box-shadow: 0 0 12px rgba(0, 240, 255, 0.45);}
+.cool-title {font-size: 1.1rem; font-weight: 700; letter-spacing: 0.3px;}
+.clock-wrap {display:flex; justify-content:center; align-items:center; height:96px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); background: radial-gradient(circle at 50% 20%, rgba(0,255,220,0.15), rgba(20,20,40,0.65));}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def _role_area_for_specialty(specialty: str) -> str:
+    s = str(specialty).lower()
+    if "security" in s:
+        return "Security Ring"
+    if "sql" in s or "data" in s:
+        return "SQL Core"
+    if "gui" in s or "ux" in s:
+        return "Design Deck"
+    if "fleet" in s or "orchestration" in s:
+        return "Fleet Nexus"
+    if "training" in s or "learning" in s:
+        return "Learning Grid"
+    return "General Bay"
+
+
+def render_next_level_control_center(
+    *,
+    sql_intel: Dict[str, Any],
+    growth_data: Dict[str, Any],
+    training_status: Dict[str, Any],
+    watch_payload: Dict[str, Any],
+    unified: Dict[str, Any],
+    cpp_kernel: Dict[str, Any],
+    volume_root: str,
+    run_logged_post_action: Callable[..., None],
+) -> None:
+    _inject_next_level_theme()
+    st.markdown("### Next-Level AIHub + SQL Command Center")
+    st.markdown('<div class="hermes-glow"><span class="recommended-pill">RECOMMENDED</span> <span class="cool-title">Lighter visual mode + richer data controls + instant reports</span></div>', unsafe_allow_html=True)
+
+    tabs = st.tabs(["SQL Center", "AIHub Lab", "Fleet Map", "Security + Benchmark", "Clock + Style"])
+    sql_health = sql_intel.get("sql_health", {}) if isinstance(sql_intel, dict) else {}
+    if not isinstance(sql_health, dict):
+        sql_health = {}
+    evidence = sql_intel.get("evidence", {}) if isinstance(sql_intel, dict) else {}
+    if not isinstance(evidence, dict):
+        evidence = {}
+
+    with tabs[0]:
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("SQL DB MB", f"{float(sql_health.get('db_mb', 0.0)):.2f}")
+        c2.metric("Training Dir MB", f"{float(sql_health.get('training_dir_mb', 0.0)):.2f}")
+        c3.metric("Evidence Rows", str(int(sql_health.get("total_evidence_rows", 0))))
+        c4.metric("Snapshot Age (min)", f"{float(sql_health.get('snapshot_age_minutes', -1.0)):.1f}")
+
+        report_scope = st.selectbox("Instant report scope", ["overview", "sql-health", "evidence", "github-context", "aihub"])
+        report_payload = {
+            "scope": report_scope,
+            "timestamp": time.time(),
+            "sql_health": sql_health,
+            "evidence": evidence,
+            "github": sql_intel.get("latest_github", {}),
+            "growth": growth_data,
+            "training": training_status,
+            "aihub": unified,
+        }
+        st.code(json.dumps(report_payload, indent=2)[:4000], language="json")
+        st.download_button("Download Instant Report", data=json.dumps(report_payload, indent=2), file_name=f"hermes_{report_scope}_report.json", mime="application/json", use_container_width=True)
+        if st.button("Save Hermes Snapshot Now", use_container_width=True):
+            info = export_hermes_profiles_snapshot(volume_root, max_rows=600)
+            st.success(f"Hermes snapshot saved: {info.get('path', 'unknown')} ({info.get('rows', 0)} rows)")
+
+    with tabs[1]:
+        st.caption("AIBox calculator for AIHub planning and power/cost balance.")
+        token_batch = st.slider("Token batch", min_value=500, max_value=200000, value=18000, step=500)
+        model_speed = st.slider("Model speed (tokens/sec)", min_value=10, max_value=600, value=130, step=5)
+        cost_per_1k = st.slider("Cost per 1k tokens (USD)", min_value=0.0001, max_value=0.0500, value=0.0045, step=0.0001, format="%.4f")
+        quality = st.slider("Quality factor", min_value=0.10, max_value=1.00, value=0.82, step=0.01)
+        calc_seconds = token_batch / max(1, model_speed)
+        calc_cost = (token_batch / 1000.0) * cost_per_1k
+        aibox = (quality * 0.55) + ((1.0 - _clamp01(calc_cost / 2.0)) * 0.20) + ((1.0 - _clamp01(calc_seconds / 300.0)) * 0.25)
+        p1, p2, p3 = st.columns(3)
+        p1.metric("ETA seconds", f"{calc_seconds:.1f}")
+        p2.metric("Estimated cost", f"${calc_cost:.4f}")
+        p3.metric("AIBox score", f"{_clamp01(aibox) * 100:.1f}%")
+        if st.button("Run AIHub Next-Level Upgrade", use_container_width=True):
+            run_logged_post_action(
+                label="aihub-next-level-upgrade",
+                path="/aihub-max-upgrade",
+                payload={
+                    "specialty": "fleet:next-level-aihub",
+                    "steps": int(720 + (_clamp01(aibox) * 240)),
+                    "candidates": int(280 + (_clamp01(aibox) * 120)),
+                    "sql_signal": min(0.99, 0.86 + (_clamp01(aibox) * 0.10)),
+                    "internet_signal": 0.08,
+                    "llm_signal": min(0.99, 0.90 + (_clamp01(aibox) * 0.08)),
+                    "stability_bias": min(0.97, 0.82 + (_clamp01(aibox) * 0.10)),
+                },
+                success_message="Next-level AIHub upgrade triggered.",
+                error_prefix="AIHub next-level upgrade failed",
+                timeout=180,
+            )
+
+    with tabs[2]:
+        profiles = sql_intel.get("recent_hermes_profiles", []) if isinstance(sql_intel, dict) else []
+        if not isinstance(profiles, list):
+            profiles = []
+        map_rows: List[Dict[str, Any]] = []
+        for i, item in enumerate([p for p in profiles if isinstance(p, dict)][:40]):
+            map_rows.append(
+                {
+                    "bot": item.get("hermes_id", f"hermes-{i+1}"),
+                    "specialty": item.get("specialty", "fleet"),
+                    "area": _role_area_for_specialty(str(item.get("specialty", "fleet"))),
+                    "level": int(float(item.get("level", 1.0))),
+                    "xp": int(float(item.get("experience_xp", 0.0))),
+                    "size_mode": item.get("size_mode", "mid"),
+                }
+            )
+        if map_rows:
+            st.dataframe(map_rows, use_container_width=True, hide_index=True)
+        else:
+            st.info("No Hermes profile map data yet. Run training and SQL snapshots for instant map population.")
+        github_ctx = sql_intel.get("latest_github", {}) if isinstance(sql_intel, dict) else {}
+        if isinstance(github_ctx, dict):
+            st.markdown("#### GitHub CLI/Data Snapshot")
+            st.json(github_ctx, expanded=False)
+
+    with tabs[3]:
+        st.markdown("#### Security Area")
+        s1, s2, s3 = st.columns(3)
+        block_remote = s1.toggle("Block remote control", value=True)
+        disable_hidden_hv = s2.toggle("Disable hidden Hyper-V paths", value=True)
+        lock_remote_cli = s3.toggle("Lock remote CLI execution", value=True)
+        shield = 0.0
+        shield += 0.34 if block_remote else 0.0
+        shield += 0.33 if disable_hidden_hv else 0.0
+        shield += 0.33 if lock_remote_cli else 0.0
+        st.progress(_clamp01(shield), text=f"Security shield score: {_clamp01(shield) * 100:.1f}%")
+        st.caption("This panel enforces dashboard policy guidance and hardening checks for safe operation.")
+
+        st.markdown("#### Benchmark")
+        if st.button("Run Benchmark", use_container_width=True):
+            growth = float(growth_data.get("growth_index", 0.0)) if isinstance(growth_data, dict) else 0.0
+            integration = float(growth_data.get("integration_index", 0.0)) if isinstance(growth_data, dict) else 0.0
+            evidence_score = float(evidence.get("score", 0.0))
+            sql_pressure = _clamp01((float(sql_health.get("db_mb", 0.0)) / 1024.0) + (float(sql_health.get("wal_mb", 0.0)) / 256.0))
+            cpp_boost = 0.12 if bool(cpp_kernel.get("available", False)) else 0.0
+            bench_score = _clamp01((growth * 0.30) + (integration * 0.24) + (evidence_score * 0.22) + ((1.0 - sql_pressure) * 0.14) + (0.10 + cpp_boost))
+            st.success(f"Benchmark score: {bench_score * 100:.1f}%")
+            st.caption("Higher score means stronger quality+stability with lower SQL pressure.")
+
+        st.markdown("#### Power Growth Recommendations")
+        recs = [
+            "Use C++ kernel acceleration for heavy loops and leave Python for orchestration/UI.",
+            "Increase model speed tiers before increasing raw token volume to keep quality-per-watt high.",
+            "Use evidence+SQL pressure loops to optimize retention without reducing decision power.",
+        ]
+        for r in recs:
+            st.markdown(f"- {r}")
+
+    with tabs[4]:
+        now_struct = time.localtime()
+        hhmmss = time.strftime("%H:%M:%S", now_struct)
+        st.markdown('<div class="clock-wrap"><h2 style="margin:0;">⏱️ ' + hhmmss + "</h2></div>", unsafe_allow_html=True)
+        st.caption("Animated clock refreshes with dashboard auto-refresh for live training watch mode.")
