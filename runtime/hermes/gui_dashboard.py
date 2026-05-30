@@ -587,7 +587,7 @@ def _initialize_session_state() -> None:
         "ctl_refresh_seconds": 20,
         "ctl_focused_layout": True,
         "ctl_show_legacy_map_ui": True,
-        "ctl_render_mode": "Lite Stable",
+        "ctl_render_mode": "Full Experience",
         "ctl_auto_enabled": False,
         "ctl_auto_interval": 45,
         "ctl_intelligent_shuffle": True,
@@ -635,13 +635,14 @@ def inject_majestic_theme() -> None:
     st.markdown(
         """
 <style>
-.stApp {position: relative; overflow-x: hidden; background: radial-gradient(circle at 10% -12%, rgba(92,126,255,0.11), rgba(12,14,24,0.96) 42%), radial-gradient(circle at 92% 0%, rgba(94,166,255,0.08), rgba(10,10,20,0.0) 50%);}
+.stApp {position: relative; overflow-x: hidden; background: radial-gradient(circle at 10% -12%, rgba(92,126,255,0.11), rgba(12,14,24,0.96) 42%), radial-gradient(circle at 92% 0%, rgba(94,166,255,0.08), rgba(10,10,20,0.0) 50%); background-size: 130% 130%; animation: monadoBgShift 18s ease-in-out infinite alternate;}
 .stApp, .stApp p, .stApp span, .stApp li, .stApp label, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {color: #eaf3ff;}
 .stApp [data-testid="stMarkdownContainer"] * {color: inherit;}
 .block-container {position: relative; z-index: 2;}
 .holo-title {font-size: 2.3rem; font-weight: 800; letter-spacing: 0.4px; margin: 0 0 0.2rem 0; background: linear-gradient(90deg, #d8f5ff 0%, #86d8ff 36%, #b695ff 68%, #8affdf 100%); -webkit-background-clip: text; background-clip: text; color: transparent; animation: holoShift 8s linear infinite;}
 .xeno-badge {display:inline-flex; align-items:center; gap:0.42rem; padding:0.18rem 0.62rem; border-radius:999px; border:1px solid rgba(125, 214, 255, 0.45); background:linear-gradient(90deg, rgba(71,110,255,0.28), rgba(109,216,255,0.16)); color:#d8efff; font-size:0.74rem; letter-spacing:0.06rem; margin-bottom:0.45rem;}
 @keyframes holoShift {0% {filter: hue-rotate(0deg);} 100% {filter: hue-rotate(360deg);}}
+@keyframes monadoBgShift {0% {background-position: 0% 40%;} 100% {background-position: 100% 60%;}}
 .block-container {max-width: 1650px; padding-top: 1.4rem; padding-bottom: 2.2rem;}
 [data-testid="stMetricValue"] {color: #e9f4ff;}
 [data-testid="stSidebar"] {background: linear-gradient(180deg, rgba(12,16,32,0.98), rgba(10,13,26,0.95));}
@@ -927,7 +928,7 @@ if "stability_bootstrap_done" not in st.session_state:
     # One-time guard to neutralize stale browser session values that can cause UI churn.
     st.session_state["ctl_live_refresh"] = False
     st.session_state["ctl_auto_enabled"] = False
-    st.session_state["ctl_render_mode"] = "Lite Stable"
+    st.session_state["ctl_render_mode"] = "Full Experience"
     st.session_state["ctl_refresh_seconds"] = int(st.session_state.get("ctl_refresh_seconds", 20))
     st.session_state["ctl_auto_interval"] = int(st.session_state.get("ctl_auto_interval", 45))
     st.session_state["stability_bootstrap_done"] = True
@@ -1482,19 +1483,19 @@ if focused_layout:
         time.sleep(refresh_seconds)
         st.rerun()
 
-if str(st.session_state.get("ctl_render_mode", "Lite Stable")) == "Lite Stable":
+if str(st.session_state.get("ctl_render_mode", "Full Experience")) == "Lite Stable":
     st.subheader("Lite Stable View")
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Bond", f"{float(bond.get('bond_score', 0.0)) * 100:.1f}%")
     c2.metric("DB MB", f"{float(bond.get('db_mb', 0.0)):.1f}")
     c3.metric("WAL MB", f"{float(bond.get('wal_mb', 0.0)):.1f}")
     c4.metric("Training", "Active" if bool(training_status.get("training_active", False)) else "Idle")
-    st.caption("Lite Stable mode keeps the Xenoblade look while reducing heavy UI rendering. Switch to Full Experience in the sidebar when ready.")
+    st.caption("Lite Stable mode keeps the Xenoblade look while reducing heavy UI rendering. Full page sections remain available below.")
     if live_refresh:
         st.caption(f"Live refresh active: updating every {refresh_seconds}s")
         time.sleep(refresh_seconds)
         st.rerun()
-    st.stop()
+    
 
 st.subheader("Training Compliance + Always-On Status")
 ts1, ts2, ts3, ts4, ts5 = st.columns(5)
