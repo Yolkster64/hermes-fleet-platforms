@@ -1180,6 +1180,29 @@ def run_cycle() -> None:
         training_variables=training_variables,
         chaos=(x, y, z, chaos_rate),
     )
+    decision_train_brain = _clamp01(
+        (weighted_reward * 0.34)
+        + (learned_truth * 0.24)
+        + (learned_shape * 0.18)
+        + (_clamp01(float(brain_value.get("value", 0.5))) * 0.16)
+        + (_clamp01(float(max_plan.get("uplift", 1.0)) / 2.0) * 0.08)
+    )
+    _emit_signal(
+        "auto_trainer.decision_train_brain",
+        decision_train_brain,
+        {
+            "cycle": _cycle,
+            "specialty": dynamic_specialty,
+            "decision_train_brain": decision_train_brain,
+            "weighted_reward": weighted_reward,
+            "truth_score": learned_truth,
+            "shape_score": learned_shape,
+            "brain_value": float(brain_value.get("value", 0.5)),
+            "max_uplift": float(max_plan.get("uplift", 1.0)),
+            "training_variables": training_variables,
+        },
+        timeout=30,
+    )
     _emit_knowledge_sync(_cycle, dynamic_specialty, signal_score, training_variables, (x, y, z, chaos_rate))
     _smart_actions(data, _cycle, dynamic_specialty, skill_pack, agent_size, dynamic_micro_agents, (x, y, z, chaos_rate))
     print(

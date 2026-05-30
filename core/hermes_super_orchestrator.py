@@ -1312,17 +1312,19 @@ class HermesSuperOrchestrator:
         hard_fact_signal = _clamp(locked_facts / max(1, len(hard_facts))) if isinstance(hard_facts, dict) and hard_facts else 0.0
         ultimate_super_signal = _clamp(float(self.store.recent_external_signal_score_by_source("ultimate_super_plan", lookback=120)))
         entrance_signal = _clamp(float(self.store.recent_external_signal_score_by_source("ultimate_entrance", lookback=120)))
+        decision_train_signal = _clamp(float(self.store.recent_external_signal_score_by_source("decision_train_brain", lookback=120)))
         confidence_signal = _clamp(
-            (evidence_ratio * 0.52)
+            (evidence_ratio * 0.48)
             + (truth_score * 0.18)
             + ((1.0 - chaos_control) * 0.08)
             + (hard_fact_signal * 0.10)
             + (ultimate_super_signal * 0.08)
             + (entrance_signal * 0.04)
+            + (decision_train_signal * 0.04)
         )
         modifier_gain = _clamp(0.55 + (confidence_signal ** 2.2), 0.35, 1.95)
         caution_level = _clamp(1.0 - confidence_signal)
-        pivot_bias = _clamp((pivot_ratio * 0.48) + (exploration_pressure * 0.22) + (chaos_control * 0.17) + ((1.0 - confidence_signal) * 0.08) + ((1.0 - ultimate_super_signal) * 0.05))
+        pivot_bias = _clamp((pivot_ratio * 0.46) + (exploration_pressure * 0.21) + (chaos_control * 0.17) + ((1.0 - confidence_signal) * 0.08) + ((1.0 - ultimate_super_signal) * 0.04) + ((1.0 - decision_train_signal) * 0.04))
         risk_damping = _clamp((stability_signal * 0.45) + (hard_fact_signal * 0.35) + (evidence_ratio * 0.20))
         range_low = _clamp(center - spread)
         range_high = _clamp(center + spread)
@@ -1372,6 +1374,7 @@ class HermesSuperOrchestrator:
             "confidence_signal": confidence_signal,
             "ultimate_super_signal": ultimate_super_signal,
             "entrance_signal": entrance_signal,
+            "decision_train_signal": decision_train_signal,
         }
         self.algorithm_state["adaptive_dynamic_modifiers"] = decision["dynamic_context"]
         mem = self.algorithm_state["adaptive_brain_memory"]
@@ -1437,17 +1440,20 @@ class HermesSuperOrchestrator:
         watch_eff = max(0.0, min(1.0, float(training_variables.get("watch_efficiency", 0.5))))
         wrongness = max(0.0, min(1.0, float(training_variables.get("wrongness_signal", 0.5))))
         yield_eff = max(0.0, min(1.0, float(efficiency_profile.get("yield_efficiency", 0.5))))
+        dynamic_ctx = adaptive_decision.get("dynamic_context", {}) if isinstance(adaptive_decision, dict) else {}
+        decision_train_signal = max(0.0, min(1.0, float(dynamic_ctx.get("decision_train_signal", 0.5))))
         confidence_to_pivot = float(big_decision_plan.get("confidence_to_pivot", 0.0)) if isinstance(big_decision_plan, dict) else 0.0
         aggression = max(
             0.0,
             min(
                 1.0,
-                (proactive * 0.34)
+                (proactive * 0.30)
                 + (adaptation * 0.18)
                 + (yield_eff * 0.18)
                 + (watch_eff * 0.12)
                 + (confidence_to_pivot * 0.10)
-                + ((1.0 - workload_complexity) * 0.08),
+                + ((1.0 - workload_complexity) * 0.07)
+                + (decision_train_signal * 0.05),
             ),
         )
         safety_guard = max(
@@ -1458,7 +1464,8 @@ class HermesSuperOrchestrator:
                 + ((1.0 - confidence) * 0.22)
                 + ((1.0 - watch_eff) * 0.16)
                 + (workload_complexity * 0.18)
-                + (0.08 if bool(hard_fact.get("locked", False)) else 0.0),
+                + (0.08 if bool(hard_fact.get("locked", False)) else 0.0)
+                + ((1.0 - decision_train_signal) * 0.04),
             ),
         )
         rollout_scale = max(0.2, min(1.4, 0.72 + (aggression * 0.56) - (safety_guard * 0.34)))
@@ -1470,6 +1477,7 @@ class HermesSuperOrchestrator:
             "rollout_scale": rollout_scale,
             "policy_score": policy_score,
             "action_mode": action_mode,
+            "decision_train_signal": decision_train_signal,
         }
 
     def _natural_selection(self) -> None:
