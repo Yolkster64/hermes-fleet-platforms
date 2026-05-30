@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Dict, Iterable, Tuple
 
 
@@ -48,12 +49,25 @@ VARIABLE_CATALOG: Dict[str, Dict[str, str]] = {
         "harmony_index": "Global harmony across watch, conscious, and maturity lanes.",
         "decision_readiness": "How ready the system is to make confident decisions now.",
         "learning_elasticity": "How quickly learning adapts without destabilization.",
+        "stability_guard": "Penalty-aware guardrail against watch/conscious divergence.",
+        "efficiency_confidence": "Confidence score for the computed efficiency profile.",
+        "composite_efficiency": "Balanced top-line efficiency index for orchestration.",
     },
 }
 
 
 def clamp01(value: float) -> float:
-    return max(0.0, min(1.0, float(value)))
+    return max(0.0, min(1.0, _safe_float(value, 0.5)))
+
+
+def _safe_float(value: float | int | str | None, default: float = 0.5) -> float:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return float(default)
+    if not math.isfinite(parsed):
+        return float(default)
+    return parsed
 
 
 def _weighted_score(parts: Iterable[Tuple[float, float]]) -> float:
@@ -169,6 +183,32 @@ def compute_efficiency_profile(training_variables: Dict[str, float]) -> Dict[str
             (watch_efficiency, 0.10),
         )
     )
+    divergence_penalty = clamp01(abs(watch_efficiency - conscious_efficiency))
+    stability_guard = clamp01(
+        (signal_stability * 0.30)
+        + (anomaly_resistance * 0.20)
+        + (drift_control * 0.20)
+        + (conscious_resilience * 0.20)
+        + ((1.0 - divergence_penalty) * 0.10)
+    )
+    efficiency_confidence = _weighted_score(
+        (
+            (signal_stability, 0.24),
+            (maturity, 0.18),
+            (stability_guard, 0.22),
+            (harmony_index, 0.18),
+            (decision_readiness, 0.18),
+        )
+    )
+    composite_efficiency = _weighted_score(
+        (
+            (yield_efficiency, 0.34),
+            (decision_readiness, 0.22),
+            (learning_elasticity, 0.18),
+            (harmony_index, 0.16),
+            (stability_guard, 0.10),
+        )
+    )
     return {
         "energy_efficiency": energy_efficiency,
         "speed_efficiency": speed_efficiency,
@@ -178,4 +218,7 @@ def compute_efficiency_profile(training_variables: Dict[str, float]) -> Dict[str
         "harmony_index": harmony_index,
         "decision_readiness": decision_readiness,
         "learning_elasticity": learning_elasticity,
+        "stability_guard": stability_guard,
+        "efficiency_confidence": efficiency_confidence,
+        "composite_efficiency": composite_efficiency,
     }

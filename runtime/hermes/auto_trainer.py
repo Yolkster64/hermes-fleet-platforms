@@ -26,6 +26,17 @@ except Exception:  # pragma: no cover
     def clamp01(value: float) -> float:
         return max(0.0, min(1.0, float(value)))
 
+    def _weighted_score(parts: list[tuple[float, float]]) -> float:
+        numerator = 0.0
+        denominator = 0.0
+        for value, weight in parts:
+            w = max(0.0, float(weight))
+            numerator += clamp01(value) * w
+            denominator += w
+        if denominator <= 0.0:
+            return 0.5
+        return clamp01(numerator / denominator)
+
     def compute_efficiency_profile(training_variables: dict[str, float]) -> dict[str, float]:
         size_factor = clamp01(training_variables.get("size_factor", 0.5))
         position_score = clamp01(training_variables.get("position_score", 0.5))
@@ -41,29 +52,117 @@ except Exception:  # pragma: no cover
         conscious_alignment = clamp01(training_variables.get("conscious_alignment", 0.5))
         conscious_resilience = clamp01(training_variables.get("conscious_resilience", 0.5))
         conscious_focus = clamp01(training_variables.get("conscious_focus", 0.5))
-        watch_efficiency = clamp01((watch_coverage * 0.35) + (signal_stability * 0.25) + (anomaly_resistance * 0.20) + (drift_control * 0.20))
-        conscious_efficiency = clamp01(
-            (conscious_clarity * 0.30)
-            + (conscious_alignment * 0.30)
-            + (conscious_resilience * 0.22)
-            + (conscious_focus * 0.18)
+        retention_strength = clamp01(training_variables.get("retention_strength", 0.5))
+        knowledge_transfer = clamp01(training_variables.get("knowledge_transfer", 0.5))
+        response_softness = clamp01(training_variables.get("response_softness", 0.5))
+        watch_efficiency = _weighted_score(
+            [
+                (watch_coverage, 0.35),
+                (signal_stability, 0.25),
+                (anomaly_resistance, 0.20),
+                (drift_control, 0.20),
+            ]
         )
-        energy_efficiency = clamp01(
-            (success_signal * 0.30)
-            + (monitor * 0.18)
-            + (maturity * 0.16)
-            + ((1.0 - wrongness_signal) * 0.16)
-            + (watch_efficiency * 0.12)
-            + (conscious_efficiency * 0.08)
+        conscious_efficiency = _weighted_score(
+            [
+                (conscious_clarity, 0.30),
+                (conscious_alignment, 0.30),
+                (conscious_resilience, 0.22),
+                (conscious_focus, 0.18),
+            ]
         )
-        speed_efficiency = clamp01((position_score * 0.36) + (success_signal * 0.25) + (size_factor * 0.19) + (monitor * 0.10) + (signal_stability * 0.10))
-        yield_efficiency = clamp01((energy_efficiency * 0.36) + (speed_efficiency * 0.30) + (maturity * 0.16) + (watch_efficiency * 0.10) + (conscious_efficiency * 0.08))
+        harmony_index = _weighted_score(
+            [
+                (watch_efficiency, 0.34),
+                (conscious_efficiency, 0.30),
+                (maturity, 0.20),
+                (monitor, 0.16),
+            ]
+        )
+        energy_efficiency = _weighted_score(
+            [
+                (success_signal, 0.30),
+                (monitor, 0.18),
+                (maturity, 0.16),
+                ((1.0 - wrongness_signal), 0.16),
+                (watch_efficiency, 0.12),
+                (conscious_efficiency, 0.08),
+            ]
+        )
+        speed_efficiency = _weighted_score(
+            [
+                (position_score, 0.36),
+                (success_signal, 0.25),
+                (size_factor, 0.19),
+                (monitor, 0.10),
+                (signal_stability, 0.10),
+            ]
+        )
+        yield_efficiency = _weighted_score(
+            [
+                (energy_efficiency, 0.36),
+                (speed_efficiency, 0.30),
+                (maturity, 0.16),
+                (watch_efficiency, 0.10),
+                (conscious_efficiency, 0.08),
+            ]
+        )
+        decision_readiness = _weighted_score(
+            [
+                (harmony_index, 0.34),
+                (speed_efficiency, 0.22),
+                (signal_stability, 0.20),
+                ((1.0 - wrongness_signal), 0.14),
+                (conscious_clarity, 0.10),
+            ]
+        )
+        learning_elasticity = _weighted_score(
+            [
+                (retention_strength, 0.28),
+                (knowledge_transfer, 0.24),
+                (conscious_focus, 0.22),
+                (response_softness, 0.16),
+                (watch_efficiency, 0.10),
+            ]
+        )
+        divergence_penalty = clamp01(abs(watch_efficiency - conscious_efficiency))
+        stability_guard = clamp01(
+            (signal_stability * 0.30)
+            + (anomaly_resistance * 0.20)
+            + (drift_control * 0.20)
+            + (conscious_resilience * 0.20)
+            + ((1.0 - divergence_penalty) * 0.10)
+        )
+        efficiency_confidence = _weighted_score(
+            [
+                (signal_stability, 0.24),
+                (maturity, 0.18),
+                (stability_guard, 0.22),
+                (harmony_index, 0.18),
+                (decision_readiness, 0.18),
+            ]
+        )
+        composite_efficiency = _weighted_score(
+            [
+                (yield_efficiency, 0.34),
+                (decision_readiness, 0.22),
+                (learning_elasticity, 0.18),
+                (harmony_index, 0.16),
+                (stability_guard, 0.10),
+            ]
+        )
         return {
             "energy_efficiency": energy_efficiency,
             "speed_efficiency": speed_efficiency,
             "yield_efficiency": yield_efficiency,
             "watch_efficiency": watch_efficiency,
             "conscious_efficiency": conscious_efficiency,
+            "harmony_index": harmony_index,
+            "decision_readiness": decision_readiness,
+            "learning_elasticity": learning_elasticity,
+            "stability_guard": stability_guard,
+            "efficiency_confidence": efficiency_confidence,
+            "composite_efficiency": composite_efficiency,
         }
 
 
