@@ -296,6 +296,11 @@ subagents = st.multiselect(
     options=["planner", "researcher", "coder", "sql-engineer", "deployer", "guardian", "observer"],
     default=recommended_subagents[profile][:subagent_count],
 )
+fleet_mode = st.selectbox(
+    "Fleet Assignment",
+    options=["working", "training", "working+training"],
+    index=0,
+)
 if len(subagents) > subagent_count:
     st.warning(f"You selected {len(subagents)} roles. Recommended max for this run: {subagent_count}.")
 
@@ -407,6 +412,8 @@ def _build_agent(name: str, family: str, type_name: str) -> dict:
         "variable_set_two": variable_set_two,
         "subagents": subagents[:subagent_count] if subagents else recommended_subagents[profile][:subagent_count],
         "subagent_count": subagent_count,
+        "fleet_mode": fleet_mode,
+        "fleet_assigned": True,
         "speed": speed_attr,
         "intelligence": intelligence_attr,
         "stability": stability_attr,
@@ -451,7 +458,7 @@ with b4:
 
 saved_agent_names = [str(a.get("name", "")).strip() for a in st.session_state["agents"] if str(a.get("name", "")).strip()]
 deploy_selected = st.multiselect("Deploy these saved agents", options=saved_agent_names, default=saved_agent_names[:1])
-d1, d2 = st.columns(2)
+d1, d2, d3, d4 = st.columns(4)
 with d1:
     if st.button("Deploy Selected", use_container_width=True):
         if not st.session_state["login_ok"]:
@@ -467,7 +474,8 @@ with d1:
                 specialty = (
                     f"{str(agent.get('family', 'Hermes')).lower()}-{str(agent.get('type', 'core')).lower().replace(' ', '-')}-"
                     f"{agent.get('tier', 'ultimate-x5')}-{agent.get('profile', 'balanced')}-"
-                    f"subs-{str(agent.get('subagent_count', 3))}-cpu{agent.get('max_cpu', 90)}-gpu{agent.get('max_gpu', 90)}-mem{agent.get('max_ram', 90)}"
+                    f"subs-{str(agent.get('subagent_count', 3))}-fleet-{str(agent.get('fleet_mode', 'working')).replace('+', 'plus')}-"
+                    f"cpu{agent.get('max_cpu', 90)}-gpu{agent.get('max_gpu', 90)}-mem{agent.get('max_ram', 90)}"
                 )
                 ok, _ = _deploy_agent(
                     st.session_state["api_key"],
@@ -497,7 +505,8 @@ with d2:
                 specialty = (
                     f"{str(agent.get('family', 'Hermes')).lower()}-{str(agent.get('type', 'core')).lower().replace(' ', '-')}-"
                     f"{agent.get('tier', 'ultimate-x5')}-{agent.get('profile', 'balanced')}-"
-                    f"smart-swarm-{len(families)}-subs-{str(agent.get('subagent_count', 3))}"
+                    f"smart-swarm-{len(families)}-subs-{str(agent.get('subagent_count', 3))}-"
+                    f"fleet-{str(agent.get('fleet_mode', 'working')).replace('+', 'plus')}"
                 )
                 ok, _ = _deploy_agent(
                     st.session_state["api_key"],
@@ -515,6 +524,17 @@ with d2:
                     agent["deployed_utc"] = datetime.now(timezone.utc).isoformat()
             _save_agent_state()
             st.success(f"Deploy all completed: {ok_count}/{total}")
+with d3:
+    if st.button("Bring Back All", use_container_width=True):
+        for agent in st.session_state["agents"]:
+            agent["deployed"] = False
+            agent["returned_utc"] = datetime.now(timezone.utc).isoformat()
+        _save_agent_state()
+        st.success("All fleets brought back. Fleet assignments were kept.")
+with d4:
+    if st.button("Save All", use_container_width=True):
+        _save_agent_state()
+        st.success("All fleet settings saved.")
 
 guide_rows = [
     {
@@ -593,6 +613,7 @@ if st.session_state["agents"]:
                 "type": a.get("type", ""),
                 "tier": a.get("tier", ""),
                 "profile": a.get("profile", ""),
+                "fleet_mode": a.get("fleet_mode", "working"),
                 "xp": int(a.get("xp_boost", 0)),
                 "speed": int(a.get("speed", 0)),
                 "intelligence": int(a.get("intelligence", 0)),
@@ -610,7 +631,7 @@ if st.session_state["agents"]:
     st.subheader("XP + Stats by Agent")
     for row in display_rows[:20]:
         state_icon = "🟢" if row["deployed"] else "⚪"
-        st.markdown(f"{state_icon} **{row['name']}** ({row['family']} / {row['type']})")
+        st.markdown(f"{state_icon} **{row['name']}** ({row['family']} / {row['type']}) - fleet: `{row['fleet_mode']}`")
         col_a, col_b, col_c = st.columns(3)
         with col_a:
             st.caption(f"XP {row['xp']}")
@@ -630,12 +651,16 @@ if st.session_state["agents"]:
 
 st.divider()
 st.subheader("Automatic Backend Upgrades")
-st.caption("AIHub, learning, brain, and SQL comprehension run automatically in the background.")
+st.caption("AIHub, JVC learning, brain, and SQL comprehension run automatically in the background.")
 if "last_auto_upgrade_ts" not in st.session_state:
     st.session_state["last_auto_upgrade_ts"] = 0.0
 if st.session_state["login_ok"]:
     now_ts = time.time()
     if now_ts - float(st.session_state["last_auto_upgrade_ts"]) >= 90.0:
+        fleet_count = len(st.session_state["agents"])
+        working_count = len([a for a in st.session_state["agents"] if str(a.get("fleet_mode", "")) == "working"])
+        training_count = len([a for a in st.session_state["agents"] if str(a.get("fleet_mode", "")) == "training"])
+        hybrid_count = len([a for a in st.session_state["agents"] if str(a.get("fleet_mode", "")) == "working+training"])
         aihub_ok, _ = _apply_aihub_upgrade(
             st.session_state["api_key"],
             specialty=f"ultimate-x-{x_tier}-auto-aihub",
@@ -656,9 +681,22 @@ if st.session_state["login_ok"]:
             llm_signal=llm_signal,
             stability_bias=0.93,
         )
+        jvc_ok, _ = _run_learning_sql_pulse(
+            st.session_state["api_key"],
+            specialty=(
+                f"jvc-learning-auto-fleets-{fleet_count}-working-{working_count}-"
+                f"training-{training_count}-hybrid-{hybrid_count}"
+            ),
+            steps=520,
+            candidates=max(180, min(240, 120 + (fleet_count * 4))),
+            sql_signal=max(0.90, sql_level / 100.0),
+            internet_signal=max(0.70, max_ram / 100.0),
+            llm_signal=llm_signal,
+            stability_bias=0.94,
+        )
         st.session_state["last_auto_upgrade_ts"] = now_ts
-        if aihub_ok and learn_ok:
-            st.success("Automatic backend upgrades completed.")
+        if aihub_ok and learn_ok and jvc_ok:
+            st.success("Automatic backend upgrades completed (including JVC learning).")
 
 st.divider()
 st.subheader("Status")
