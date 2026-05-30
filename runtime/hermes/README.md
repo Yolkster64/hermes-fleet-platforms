@@ -49,7 +49,8 @@
 - Yes, you can use GPU for more performance. Use:
   1. Install Docker GPU runtime support on host (NVIDIA Container Toolkit / Docker GPU support).
   2. Verify GPU visibility in Docker (`docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi`).
-  3. In dashboard -> **Security + Benchmark** -> click **Enable GPU Turbo (All Available)**.
+  3. Quick startup with max GPU profile: `pwsh ./runtime/hermes/scripts/startup/enable_gpu_quick_setup.ps1 -Mode local`
+  4. In dashboard -> **Security + Benchmark** -> click **Enable GPU Turbo (All Available)**.
 - For mixed stability + performance, use:
   - `Apply Max Power CPU/RAM/GPU` first, then `Enable GPU Turbo (All Available)`.
 
