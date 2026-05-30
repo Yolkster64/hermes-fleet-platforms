@@ -75,6 +75,9 @@ SIZE_MODE_DETAILS = {
 HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
     "hybrid-core": {
         "title": "Hybrid",
+        "group": "Custom",
+        "personality": "Adaptive orchestrator that balances speed, safety, and exploration.",
+        "description": "Best all-around profile for mixed workloads and stable continuous upgrades.",
         "swarm_strategy": "hybrid",
         "micro_agents": 188,
         "gaussian_pressure": 0.83,
@@ -84,6 +87,9 @@ HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
     },
     "mesh-swarm": {
         "title": "Mesh",
+        "group": "Custom",
+        "personality": "Highly collaborative specialist that links sub-agents into a dense coordination net.",
+        "description": "Strong for big fleet/hub synchronization and multi-step joint reasoning.",
         "swarm_strategy": "mesh",
         "micro_agents": 210,
         "gaussian_pressure": 0.85,
@@ -93,6 +99,9 @@ HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
     },
     "normal-steady": {
         "title": "Normal",
+        "group": "Custom",
+        "personality": "Predictable baseline profile focused on operational stability and consistency.",
+        "description": "Good default when you want lower variance and cleaner repeatability.",
         "swarm_strategy": "specialist-mix",
         "micro_agents": 164,
         "gaussian_pressure": 0.78,
@@ -102,12 +111,63 @@ HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
     },
     "deep-thinker": {
         "title": "Deep Thinker",
+        "group": "Custom",
+        "personality": "Long-horizon planner with stronger analysis and pattern depth.",
+        "description": "Best for complex decisions, SQL pattern mining, and higher-order strategy.",
         "swarm_strategy": "multipolar",
         "micro_agents": 228,
         "gaussian_pressure": 0.90,
         "high_level_learning": 0.86,
         "techniques": ["Gaussian 3D evidence", "Multipolar ensemble", "GNAA adaptive memory"],
         "specialty_tag": "deep-thinker",
+    },
+    "official-quick-thinker": {
+        "title": "Quick Thinker",
+        "group": "Official",
+        "personality": "Fast-response profile tuned for speed and short-cycle actions.",
+        "description": "Great for rapid iterations, quick diagnostics, and low-latency deployment loops.",
+        "swarm_strategy": "swarm",
+        "micro_agents": 200,
+        "gaussian_pressure": 0.79,
+        "high_level_learning": 0.62,
+        "techniques": ["C++ neural kernel boost", "Multi-parallel swarm", "Quantized compression"],
+        "specialty_tag": "official-quick",
+    },
+    "official-deep-thinker": {
+        "title": "Official Deep Thinker",
+        "group": "Official",
+        "personality": "Reasoning-heavy profile optimized for depth, structure, and memory quality.",
+        "description": "Use for hard strategy problems and long training arcs.",
+        "swarm_strategy": "multipolar",
+        "micro_agents": 236,
+        "gaussian_pressure": 0.92,
+        "high_level_learning": 0.88,
+        "techniques": ["Gaussian 3D evidence", "GNAA adaptive memory", "Multipolar ensemble"],
+        "specialty_tag": "official-deep",
+    },
+    "official-balanced-thinker": {
+        "title": "Balanced Thinker",
+        "group": "Official",
+        "personality": "Even profile balancing throughput, stability, and interpretability.",
+        "description": "Good for broad production use with less tuning overhead.",
+        "swarm_strategy": "hybrid",
+        "micro_agents": 192,
+        "gaussian_pressure": 0.84,
+        "high_level_learning": 0.74,
+        "techniques": ["KNAA/QNAA reasoning", "Cross-agent communication mesh", "Natural pressure adaptation"],
+        "specialty_tag": "official-balanced",
+    },
+    "official-creative-thinker": {
+        "title": "Creative Thinker",
+        "group": "Official",
+        "personality": "Exploration-focused profile that favors diversity and novel combinations.",
+        "description": "Best for ideation, alternate plans, and design-heavy AIHub work.",
+        "swarm_strategy": "mesh",
+        "micro_agents": 214,
+        "gaussian_pressure": 0.87,
+        "high_level_learning": 0.82,
+        "techniques": ["Multipolar ensemble", "Cross-agent communication mesh", "GNAA adaptive memory"],
+        "specialty_tag": "official-creative",
     },
 }
 MODEL_OPTIONS = [
@@ -469,19 +529,25 @@ with st.sidebar:
     live_refresh = st.checkbox("Live fleet auto-refresh", value=True)
     refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, value=20, step=5)
     focused_layout = st.checkbox("Focused layout (clean view)", value=True)
-    show_legacy_map_ui = st.checkbox("Show legacy AIHub map panels", value=False)
+    show_legacy_map_ui = st.checkbox("Show AIHub Hub + Map panels", value=True)
     st.markdown("### Hermes Type + Model")
     hermes_type_labels = {k: str(v.get("title", k)) for k, v in HERMES_TYPE_PRESETS.items()}
     hermes_type_keys = list(hermes_type_labels.keys())
     current_type = _selected_hermes_type_key()
     hermes_type_index = hermes_type_keys.index(current_type) if current_type in hermes_type_keys else 0
     selected_hermes_type = st.selectbox(
-        "Choose Hermes type (4)",
+        "Choose Hermes type (custom + official)",
         options=hermes_type_keys,
         index=hermes_type_index,
         format_func=lambda key: hermes_type_labels.get(key, key),
         key="ctl_hermes_type",
     )
+    selected_preset = HERMES_TYPE_PRESETS.get(selected_hermes_type, {})
+    st.caption(
+        f"{selected_preset.get('group', 'Custom')} • "
+        f"{selected_preset.get('personality', 'Adaptive Hermes profile.')}"
+    )
+    st.caption(str(selected_preset.get("description", "")))
     selected_model = st.selectbox(
         "Preferred model",
         options=MODEL_OPTIONS,
@@ -625,6 +691,30 @@ st.caption(
     f"gateway={int(float(bond_signals.get('gateway_link', 0.0)))} | volume={int(float(bond_signals.get('volume_link', 0.0)))} | "
     f"auto_setup={int(float(bond_signals.get('auto_setup', 0.0)))} | sql_load(db/wal)={float(bond.get('db_mb', 0.0)):.1f}/{float(bond.get('wal_mb', 0.0)):.1f}MB"
 )
+with st.expander("Hermes Type Catalog + Optimization Tips", expanded=False):
+    st.dataframe(
+        [
+            {
+                "type": preset.get("title", key),
+                "group": preset.get("group", "Custom"),
+                "personality": preset.get("personality", ""),
+                "description": preset.get("description", ""),
+                "swarm": preset.get("swarm_strategy", ""),
+                "agents": int(preset.get("micro_agents", 0)),
+                "gaussian": float(preset.get("gaussian_pressure", 0.0)),
+                "learning": float(preset.get("high_level_learning", 0.0)),
+            }
+            for key, preset in HERMES_TYPE_PRESETS.items()
+            if isinstance(preset, dict)
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.markdown(
+        "- **Optimization tip:** use Quick/Hybrid for deployment speed, Mesh/Creative for collaboration breadth, and Deep modes for harder reasoning.\n"
+        "- **Stability tip:** keep gaussian pressure in 0.78-0.90 for consistent SQL growth quality.\n"
+        "- **Scale tip:** increase micro agents gradually (+16 to +32) while watching SQL storage pressure."
+    )
 if not watch_err and isinstance(watch_payload, dict):
     st.caption(f"Watch stream: {watch_payload.get('watch_timestamp_utc', 'n/a')} (gateway aggregated)")
 orchestration_counts = snapshot.get("super_orchestration_counts", {}) if isinstance(snapshot, dict) else {}
@@ -739,6 +829,18 @@ else:
 
 if focused_layout:
     st.subheader("Focused Hermes Center")
+    render_next_level_control_center(
+        sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
+        growth_data=growth_data if isinstance(growth_data, dict) else {},
+        training_status=training_status if isinstance(training_status, dict) else {},
+        watch_payload=watch_payload if isinstance(watch_payload, dict) else {},
+        unified=unified if isinstance(unified, dict) else {},
+        cpp_kernel=cpp_kernel if isinstance(cpp_kernel, dict) else {},
+        ultimate_entrance=ultimate_entrance if isinstance(ultimate_entrance, dict) else {},
+        volume_root=live_volume_root,
+        run_logged_post_action=run_logged_post_action,
+        show_center_nexus=True,
+    )
     render_fleet_showcase_panels(
         sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
         growth_data=growth_data if isinstance(growth_data, dict) else {},

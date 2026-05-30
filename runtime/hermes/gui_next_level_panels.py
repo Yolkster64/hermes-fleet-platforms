@@ -113,8 +113,8 @@ def render_next_level_control_center(
     show_center_nexus: bool = False,
 ) -> None:
     _inject_next_level_theme()
-    st.markdown("### Next-Level AIHub + SQL Command Center")
-    st.markdown('<div class="hermes-glow"><span class="recommended-pill">RECOMMENDED</span> <span class="cool-title">Lighter visual mode + richer data controls + instant reports</span></div>', unsafe_allow_html=True)
+    st.markdown("### Level 4 AIHub + SQL Command Center")
+    st.markdown('<div class="hermes-glow"><span class="recommended-pill">LEVEL 4</span> <span class="cool-title">Smarter visuals, center SQL controls, deployment actions, and hub/map guidance</span></div>', unsafe_allow_html=True)
 
     tabs = st.tabs(["SQL Center", "AIHub Lab", "Fleet Table", "Evidence Advisor", "Security + Benchmark", "Clock + Style"])
     sql_health = sql_intel.get("sql_health", {}) if isinstance(sql_intel, dict) else {}
@@ -188,6 +188,7 @@ def render_next_level_control_center(
             )
 
     with tabs[2]:
+        st.markdown("#### Hermes Army / Barn Settings")
         if show_center_nexus:
             _render_center_nexus(
                 sql_health=sql_health,

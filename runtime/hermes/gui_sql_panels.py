@@ -130,6 +130,36 @@ def render_sql_intelligence_panels(
             render_xp_bar(f"{hid} Synergy", synergy_ratio, "#F4D03F")
 
     lf1, lf2 = st.columns([1, 1])
+    st.caption("Deployment controls")
+    d1, d2 = st.columns(2)
+    with d1:
+        if st.button("Deploy SQL Center Upgrade", use_container_width=True):
+            run_logged_post_action(
+                "deploy-sql-center-upgrade",
+                "/learning-pulse",
+                {
+                    "specialty": "fleet:sql-center-upgrade",
+                    "steps": 420,
+                    "candidates": 220,
+                    "sql_signal": 0.96,
+                    "internet_signal": 0.06,
+                    "llm_signal": 0.93,
+                    "stability_bias": 0.89,
+                },
+                "SQL center deployment triggered.",
+                "SQL center deployment failed",
+                timeout=120,
+            )
+    with d2:
+        if st.button("Deploy Hub + Map Sync", use_container_width=True):
+            run_logged_post_action(
+                "deploy-hub-map-sync",
+                "/optimize-fleet",
+                {"specialty": "fleet:hub-map-sync", "candidates": 260},
+                "Hub + map sync deployment triggered.",
+                "Hub + map deployment failed",
+                timeout=120,
+            )
     with lf1:
         if st.button("Lock Fleet Tough Mode", use_container_width=True):
             run_logged_post_action(

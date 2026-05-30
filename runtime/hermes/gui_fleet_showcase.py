@@ -178,6 +178,38 @@ def _progress_variant(label: str, value: float, tone: str) -> None:
     )
 
 
+def _sub_agent_summary(cards: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    buckets = {
+        "Coordinator Mesh": {"match": ("fleet", "orchestration"), "tips": "Keep routing weights balanced and reduce overloaded routes."},
+        "SQL Intelligence": {"match": ("sql", "data"), "tips": "Improve SQL health first, then raise candidate counts."},
+        "UX + Hub": {"match": ("gui", "ux"), "tips": "Deploy small UI iterations and monitor response stability."},
+        "Security Guard": {"match": ("security", "hardening"), "tips": "Prioritize hardening toggles before aggressive upgrades."},
+    }
+    results: List[Dict[str, Any]] = []
+    for name, cfg in buckets.items():
+        picked = [
+            c
+            for c in cards
+            if any(token in str(c.get("specialty", "")).lower() for token in cfg["match"])
+        ]
+        if not picked:
+            continue
+        avg_xp = sum(float(c.get("experience_xp", 0.0)) for c in picked) / max(1, len(picked))
+        avg_lvl = sum(float(c.get("level", 1.0)) for c in picked) / max(1, len(picked))
+        avg_speed = sum(float(c.get("speed_bonus", 0.0)) for c in picked) / max(1, len(picked))
+        readiness = min(1.0, (avg_xp / 10000.0) * 0.45 + (avg_lvl / 120.0) * 0.35 + avg_speed * 0.20)
+        results.append(
+            {
+                "name": name,
+                "readiness": readiness,
+                "members": len(picked),
+                "tips": str(cfg["tips"]),
+                "profile": "Tight sub-agent collaboration with guided optimization loops.",
+            }
+        )
+    return results
+
+
 def render_fleet_showcase_panels(
     sql_intel: Dict[str, Any],
     growth_data: Dict[str, Any],
@@ -271,3 +303,13 @@ def render_fleet_showcase_panels(
                 _progress_variant("Synergy", synergy_ratio, "synergy")
                 st.caption(f"Accessories: {_accessories_for_role(role)}")
                 st.caption(f"Boosts: speed +{speed * 100:.1f}% • token +{token * 100:.1f}%")
+
+    st.markdown("#### Sub-Agent Bars + Optimization Guide")
+    sub_agents = _sub_agent_summary(cards)
+    if sub_agents:
+        for item in sub_agents:
+            _progress_variant(f"{item['name']} readiness", float(item["readiness"]), "synergy")
+            st.caption(f"{item['name']}: {item['profile']}")
+            st.caption(f"Tip: {item['tips']} • members: {int(item['members'])}")
+    else:
+        st.caption("Sub-agent readiness appears after profile snapshots include specialty coverage.")

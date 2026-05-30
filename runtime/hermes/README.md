@@ -145,8 +145,11 @@ This runtime enables:
   - GUI API client now auto-falls back across gateway/API endpoints (`8788`/`8787`, localhost/container service names) and key variants to recover Hermes access automatically
   - Sidebar now includes quick **Login/Reconnect** controls and explicit offline recovery messaging for faster Hermes access recovery
   - New sidebar **Focused layout (clean view)** keeps the main nexus/fleet/sql surfaces visible and hides legacy advanced blocks unless needed
-  - Legacy AIHub map/diagram panels are now hidden by default (`Show legacy AIHub map panels`) for a cleaner stable view
-  - GUI now includes full **Hermes Type + Model** controls: pick from 4 presets (`Hybrid`, `Mesh`, `Normal`, `Deep Thinker`) and apply/change preferred model later without restarting
+  - AIHub Hub + Map panel visibility is controlled from sidebar (`Show AIHub Hub + Map panels`)
+  - GUI now includes expanded **Hermes Type + Model** controls with **custom + official** personalities and descriptions:
+    - Custom: `Hybrid`, `Mesh`, `Normal`, `Deep Thinker`
+    - Official: `Quick Thinker`, `Official Deep Thinker`, `Balanced Thinker`, `Creative Thinker`
+  - Level 4 center adds SQL/hub deployment buttons and sub-agent readiness bars with optimization tips
   - GUI now shows per-Hermes level/XP/speed bonus/token gain bars, GitHub CLI connection panel, and fleet lock/unlock controls for hard-problem mode
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
   - Deep Auto Learning Zone (`♾️`) with study-area targeting and multi-round comparison
