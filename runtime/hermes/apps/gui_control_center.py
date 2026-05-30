@@ -288,6 +288,8 @@ with cram:
 with cgpu:
     max_gpu = st.slider("Max GPU %", 10, 100, 90)
 ultimate_sql_level = st.slider("Ultimate SQL Level", 0, 100, 88)
+micro_count = st.slider("Microservices (toggleable amount)", 1, 64, 12)
+micro_auto_scale = st.toggle("Auto-scale microservices", value=True)
 
 with st.expander("Quick Guide", expanded=False):
     st.markdown(
@@ -325,6 +327,24 @@ with st.expander("Deep Guide: Hermes Types, X Forms, Hybrid, and 4 Models", expa
         "3. Use AIHub mesh + Learning/SQL pulse.\n"
         "4. Run `Run Ultimate Everything Now` for full backend execution."
     )
+with st.expander("Mix & Match Guide (Presets, Hints, Best Starting Practices)", expanded=False):
+    st.markdown(
+        "**Quick Mix Presets**\n"
+        "- `fast-launch`: Type `builder`, brain `ultimate-x5`, microservices `8-16`\n"
+        "- `deep-research`: Type `analyst`, brain `ultimate-x6`, microservices `16-32`\n"
+        "- `safe-production`: Type `guardian`, brain `full-brain`, microservices `12-24`\n"
+        "- `balanced-hybrid`: Type `hermes` + hybrid form, microservices `10-20`\n\n"
+        "**Best Starting Practices**\n"
+        "1. Start with `hermes` or `ultimate-x5` first, not max-everything.\n"
+        "2. Keep microservices at `12` initially and scale after one healthy deploy.\n"
+        "3. Enable AIHub mesh with 3-4 LLMs first, then expand.\n"
+        "4. Run `Ultimate Learning + SQL Pulse` before `Ultimate Everything`.\n"
+        "5. Save a backbone profile for each workload (fast, safe, deep).\n\n"
+        "**Hints**\n"
+        "- Higher GPU + AIHub mesh = better LLM throughput.\n"
+        "- Higher SQL level helps memory/recall but can raise latency.\n"
+        "- `ultimate-x6` is strongest for deep learning carry-over across agents."
+    )
 
 b1, b2 = st.columns(2)
 with b1:
@@ -351,6 +371,8 @@ with bb1:
                 "saber_power": saber_power,
                 "training_intensity": training_intensity,
                 "selected_packs": selected_packs,
+                "micro_count": micro_count,
+                "micro_auto_scale": micro_auto_scale,
                 "max_cpu": max_cpu,
                 "max_ram": max_ram,
                 "max_gpu": max_gpu,
@@ -391,6 +413,8 @@ with a1:
                     "xp_boost": xp_boost,
                     "saber_power": saber_power,
                     "feature_packs": len(selected_packs),
+                    "micro_count": micro_count,
+                    "micro_auto_scale": micro_auto_scale,
                     "max_cpu": max_cpu,
                     "max_ram": max_ram,
                     "max_gpu": max_gpu,
@@ -419,6 +443,8 @@ with a2:
             active_llm_mesh = (backbone or {}).get("llm_mesh", llm_mesh)
             active_training = int((backbone or {}).get("training_intensity", training_intensity))
             active_packs = (backbone or {}).get("selected_packs", selected_packs)
+            active_micro_count = int((backbone or {}).get("micro_count", micro_count))
+            active_micro_auto = bool((backbone or {}).get("micro_auto_scale", micro_auto_scale))
             active_cpu = int((backbone or {}).get("max_cpu", max_cpu))
             active_ram = int((backbone or {}).get("max_ram", max_ram))
             active_gpu = int((backbone or {}).get("max_gpu", max_gpu))
@@ -432,6 +458,8 @@ with a2:
                 active_learning_share = True
                 active_llm_mesh = ["openai", "anthropic", "gemini", "mistral", "grok", "deepseek", "llama", "qwen"]
                 active_training = max(420, active_training)
+                active_micro_count = max(32, active_micro_count)
+                active_micro_auto = True
                 active_cpu = max(95, active_cpu)
                 active_ram = max(92, active_ram)
                 active_gpu = max(98, active_gpu)
@@ -444,10 +472,11 @@ with a2:
 
             mesh_suffix = "+".join(active_llm_mesh[:3]) if isinstance(active_llm_mesh, list) and active_llm_mesh else "default-mesh"
             share_suffix = "shared" if active_learning_share else "solo"
-            specialty = f"{agent_type}-{active_brain}-{active_aihub}-{active_learning_mode}-{share_suffix}-{mesh_suffix}"
+            micro_suffix = f"m{active_micro_count}-{'auto' if active_micro_auto else 'manual'}"
+            specialty = f"{agent_type}-{active_brain}-{active_aihub}-{active_learning_mode}-{share_suffix}-{mesh_suffix}-{micro_suffix}"
             specialty = f"{specialty}-{ai_mind_mode}"
             steps = max(60, int(active_training))
-            candidates = max(40, min(240, pack_count * 8))
+            candidates = max(40, min(240, max(pack_count * 8, active_micro_count * 4)))
             sql_signal = max(0.4, min(1.0, active_cpu / 100.0))
             internet_signal = max(0.3, min(1.0, active_ram / 100.0))
             llm_signal = max(0.4, min(1.0, active_gpu / 100.0))
