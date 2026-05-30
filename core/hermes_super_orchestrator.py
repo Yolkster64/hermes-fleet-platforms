@@ -2299,6 +2299,7 @@ class HermesSuperOrchestrator:
         conscious_brain_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("conscious_brain", lookback=120))))
         major_training_campaign_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("major_training_campaign", lookback=120))))
         aihub_training_pressure_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("aihub_training_pressure", lookback=120))))
+        bonusllm_goodies_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("bonusllm_goodies", lookback=120))))
         speed_priority = clamp01(speed_priority)
         energy_saver = clamp01(energy_saver)
 
@@ -2345,6 +2346,7 @@ class HermesSuperOrchestrator:
                 + (conscious_brain_signal * power_score * 0.07)
                 + (major_training_campaign_signal * power_score * 0.07)
                 + (aihub_training_pressure_signal * cost_score * 0.04)
+                + (bonusllm_goodies_signal * power_score * 0.08)
             )
             scored.append((blend, p, speed_score, cost_score, power_score))
 
@@ -2354,6 +2356,12 @@ class HermesSuperOrchestrator:
         estimated_cost = (token_load / 1000.0) * selected["cost_per_1k"] * (1.0 - (bonus_amp * 0.22))
         token_efficiency = max(0.0, min(1.0, (top[2] * 0.35) + (top[3] * 0.40) + (top[4] * 0.25)))
         blend_mode = f"{goal_profile}-cost-speed-power-amplified" if bonus_amp > 0.55 else f"{goal_profile}-cost-speed-power-balanced"
+        goodies_pack = {
+            "latency_turbo": clamp01((bonusllm_goodies_signal * 0.62) + (speed_priority * 0.38)),
+            "truth_guard": clamp01((efficiency_confidence * 0.58) + (signal_stability * 0.42)),
+            "creativity_spark": clamp01((major_training_campaign_signal * 0.52) + (aihub_brain_learning_signal * 0.48)),
+            "cost_saver": clamp01((stability_guard * 0.55) + (energy_saver * 0.45)),
+        }
         return {
             "selected_model": selected["id"],
             "blend_mode": blend_mode,
@@ -2387,7 +2395,9 @@ class HermesSuperOrchestrator:
                 "conscious_brain_signal": conscious_brain_signal,
                 "major_training_campaign_signal": major_training_campaign_signal,
                 "aihub_training_pressure_signal": aihub_training_pressure_signal,
+                "bonusllm_goodies_signal": bonusllm_goodies_signal,
             },
+            "bonusllm_goodies": goodies_pack,
             "candidates": [
                 {
                     "model": item[1]["id"],
@@ -2413,6 +2423,7 @@ class HermesSuperOrchestrator:
         conscious_brain_signal = self.store.recent_external_signal_score_by_source("conscious_brain")
         major_training_campaign_signal = self.store.recent_external_signal_score_by_source("major_training_campaign")
         aihub_training_pressure_signal = self.store.recent_external_signal_score_by_source("aihub_training_pressure")
+        bonusllm_goodies_signal = self.store.recent_external_signal_score_by_source("bonusllm_goodies")
         movie_mesh_signal = self.store.knowledge_mesh_task_signal("movie")
         media_mesh_signal = self.store.knowledge_mesh_task_signal("media")
         movie_domain_signal = max(0.0, min(1.0, (movie_signal * 0.4) + (media_signal * 0.2) + (movie_mesh_signal * 0.25) + (media_mesh_signal * 0.15)))
@@ -2445,7 +2456,8 @@ class HermesSuperOrchestrator:
                 + (evidence_sql_signal * 0.05)
                 + (conscious_brain_signal * 0.06)
                 + (major_training_campaign_signal * 0.07)
-                + (aihub_training_pressure_signal * 0.05),
+                + (aihub_training_pressure_signal * 0.05)
+                + (bonusllm_goodies_signal * 0.07),
             ),
         )
         if persist:

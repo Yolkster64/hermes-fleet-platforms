@@ -1478,6 +1478,34 @@ def run_cycle() -> None:
                 },
                 timeout=30,
             )
+            bonusllm_goodies = _clamp01(
+                (aihub_brain_learning * 0.34)
+                + (float(training_variables.get("composite_efficiency", 0.5)) * 0.22)
+                + (float(training_variables.get("efficiency_confidence", 0.5)) * 0.18)
+                + (float(training_variables.get("decision_readiness", 0.5)) * 0.12)
+                + (float(major_campaign.get("campaign_boost", 0.5)) * 0.08)
+                + (float(major_campaign.get("evidence_score", 0.0)) * 0.06)
+            )
+            goodies_pack = {
+                "latency_turbo": _clamp01((bonusllm_goodies * 0.62) + (float(training_variables.get("watch_efficiency", 0.5)) * 0.38)),
+                "truth_guard": _clamp01((float(training_variables.get("efficiency_confidence", 0.5)) * 0.58) + (float(training_variables.get("signal_stability", 0.5)) * 0.42)),
+                "creativity_spark": _clamp01((float(sql_intel.get("pattern_score", 0.5)) * 0.55) + (max(0.0, float(sql_intel.get("trend", 0.0))) * 0.45)),
+                "cost_saver": _clamp01((float(training_variables.get("stability_guard", 0.5)) * 0.52) + ((1.0 - float(major_campaign.get("training_pressure", 0.5))) * 0.48)),
+            }
+            _emit_signal(
+                "auto_trainer.bonusllm_goodies",
+                bonusllm_goodies,
+                {
+                    "cycle": _cycle,
+                    "specialty": dynamic_specialty,
+                    "bonusllm_goodies": bonusllm_goodies,
+                    "goodies_pack": goodies_pack,
+                    "aihub_brain_learning": aihub_brain_learning,
+                    "campaign_boost": float(major_campaign.get("campaign_boost", 0.5)),
+                    "training_variables": training_variables,
+                },
+                timeout=30,
+            )
             evidence_sql = sql_intel.get("evidence", {}) if isinstance(sql_intel, dict) else {}
             if isinstance(evidence_sql, dict):
                 _emit_signal(
