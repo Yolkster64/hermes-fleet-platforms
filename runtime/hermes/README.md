@@ -108,7 +108,9 @@ This runtime enables:
   - Trainer now auto-exports SQL-backed Hermes profile snapshots to volume (`training/hermes_agent_profiles_snapshot.json`) for backup/restore handoff
   - SQL intelligence now includes deep compression + 3D overlap metrics and auto-generated benefits/ideas for next training moves
   - SQL intel now exposes training-volume health (`training_dir_mb`, `wal_mb`, `snapshot_age_minutes`) to strengthen volume-aware decisions
+  - Trainer evidence now persists in SQL (`training_evidence`) and SQL intel surfaces evidence score/reward/truth/shape + top strategy
   - SQL layer is now performance-hardened with indexes + automatic retention pruning (`HERMES_SQL_MAX_CYCLE_ROWS`, `HERMES_SQL_MAX_AGENT_ROWS`, `HERMES_SQL_MAX_GITHUB_ROWS`, `HERMES_SQL_MAX_PROFILE_ROWS`) plus cadence controls (`HERMES_SQL_INTEL_LOOKBACK`, `HERMES_SQL_PRUNE_EVERY`, `HERMES_SQL_OPTIMIZE_EVERY`, `HERMES_SQL_PROFILE_SNAPSHOT_EVERY`, `HERMES_SQL_GITHUB_INGEST_EVERY`)
+  - Added `HERMES_SQL_MAX_EVIDENCE_ROWS` and `auto_trainer.evidence_sql` for evidence-aware SQL retention and AIHub/brain blending
   - Trainer now emits `auto_trainer.sql_volume_pressure` and can trigger faster SQL optimization cadence when DB/WAL/snapshot pressure rises
   - Trainer now emits an `auto_trainer.ultimate_super_plan` signal that adapts pulse steps/candidates and sql/llm/stability weights from SQL health pressure + watch stability + retention
   - Trainer now emits `auto_trainer.aihub_brain_learning` to close the loop between SQL/watch/optimizer learning quality and AIHub routing/bonus logic

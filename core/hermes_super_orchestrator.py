@@ -2262,6 +2262,7 @@ class HermesSuperOrchestrator:
         aihub_bridge_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("aihub_bridge", lookback=120))))
         watch_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("watch_signal", lookback=120))))
         aihub_brain_learning_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("aihub_brain_learning", lookback=120))))
+        evidence_sql_signal = max(0.0, min(1.0, float(self.store.recent_external_signal_score_by_source("evidence_sql", lookback=120))))
         speed_priority = clamp01(speed_priority)
         energy_saver = clamp01(energy_saver)
 
@@ -2299,6 +2300,7 @@ class HermesSuperOrchestrator:
                 + (action_brain_signal * power_score * 0.07)
                 + (bonus_signal * power_score * 0.05)
                 + (aihub_brain_learning_signal * power_score * 0.08)
+                + (evidence_sql_signal * power_score * 0.06)
             )
             scored.append((blend, p, speed_score, cost_score, power_score))
 
@@ -2332,6 +2334,7 @@ class HermesSuperOrchestrator:
                 "aihub_bridge_signal": aihub_bridge_signal,
                 "watch_signal": watch_signal,
                 "aihub_brain_learning_signal": aihub_brain_learning_signal,
+                "evidence_sql_signal": evidence_sql_signal,
             },
             "candidates": [
                 {
@@ -2354,6 +2357,7 @@ class HermesSuperOrchestrator:
         aihub_bridge_signal = self.store.recent_external_signal_score_by_source("aihub_bridge")
         watch_signal = self.store.recent_external_signal_score_by_source("watch_signal")
         aihub_brain_learning_signal = self.store.recent_external_signal_score_by_source("aihub_brain_learning")
+        evidence_sql_signal = self.store.recent_external_signal_score_by_source("evidence_sql")
         movie_mesh_signal = self.store.knowledge_mesh_task_signal("movie")
         media_mesh_signal = self.store.knowledge_mesh_task_signal("media")
         movie_domain_signal = max(0.0, min(1.0, (movie_signal * 0.4) + (media_signal * 0.2) + (movie_mesh_signal * 0.25) + (media_mesh_signal * 0.15)))
@@ -2371,7 +2375,7 @@ class HermesSuperOrchestrator:
             0.0,
             min(
                 1.0,
-                (signal * 0.16)
+                (signal * 0.15)
                 + (movie_domain_signal * 0.08)
                 + (knaa_avg * 0.12)
                 + (fleet_avg * 0.11)
@@ -2382,7 +2386,8 @@ class HermesSuperOrchestrator:
                 + (art_pattern_signal * 0.05)
                 + (aihub_bridge_signal * 0.05)
                 + (watch_signal * 0.10)
-                + (aihub_brain_learning_signal * 0.08),
+                + (aihub_brain_learning_signal * 0.08)
+                + (evidence_sql_signal * 0.06),
             ),
         )
         if persist:

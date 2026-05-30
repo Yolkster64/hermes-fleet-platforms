@@ -152,6 +152,23 @@ def ensure_training_sql(volume_root: str) -> str:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS training_evidence (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cycle INTEGER NOT NULL,
+                occasion TEXT NOT NULL,
+                strategy TEXT NOT NULL,
+                agent_size TEXT NOT NULL,
+                ratio_key TEXT NOT NULL,
+                reward REAL NOT NULL,
+                truth_score REAL NOT NULL,
+                shape_score REAL NOT NULL,
+                evidence_score REAL NOT NULL,
+                created_unix REAL NOT NULL
+            )
+            """
+        )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_training_cycles_cycle ON training_cycles(cycle)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_training_cycles_created ON training_cycles(created_unix)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_vars_cycle ON hermes_agent_variables(cycle)")
@@ -159,6 +176,8 @@ def ensure_training_sql(volume_root: str) -> str:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_vars_hermes ON hermes_agent_variables(hermes_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_agent_profiles_updated ON hermes_agent_profiles(updated_unix)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_github_context_created ON github_context(created_unix)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_training_evidence_cycle ON training_evidence(cycle)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_training_evidence_created ON training_evidence(created_unix)")
         conn.commit()
     _SCHEMA_READY.add(db)
     return db
@@ -170,9 +189,10 @@ def prune_training_sql(
     max_agent_rows: int = 24000,
     max_github_rows: int = 4000,
     max_profile_rows: int = 3000,
+    max_evidence_rows: int = 12000,
 ) -> Dict[str, int]:
     db = ensure_training_sql(volume_root)
-    pruned = {"training_cycles": 0, "hermes_agent_variables": 0, "github_context": 0, "hermes_agent_profiles": 0}
+    pruned = {"training_cycles": 0, "hermes_agent_variables": 0, "github_context": 0, "hermes_agent_profiles": 0, "training_evidence": 0}
     with _connect(db) as conn:
         conn.execute(
             """
@@ -237,6 +257,28 @@ def prune_training_sql(
         pruned["hermes_agent_profiles"] = (
             int(conn.total_changes) - pruned["training_cycles"] - pruned["hermes_agent_variables"] - pruned["github_context"]
         )
+        conn.execute(
+            """
+            DELETE FROM training_evidence
+            WHERE id < COALESCE(
+                (
+                    SELECT id
+                    FROM training_evidence
+                    ORDER BY id DESC
+                    LIMIT 1 OFFSET ?
+                ),
+                -1
+            )
+            """,
+            (max(0, int(max_evidence_rows) - 1),),
+        )
+        pruned["training_evidence"] = (
+            int(conn.total_changes)
+            - pruned["training_cycles"]
+            - pruned["hermes_agent_variables"]
+            - pruned["github_context"]
+            - pruned["hermes_agent_profiles"]
+        )
         conn.commit()
     return pruned
 
@@ -267,6 +309,42 @@ def record_training_cycle(
                 float(truth_score),
                 float(shape_score),
                 json.dumps(training_variables),
+                time.time(),
+            ),
+        )
+        conn.commit()
+
+
+def record_training_evidence(
+    volume_root: str,
+    cycle: int,
+    occasion: str,
+    strategy: str,
+    agent_size: str,
+    ratio_key: str,
+    reward: float,
+    truth_score: float,
+    shape_score: float,
+    evidence_score: float,
+) -> None:
+    db = ensure_training_sql(volume_root)
+    with _connect(db) as conn:
+        conn.execute(
+            """
+            INSERT INTO training_evidence (
+                cycle, occasion, strategy, agent_size, ratio_key, reward, truth_score, shape_score, evidence_score, created_unix
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                int(cycle),
+                str(occasion),
+                str(strategy),
+                str(agent_size),
+                str(ratio_key),
+                float(reward),
+                float(truth_score),
+                float(shape_score),
+                float(evidence_score),
                 time.time(),
             ),
         )
@@ -499,10 +577,20 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
             LIMIT 30
             """
         ).fetchall()
+        evidence_rows = conn.execute(
+            """
+            SELECT evidence_score, reward, truth_score, shape_score, strategy
+            FROM training_evidence
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (max(12, min(lookback, 300)),),
+        ).fetchall()
         total_cycles = conn.execute("SELECT COUNT(1) FROM training_cycles").fetchone()
         total_agents = conn.execute("SELECT COUNT(1) FROM hermes_agent_variables").fetchone()
         total_profiles = conn.execute("SELECT COUNT(1) FROM hermes_agent_profiles").fetchone()
         total_github = conn.execute("SELECT COUNT(1) FROM github_context").fetchone()
+        total_evidence = conn.execute("SELECT COUNT(1) FROM training_evidence").fetchone()
 
     if not rows:
         return {"rows": 0, "pattern_score": 0.0, "trend": 0.0, "variable_means": {}, "latest_github": {}}
@@ -552,6 +640,24 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
         recent_hermes_profiles = [_build_saved_hermes_profile(row) for row in saved_profiles]
     else:
         recent_hermes_profiles = [_build_recent_hermes_profile(row) for row in latest_agents]
+    evidence_payload: Dict[str, object]
+    if evidence_rows:
+        ev_count = len(evidence_rows)
+        strategy_counts: Dict[str, int] = {}
+        for row in evidence_rows:
+            key = str(row[4] or "unknown")
+            strategy_counts[key] = strategy_counts.get(key, 0) + 1
+        top_strategy = max(strategy_counts.items(), key=lambda item: item[1])[0] if strategy_counts else "unknown"
+        evidence_payload = {
+            "rows": ev_count,
+            "score": float(sum(float(r[0]) for r in evidence_rows) / ev_count),
+            "reward": float(sum(float(r[1]) for r in evidence_rows) / ev_count),
+            "truth": float(sum(float(r[2]) for r in evidence_rows) / ev_count),
+            "shape": float(sum(float(r[3]) for r in evidence_rows) / ev_count),
+            "top_strategy": top_strategy,
+        }
+    else:
+        evidence_payload = {"rows": 0, "score": 0.0, "reward": 0.0, "truth": 0.0, "shape": 0.0, "top_strategy": "unknown"}
     benefits, ideas = _benefits_and_ideas(art_pattern, trend)
     db_bytes = os.path.getsize(db) if os.path.exists(db) else 0
     volume_health = _training_volume_health(volume_root, db)
@@ -571,12 +677,14 @@ def compute_sql_pattern_intel(volume_root: str, lookback: int = 240) -> Dict[str
         "art_pattern": art_pattern,
         "latest_github": github_payload,
         "recent_hermes_profiles": recent_hermes_profiles,
+        "evidence": evidence_payload,
         "sql_health": {
             "db_mb": float(db_bytes) / (1024.0 * 1024.0),
             "total_cycles": int(total_cycles[0]) if total_cycles else len(rows),
             "total_agent_rows": int(total_agents[0]) if total_agents else 0,
             "total_profile_rows": int(total_profiles[0]) if total_profiles else 0,
             "total_github_rows": int(total_github[0]) if total_github else 0,
+            "total_evidence_rows": int(total_evidence[0]) if total_evidence else 0,
             "training_files": float(volume_health.get("training_files", 0.0)),
             "training_dir_mb": float(volume_health.get("training_dir_mb", 0.0)),
             "wal_mb": float(volume_health.get("wal_mb", 0.0)),

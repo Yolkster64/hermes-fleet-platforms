@@ -14,6 +14,7 @@ from training_sql_intel import (
     ingest_github_context,
     optimize_training_sql,
     prune_training_sql,
+    record_training_evidence,
     record_hermes_agent_variables,
     record_training_cycle,
 )
@@ -81,6 +82,7 @@ SQL_MAX_CYCLE_ROWS = int(os.getenv("HERMES_SQL_MAX_CYCLE_ROWS", "6000"))
 SQL_MAX_AGENT_ROWS = int(os.getenv("HERMES_SQL_MAX_AGENT_ROWS", "24000"))
 SQL_MAX_GITHUB_ROWS = int(os.getenv("HERMES_SQL_MAX_GITHUB_ROWS", "4000"))
 SQL_MAX_PROFILE_ROWS = int(os.getenv("HERMES_SQL_MAX_PROFILE_ROWS", "3000"))
+SQL_MAX_EVIDENCE_ROWS = int(os.getenv("HERMES_SQL_MAX_EVIDENCE_ROWS", "12000"))
 SQL_INTEL_LOOKBACK = int(os.getenv("HERMES_SQL_INTEL_LOOKBACK", "240"))
 SQL_PRUNE_EVERY = int(os.getenv("HERMES_SQL_PRUNE_EVERY", "10"))
 SQL_OPTIMIZE_EVERY = int(os.getenv("HERMES_SQL_OPTIMIZE_EVERY", "30"))
@@ -1083,6 +1085,7 @@ def run_cycle() -> None:
                     max_agent_rows=SQL_MAX_AGENT_ROWS,
                     max_github_rows=SQL_MAX_GITHUB_ROWS,
                     max_profile_rows=SQL_MAX_PROFILE_ROWS,
+                    max_evidence_rows=SQL_MAX_EVIDENCE_ROWS,
                 )
                 _emit_signal(
                     "auto_trainer.sql_maintenance",
@@ -1181,11 +1184,42 @@ def run_cycle() -> None:
                 },
                 timeout=30,
             )
+            evidence_sql = sql_intel.get("evidence", {}) if isinstance(sql_intel, dict) else {}
+            if isinstance(evidence_sql, dict):
+                _emit_signal(
+                    "auto_trainer.evidence_sql",
+                    float(evidence_sql.get("score", 0.0)),
+                    {
+                        "cycle": _cycle,
+                        "specialty": dynamic_specialty,
+                        "evidence": evidence_sql,
+                        "sql_health": sql_health,
+                    },
+                    timeout=20,
+                )
         except Exception as sql_exc:
             print(f"[auto-trainer] sql intel failed: {sql_exc}")
     weighted_reward = max(0.0, min(1.0, (learned_reward * 0.75) + (brain_value["value"] * 0.25)))
     _update_strategy_memory(occasion, selected_strategy, weighted_reward, learned_truth, learned_shape)
     _record_evidence(occasion, selected_strategy, agent_size, factors, learned_reward, learned_truth, learned_shape)
+    evidence_ratio_key = f"{factors['ratio_sql']:.2f}/{factors['ratio_internet']:.2f}/{factors['ratio_llm']:.2f}/{factors['ratio_stability']:.2f}"
+    evidence_score = _clamp01((learned_reward * 0.45) + (learned_truth * 0.35) + (learned_shape * 0.20))
+    if _volume_root:
+        try:
+            record_training_evidence(
+                volume_root=_volume_root,
+                cycle=_cycle,
+                occasion=occasion,
+                strategy=selected_strategy,
+                agent_size=agent_size,
+                ratio_key=evidence_ratio_key,
+                reward=learned_reward,
+                truth_score=learned_truth,
+                shape_score=learned_shape,
+                evidence_score=evidence_score,
+            )
+        except Exception as ev_exc:
+            print(f"[auto-trainer] evidence sql failed: {ev_exc}")
     _emit_strategy_feedback(
         cycle=_cycle,
         focus=focus,
