@@ -740,7 +740,12 @@ if st.button("Run Ultimate Learning + SQL Pulse", use_container_width=True):
 st.divider()
 st.subheader("Ultimate Everything (Backend Only)")
 st.caption("Runs all earlier capabilities (or better): ultimate AIHub/LLMs + ultimate brain/learning/sql + ultimate deployment, while keeping GUI simple.")
-if st.button("Run Ultimate Everything Now", use_container_width=True):
+u1, u2 = st.columns(2)
+with u1:
+    run_ultimate_all = st.button("Run Ultimate Everything Now", use_container_width=True)
+with u2:
+    run_ultimate_alias = st.button("Run Ultimate Upgrade (All Similar Features)", use_container_width=True)
+if run_ultimate_all or run_ultimate_alias:
     if not st.session_state["login_ok"]:
         st.error("Log in first, then run Ultimate Everything.")
     else:
