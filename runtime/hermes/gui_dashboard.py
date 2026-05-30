@@ -231,6 +231,54 @@ ALGORITHMIC_HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
         "techniques": ["Sub-agent niche shaping", "GNAA adaptive memory", "KNAA/QNAA reasoning"],
         "specialty_tag": "legacy-specialist",
     },
+    "legacy-linear-regression": {
+        "title": "Linear Regression",
+        "group": "Legacy Strategy",
+        "personality": "Signal trend fitter tuned for steady directional optimization.",
+        "description": "Uses regression-like trend pressure for smooth iterative improvements.",
+        "swarm_strategy": "normal",
+        "micro_agents": 172,
+        "gaussian_pressure": 0.76,
+        "high_level_learning": 0.70,
+        "techniques": ["Gaussian 3D evidence", "Natural pressure adaptation", "Quantized compression"],
+        "specialty_tag": "legacy-linear-regression",
+    },
+    "legacy-bayesian-optimizer": {
+        "title": "Bayesian Optimizer",
+        "group": "Legacy Strategy",
+        "personality": "Confidence-weighted explorer that balances exploration and exploitation.",
+        "description": "Chooses upgrades via probabilistic confidence to improve sample efficiency.",
+        "swarm_strategy": "hybrid",
+        "micro_agents": 208,
+        "gaussian_pressure": 0.88,
+        "high_level_learning": 0.82,
+        "techniques": ["Gaussian 3D evidence", "Multipolar ensemble", "GNAA adaptive memory"],
+        "specialty_tag": "legacy-bayesian",
+    },
+    "legacy-gradient-boost": {
+        "title": "Gradient Boost",
+        "group": "Legacy Strategy",
+        "personality": "Incremental improver stacking many small gains into stronger performance.",
+        "description": "Strong for repeated optimization cycles where each pass refines weak spots.",
+        "swarm_strategy": "specialist-mix",
+        "micro_agents": 216,
+        "gaussian_pressure": 0.86,
+        "high_level_learning": 0.81,
+        "techniques": ["Sub-agent niche shaping", "KNAA/QNAA reasoning", "Cross-agent communication mesh"],
+        "specialty_tag": "legacy-gradient-boost",
+    },
+    "legacy-reinforcement-policy": {
+        "title": "Reinforcement Policy",
+        "group": "Legacy Strategy",
+        "personality": "Reward-driven learner focused on action quality under changing conditions.",
+        "description": "Great for adaptive policy tuning and long-running optimization campaigns.",
+        "swarm_strategy": "swarm",
+        "micro_agents": 228,
+        "gaussian_pressure": 0.89,
+        "high_level_learning": 0.84,
+        "techniques": ["Chaos engine trials", "GNAA adaptive memory", "Multi-parallel swarm"],
+        "specialty_tag": "legacy-reinforcement",
+    },
 }
 MODEL_OPTIONS = [
     "hermes-fleet-latest",
@@ -304,9 +352,18 @@ def _use_algorithmic_presets() -> bool:
     return bool(st.session_state.get("ctl_enable_algorithmic_types", False))
 
 
+def _enabled_legacy_types() -> List[str]:
+    raw = st.session_state.get("ctl_enabled_legacy_types", list(ALGORITHMIC_HERMES_TYPE_PRESETS.keys()))
+    if not isinstance(raw, list):
+        return list(ALGORITHMIC_HERMES_TYPE_PRESETS.keys())
+    keys = [str(item) for item in raw if str(item) in ALGORITHMIC_HERMES_TYPE_PRESETS]
+    return keys or list(ALGORITHMIC_HERMES_TYPE_PRESETS.keys())
+
+
 def _active_hermes_presets() -> Dict[str, Dict[str, Any]]:
     if _use_algorithmic_presets():
-        return {**HERMES_TYPE_PRESETS, **ALGORITHMIC_HERMES_TYPE_PRESETS}
+        enabled = {k: ALGORITHMIC_HERMES_TYPE_PRESETS[k] for k in _enabled_legacy_types()}
+        return {**HERMES_TYPE_PRESETS, **enabled}
     return dict(HERMES_TYPE_PRESETS)
 
 
@@ -374,6 +431,7 @@ def _initialize_session_state() -> None:
         "ctl_high_level_learning": 0.72,
         "ctl_hermes_type": "hybrid-core",
         "ctl_enable_algorithmic_types": False,
+        "ctl_enabled_legacy_types": list(ALGORITHMIC_HERMES_TYPE_PRESETS.keys()),
         "ctl_model_override": "hermes-fleet-latest",
     }
     for key, value in defaults.items():
@@ -605,6 +663,23 @@ with st.sidebar:
     focused_layout = st.checkbox("Focused layout (clean view)", value=True)
     show_legacy_map_ui = st.checkbox("Show AIHub Hub + Map panels", value=True)
     st.checkbox("Enable legacy strategy Hermes types", value=False, key="ctl_enable_algorithmic_types")
+    if st.session_state.get("ctl_enable_algorithmic_types", False):
+        legacy_options = list(ALGORITHMIC_HERMES_TYPE_PRESETS.keys())
+        st.multiselect(
+            "Legacy strategy toggles",
+            options=legacy_options,
+            default=_enabled_legacy_types(),
+            format_func=lambda key: str(ALGORITHMIC_HERMES_TYPE_PRESETS.get(key, {}).get("title", key)),
+            key="ctl_enabled_legacy_types",
+        )
+        with st.expander("Legacy strategy bars", expanded=False):
+            for legacy_key in _enabled_legacy_types():
+                legacy_preset = ALGORITHMIC_HERMES_TYPE_PRESETS.get(legacy_key, {})
+                title = str(legacy_preset.get("title", legacy_key))
+                st.caption(title)
+                st.progress(min(1.0, float(legacy_preset.get("micro_agents", 0)) / 256.0), text=f"{title} • Agent Scale")
+                st.progress(min(1.0, float(legacy_preset.get("gaussian_pressure", 0.0))), text=f"{title} • Gaussian Pressure")
+                st.progress(min(1.0, float(legacy_preset.get("high_level_learning", 0.0))), text=f"{title} • Learning Focus")
     st.markdown("### Hermes Type + Model")
     active_type_presets = _active_hermes_presets()
     hermes_type_labels = {k: str(v.get("title", k)) for k, v in active_type_presets.items()}
