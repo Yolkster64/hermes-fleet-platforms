@@ -638,6 +638,47 @@ def render_variable_guide() -> None:
     )
 
 
+def render_icon_detail_guide() -> None:
+    st.markdown("#### Xenoblade Signal Icon Guide")
+    st.dataframe(
+        [
+            {
+                "Icon": "⚔️",
+                "What it means": "Combat/Action Mode",
+                "Specifics": "Triggers aggressive training and deployment actions, tuned for fast output and high throughput pushes.",
+            },
+            {
+                "Icon": "🧠",
+                "What it means": "Mind/Reasoning Layer",
+                "Specifics": "Represents top-level decision routing (Balanced/C++/Security/Learning mind) and strategy weighting.",
+            },
+            {
+                "Icon": "🛡️",
+                "What it means": "Security Guard",
+                "Specifics": "Hardens web/runtime behavior (headers, CSRF, cookie policy, rate guard, lockdown profiles).",
+            },
+            {
+                "Icon": "⚙️",
+                "What it means": "System Optimization",
+                "Specifics": "Applies low-data, low-friction runtime settings (reduced refresh churn, focused layout, stable controls).",
+            },
+            {
+                "Icon": "📊",
+                "What it means": "SQL/Data Core",
+                "Specifics": "Tracks DB/WAL pressure, evidence confidence, and center shape telemetry for readiness and diagnostics.",
+            },
+            {
+                "Icon": "⏱️",
+                "What it means": "Monado Clock",
+                "Specifics": "Shows live runtime pulse timing and visual heartbeat for current training/watch cadence.",
+            },
+        ],
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.caption("Every icon now has explicit behavior detail so you can read the screen quickly and still get full context.")
+
+
 def _algorithm_bar_pack(preset: Dict[str, Any], optimized: Dict[str, Any], mode_name: str) -> List[Tuple[str, float, str]]:
     techniques = [str(t) for t in preset.get("techniques", [])] if isinstance(preset, dict) else []
     mode_cfg = OPERATION_MODES.get(mode_name, {})
@@ -1089,6 +1130,7 @@ st.caption(
     f"gateway={int(float(bond_signals.get('gateway_link', 0.0)))} | volume={int(float(bond_signals.get('volume_link', 0.0)))} | "
     f"auto_setup={int(float(bond_signals.get('auto_setup', 0.0)))} | sql_load(db/wal)={float(bond.get('db_mb', 0.0)):.1f}/{float(bond.get('wal_mb', 0.0)):.1f}MB"
 )
+render_icon_detail_guide()
 st.subheader("Hermes Type Deck (7 Active Types)")
 deck_presets = _all_hermes_presets()
 deck_keys = [key for key in CENTER_ACTIVE_TYPE_KEYS if key in deck_presets]
