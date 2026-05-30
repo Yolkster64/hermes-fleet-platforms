@@ -277,6 +277,24 @@ agent_type = st.selectbox(
 )
 saved_agent_names = [str(a.get("name", "")).strip() for a in st.session_state["agents"] if str(a.get("name", "")).strip()]
 deploy_target = st.selectbox("Select Saved Agent", options=["(new agent)"] + saved_agent_names, index=0)
+deploy_mode = st.selectbox(
+    "Deploy Mode (manual only)",
+    options=["single-agent-manual", "deploy-10-chosen-agents"],
+    index=0,
+)
+deploy_chosen_agents = st.multiselect(
+    "Deploy 10 Chosen Agents",
+    options=saved_agent_names,
+    default=saved_agent_names[:10],
+    max_selections=10,
+)
+agent_variance_model = st.selectbox(
+    "Per-Agent Variance Model",
+    options=["linear-regression", "tree-ensemble", "bayesian", "neural-lite"],
+    index=0,
+)
+agent_variance_strength = st.slider("Per-Agent Variance Strength", 0, 100, 70)
+smart_upgrade_bars = st.slider("Agent Smart Upgrades Bars (1-30)", 1, 30, 30)
 
 st.subheader("Ultimate X Controls (X5 / X6)")
 feature_options = [f"core-pack-{i:02d}" for i in range(1, 31)]
@@ -579,7 +597,9 @@ with a2:
             spec_suffix = "+".join(active_specializations[:3]) if isinstance(active_specializations, list) and active_specializations else "general"
             parallel_suffix = f"pmi{active_micro_parallel}-pma{active_macro_parallel}-sw{active_swarm}"
             opt_suffix = f"opt-{active_llm_opt_profile}-c{active_llm_cost}-p{active_llm_power}-f{active_llm_perf}"
-            specialty = f"{agent_type}-{active_brain}-{active_aihub}-{active_learning_mode}-{share_suffix}-{mesh_suffix}-{micro_suffix}-{spec_suffix}-{parallel_suffix}-{opt_suffix}"
+            variance_suffix = f"var-{agent_variance_model}-v{agent_variance_strength}"
+            bars_suffix = f"bars-{smart_upgrade_bars}"
+            specialty = f"{agent_type}-{active_brain}-{active_aihub}-{active_learning_mode}-{share_suffix}-{mesh_suffix}-{micro_suffix}-{spec_suffix}-{parallel_suffix}-{opt_suffix}-{variance_suffix}-{bars_suffix}"
             specialty = f"{specialty}-{ai_mind_mode}"
             if active_dynamic:
                 specialty = f"{specialty}-dynamic"
@@ -588,7 +608,7 @@ with a2:
             steps = max(60, int(active_training))
             if active_dynamic:
                 steps = min(560, steps + 60)
-            candidates = max(40, min(240, max(pack_count * 8, active_micro_count * 4, active_swarm)))
+            candidates = max(40, min(240, max(pack_count * 8, active_micro_count * 4, active_swarm, smart_upgrade_bars * 6)))
             sql_signal = max(0.4, min(1.0, active_cpu / 100.0))
             internet_signal = max(0.3, min(1.0, active_ram / 100.0))
             llm_signal = _llm_optimization_factor(
@@ -600,21 +620,50 @@ with a2:
                 force_ultimate=(earlier_ultimate_bundle or universal_apply_all),
             )
             stability_bias = max(0.4, min(1.0, ((active_xp + active_saber) / 2) / 100.0))
-            ok, err = _deploy_agent(
-                st.session_state["api_key"],
-                specialty=specialty,
-                steps=steps,
-                candidates=candidates,
-                sql_signal=sql_signal,
-                internet_signal=internet_signal,
-                llm_signal=llm_signal,
-                stability_bias=stability_bias,
-            )
-            if ok:
-                source = selected_backbone if selected_backbone != "(none)" else "live sliders"
-                st.success(f"Deploy triggered for {target_name} ({specialty}) using {source}.")
+            source = selected_backbone if selected_backbone != "(none)" else "live sliders"
+            if deploy_mode == "deploy-10-chosen-agents":
+                targets = deploy_chosen_agents[:10] if deploy_chosen_agents else ([target_name] if target_name else [])
+                success_count = 0
+                errors: list[str] = []
+                for chosen_name in targets:
+                    ok, err = _deploy_agent(
+                        st.session_state["api_key"],
+                        specialty=f"{specialty}-agent-{chosen_name}",
+                        steps=steps,
+                        candidates=candidates,
+                        sql_signal=sql_signal,
+                        internet_signal=internet_signal,
+                        llm_signal=llm_signal,
+                        stability_bias=stability_bias,
+                    )
+                    if ok:
+                        success_count += 1
+                    else:
+                        errors.append(f"{chosen_name}: {err}")
+                if success_count == len(targets) and targets:
+                    st.success(f"Deploy triggered for {success_count} chosen agents using {source}.")
+                elif success_count > 0:
+                    st.warning(f"Deploy partially succeeded ({success_count}/{len(targets)}).")
+                    st.error("; ".join(errors[:3]))
+                else:
+                    st.error("Deploy failed for chosen agents.")
+                    if errors:
+                        st.error("; ".join(errors[:3]))
             else:
-                st.error(f"Deploy failed: {err}")
+                ok, err = _deploy_agent(
+                    st.session_state["api_key"],
+                    specialty=specialty,
+                    steps=steps,
+                    candidates=candidates,
+                    sql_signal=sql_signal,
+                    internet_signal=internet_signal,
+                    llm_signal=llm_signal,
+                    stability_bias=stability_bias,
+                )
+                if ok:
+                    st.success(f"Deploy triggered for {target_name} ({specialty}) using {source}.")
+                else:
+                    st.error(f"Deploy failed: {err}")
 
 px1, px2 = st.columns(2)
 with px1:
@@ -860,7 +909,7 @@ if st.session_state["login_ok"]:
 
 st.divider()
 st.subheader("Ultimate Everything (Backend Only)")
-st.caption("Runs all earlier capabilities (or better): ultimate AIHub/LLMs + ultimate brain/learning/sql + ultimate deployment, automatically.")
+st.caption("Runs all earlier capabilities (or better) automatically for AIHub/LLMs + brain/learning/sql. Deployment is manual by agent choice.")
 auto_ultimate_upgrade = st.toggle("Automatic Ultimate Upgrade", value=True)
 if "last_auto_ultimate_ts" not in st.session_state:
     st.session_state["last_auto_ultimate_ts"] = 0.0
@@ -907,33 +956,14 @@ if auto_ultimate_upgrade:
                 ),
                 stability_bias=0.95,
             )
-            deploy_ok, deploy_err = _deploy_agent(
-                st.session_state["api_key"],
-                specialty=f"{backend_specialty}-deploy",
-                steps=560,
-                candidates=240,
-                sql_signal=0.98,
-                internet_signal=0.92,
-                llm_signal=_llm_optimization_factor(
-                    mesh_size=len(llm_mesh),
-                    cost_bias=llm_cost_bias,
-                    power_bias=llm_power_bias,
-                    perf_bias=llm_perf_bias,
-                    profile=llm_optimization_profile,
-                    force_ultimate=True,
-                ),
-                stability_bias=0.96,
-            )
             st.session_state["last_auto_ultimate_ts"] = now_ts
-            if aihub_ok and learning_ok and deploy_ok:
-                st.success("Automatic ultimate upgrade completed.")
+            if aihub_ok and learning_ok:
+                st.success("Automatic ultimate upgrade completed (deploy remains manual).")
             else:
                 if not aihub_ok:
                     st.error(f"Ultimate AIHub failed: {aihub_err}")
                 if not learning_ok:
                     st.error(f"Ultimate learning/sql failed: {learning_err}")
-                if not deploy_ok:
-                    st.error(f"Ultimate deployment failed: {deploy_err}")
         else:
             wait_for = int(90 - (now_ts - float(st.session_state["last_auto_ultimate_ts"])))
             st.caption(f"Automatic ultimate upgrade cooldown: {max(wait_for, 0)}s")
