@@ -352,19 +352,46 @@ def _use_algorithmic_presets() -> bool:
     return bool(st.session_state.get("ctl_enable_algorithmic_types", False))
 
 
-def _enabled_legacy_types() -> List[str]:
-    raw = st.session_state.get("ctl_enabled_legacy_types", list(ALGORITHMIC_HERMES_TYPE_PRESETS.keys()))
-    if not isinstance(raw, list):
-        return list(ALGORITHMIC_HERMES_TYPE_PRESETS.keys())
-    keys = [str(item) for item in raw if str(item) in ALGORITHMIC_HERMES_TYPE_PRESETS]
-    return keys or list(ALGORITHMIC_HERMES_TYPE_PRESETS.keys())
-
-
 def _active_hermes_presets() -> Dict[str, Dict[str, Any]]:
     if _use_algorithmic_presets():
-        enabled = {k: ALGORITHMIC_HERMES_TYPE_PRESETS[k] for k in _enabled_legacy_types()}
-        return {**HERMES_TYPE_PRESETS, **enabled}
+        return {**HERMES_TYPE_PRESETS, **ALGORITHMIC_HERMES_TYPE_PRESETS}
     return dict(HERMES_TYPE_PRESETS)
+
+
+def _species_profile(species: str) -> Dict[str, Any]:
+    lookup = {
+        "Hybrid": {
+            "agent_mult": 1.00,
+            "gaussian_bias": 0.00,
+            "learning_bias": 0.02,
+            "ops": "Balanced operations mode: stable routing, medium risk, high consistency.",
+        },
+        "Normal": {
+            "agent_mult": 0.92,
+            "gaussian_bias": -0.04,
+            "learning_bias": -0.02,
+            "ops": "Stability mode: lower variance, cleaner repeatability, controlled exploration.",
+        },
+        "Mesh": {
+            "agent_mult": 1.10,
+            "gaussian_bias": 0.03,
+            "learning_bias": 0.05,
+            "ops": "Collaboration mode: stronger cross-agent linkage and deeper coordination.",
+        },
+    }
+    return lookup.get(species, lookup["Hybrid"])
+
+
+def _optimized_settings(preset: Dict[str, Any], species: str) -> Dict[str, Any]:
+    base_agents = int(preset.get("micro_agents", 160))
+    base_gaussian = float(preset.get("gaussian_pressure", 0.80))
+    base_learning = float(preset.get("high_level_learning", 0.70))
+    species_cfg = _species_profile(species)
+    agents = int(max(32, min(256, round(base_agents * float(species_cfg.get("agent_mult", 1.0))))))
+    gaussian = max(0.40, min(1.00, base_gaussian + float(species_cfg.get("gaussian_bias", 0.0))))
+    learning = max(0.0, min(1.0, base_learning + float(species_cfg.get("learning_bias", 0.0))))
+    operation = str(species_cfg.get("ops", "Balanced operations mode."))
+    return {"micro_agents": agents, "gaussian_pressure": gaussian, "high_level_learning": learning, "operations": operation}
 
 
 def _selected_hermes_type_key() -> str:
@@ -430,8 +457,8 @@ def _initialize_session_state() -> None:
         "ctl_permanent_intelligence": True,
         "ctl_high_level_learning": 0.72,
         "ctl_hermes_type": "hybrid-core",
+        "ctl_hermes_species": "Hybrid",
         "ctl_enable_algorithmic_types": False,
-        "ctl_enabled_legacy_types": list(ALGORITHMIC_HERMES_TYPE_PRESETS.keys()),
         "ctl_model_override": "hermes-fleet-latest",
     }
     for key, value in defaults.items():
@@ -663,23 +690,7 @@ with st.sidebar:
     focused_layout = st.checkbox("Focused layout (clean view)", value=True)
     show_legacy_map_ui = st.checkbox("Show AIHub Hub + Map panels", value=True)
     st.checkbox("Enable legacy strategy Hermes types", value=False, key="ctl_enable_algorithmic_types")
-    if st.session_state.get("ctl_enable_algorithmic_types", False):
-        legacy_options = list(ALGORITHMIC_HERMES_TYPE_PRESETS.keys())
-        st.multiselect(
-            "Legacy strategy toggles",
-            options=legacy_options,
-            default=_enabled_legacy_types(),
-            format_func=lambda key: str(ALGORITHMIC_HERMES_TYPE_PRESETS.get(key, {}).get("title", key)),
-            key="ctl_enabled_legacy_types",
-        )
-        with st.expander("Legacy strategy bars", expanded=False):
-            for legacy_key in _enabled_legacy_types():
-                legacy_preset = ALGORITHMIC_HERMES_TYPE_PRESETS.get(legacy_key, {})
-                title = str(legacy_preset.get("title", legacy_key))
-                st.caption(title)
-                st.progress(min(1.0, float(legacy_preset.get("micro_agents", 0)) / 256.0), text=f"{title} • Agent Scale")
-                st.progress(min(1.0, float(legacy_preset.get("gaussian_pressure", 0.0))), text=f"{title} • Gaussian Pressure")
-                st.progress(min(1.0, float(legacy_preset.get("high_level_learning", 0.0))), text=f"{title} • Learning Focus")
+    st.selectbox("Hermes species", options=["Hybrid", "Normal", "Mesh"], key="ctl_hermes_species")
     st.markdown("### Hermes Type + Model")
     active_type_presets = _active_hermes_presets()
     hermes_type_labels = {k: str(v.get("title", k)) for k, v in active_type_presets.items()}
@@ -694,11 +705,16 @@ with st.sidebar:
         key="ctl_hermes_type",
     )
     selected_preset = active_type_presets.get(selected_hermes_type, {})
+    optimized = _optimized_settings(selected_preset, str(st.session_state.get("ctl_hermes_species", "Hybrid")))
     st.caption(
         f"{selected_preset.get('group', 'Custom')} • "
         f"{selected_preset.get('personality', 'Adaptive Hermes profile.')}"
     )
     st.caption(str(selected_preset.get("description", "")))
+    st.progress(min(1.0, float(optimized.get("micro_agents", 0)) / 256.0), text="Auto Agent Scale")
+    st.progress(min(1.0, float(optimized.get("gaussian_pressure", 0.0))), text="Auto Gaussian Pressure")
+    st.progress(min(1.0, float(optimized.get("high_level_learning", 0.0))), text="Auto Learning Focus")
+    st.caption(f"Operating style: {optimized.get('operations', 'Balanced operations mode.')}")
     selected_model = st.selectbox(
         "Preferred model",
         options=MODEL_OPTIONS,
@@ -709,10 +725,11 @@ with st.sidebar:
     with s1:
         if st.button("Apply Type Preset", use_container_width=True):
             preset = active_type_presets.get(selected_hermes_type, {})
+            auto = _optimized_settings(preset, str(st.session_state.get("ctl_hermes_species", "Hybrid")))
             st.session_state["ctl_swarm_strategy"] = str(preset.get("swarm_strategy", st.session_state.get("ctl_swarm_strategy", "hybrid")))
-            st.session_state["ctl_micro_agents"] = int(preset.get("micro_agents", st.session_state.get("ctl_micro_agents", 160)))
-            st.session_state["ctl_gaussian_pressure"] = float(preset.get("gaussian_pressure", st.session_state.get("ctl_gaussian_pressure", 0.8)))
-            st.session_state["ctl_high_level_learning"] = float(preset.get("high_level_learning", st.session_state.get("ctl_high_level_learning", 0.72)))
+            st.session_state["ctl_micro_agents"] = int(auto.get("micro_agents", st.session_state.get("ctl_micro_agents", 160)))
+            st.session_state["ctl_gaussian_pressure"] = float(auto.get("gaussian_pressure", st.session_state.get("ctl_gaussian_pressure", 0.8)))
+            st.session_state["ctl_high_level_learning"] = float(auto.get("high_level_learning", st.session_state.get("ctl_high_level_learning", 0.72)))
             preset_techniques = preset.get("techniques", [])
             if isinstance(preset_techniques, list) and preset_techniques:
                 st.session_state["ctl_techniques"] = [str(t) for t in preset_techniques[:6]]
@@ -729,7 +746,10 @@ with st.sidebar:
                 },
                 timeout=45,
             )
-            st.success(f"Applied {hermes_type_labels.get(selected_hermes_type, selected_hermes_type)} preset.")
+            st.success(
+                f"Applied optimized {hermes_type_labels.get(selected_hermes_type, selected_hermes_type)} "
+                f"({st.session_state.get('ctl_hermes_species', 'Hybrid')}) preset."
+            )
     with s2:
         if st.button("Apply Model", use_container_width=True):
             safe_post(
@@ -746,7 +766,10 @@ with st.sidebar:
                 timeout=45,
             )
             st.success(f"Model preference set to {selected_model}.")
-    st.caption(f"Active type: {hermes_type_labels.get(_selected_hermes_type_key(), _selected_hermes_type_key())} | model: {_selected_model_override() or 'auto'}")
+    st.caption(
+        f"Active type: {hermes_type_labels.get(_selected_hermes_type_key(), _selected_hermes_type_key())} | "
+        f"species: {st.session_state.get('ctl_hermes_species', 'Hybrid')} | model: {_selected_model_override() or 'auto'}"
+    )
 
 watch_payload, watch_err = safe_get("/system-watch", timeout=25)
 gateway_watch, gateway_watch_err = safe_get("/gateway-max-status", timeout=20)
@@ -864,6 +887,8 @@ with st.expander("Hermes Type Catalog + Optimization Tips", expanded=False):
     )
     if not _use_algorithmic_presets():
         st.caption("Turn on 'Enable legacy strategy Hermes types' in the sidebar to load Hybrid/Mesh/Parallel + additional legacy strategy modes.")
+    else:
+        st.caption("Legacy strategy modes are auto-calibrated with species-aware bars and applied as optimized settings.")
     st.markdown(
         "- **Optimization tip:** use Quick/Hybrid for deployment speed, Mesh/Creative for collaboration breadth, and Deep modes for harder reasoning.\n"
         "- **Stability tip:** keep gaussian pressure in 0.78-0.90 for consistent SQL growth quality.\n"
