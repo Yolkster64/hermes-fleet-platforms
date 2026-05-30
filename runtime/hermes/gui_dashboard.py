@@ -605,6 +605,7 @@ def inject_majestic_theme() -> None:
 @keyframes monadoSpin {from {transform: rotate(0deg) scale(1.08);} to {transform: rotate(360deg) scale(1.08);}}
 .block-container {position: relative; z-index: 2;}
 .holo-title {font-size: 2.3rem; font-weight: 800; letter-spacing: 0.4px; margin: 0 0 0.2rem 0; background: linear-gradient(90deg, #d8f5ff 0%, #86d8ff 36%, #b695ff 68%, #8affdf 100%); -webkit-background-clip: text; background-clip: text; color: transparent; animation: holoShift 8s linear infinite;}
+.xeno-badge {display:inline-flex; align-items:center; gap:0.42rem; padding:0.18rem 0.62rem; border-radius:999px; border:1px solid rgba(125, 214, 255, 0.45); background:linear-gradient(90deg, rgba(71,110,255,0.28), rgba(109,216,255,0.16)); color:#d8efff; font-size:0.74rem; letter-spacing:0.06rem; margin-bottom:0.45rem;}
 .holo-laser-layer {position: fixed; inset: 0; pointer-events: none; z-index: 1; mix-blend-mode: screen;}
 .holo-laser {position: absolute; left: -20%; width: 140%; height: 2px; opacity: 0.34; background: linear-gradient(90deg, rgba(0,0,0,0), rgba(99,255,240,0.88), rgba(172,121,255,0.78), rgba(0,0,0,0)); filter: blur(0.2px);}
 .holo-laser-a {top: 24%; animation: laserSweepA 8.5s linear infinite;}
@@ -617,7 +618,8 @@ def inject_majestic_theme() -> None:
 .block-container {max-width: 1650px; padding-top: 1.4rem; padding-bottom: 2.2rem;}
 [data-testid="stMetricValue"] {color: #e9f4ff;}
 [data-testid="stSidebar"] {background: linear-gradient(180deg, rgba(12,16,32,0.98), rgba(10,13,26,0.95));}
-div.stButton > button {border-radius: 10px; border: 1px solid rgba(120,205,255,0.30); box-shadow: none;}
+div.stButton > button {border-radius: 12px; border: 1px solid rgba(120,205,255,0.45); background: linear-gradient(135deg, rgba(34,44,88,0.92), rgba(17,24,52,0.96)); box-shadow: 0 0 12px rgba(104,184,255,0.22); color: #eaf6ff; transition: all .18s ease;}
+div.stButton > button:hover {border-color: rgba(166,236,255,0.88); box-shadow: 0 0 18px rgba(104,184,255,0.44);}
 [data-testid="stHorizontalBlock"] {gap: 1rem;}
 .stProgress > div > div {height: 0.72rem; border-radius: 999px;}
 </style>
@@ -846,6 +848,7 @@ st.set_page_config(page_title="Hermes Control Dashboard", page_icon="🧠", layo
 inject_majestic_theme()
 st.markdown('<div class="holo-laser-layer"><div class="holo-laser holo-laser-a"></div><div class="holo-laser holo-laser-b"></div></div>', unsafe_allow_html=True)
 st.markdown('<div class="holo-kanji">斬 盾 学 光 神 機</div>', unsafe_allow_html=True)
+st.markdown('<div class="xeno-badge">XENOBLADE CHRONICLES • MONADO INTERFACE</div>', unsafe_allow_html=True)
 st.markdown('<div class="holo-title">Hermes Fleet Control Dashboard</div>', unsafe_allow_html=True)
 st.caption("Clear control view: runtime status, SQL intelligence, and one-click fleet actions.")
 

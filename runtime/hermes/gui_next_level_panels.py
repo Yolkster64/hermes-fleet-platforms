@@ -30,6 +30,8 @@ def _inject_next_level_theme() -> None:
 .holo-scan {height: 4px; border-radius: 999px; background: linear-gradient(90deg, rgba(0,0,0,0), rgba(117,246,255,0.9), rgba(186,120,255,0.8), rgba(0,0,0,0)); opacity: 0.66; animation: scanSweep 6.6s linear infinite;}
 .clock-wrap {display:flex; justify-content:center; align-items:center; height:96px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); background: radial-gradient(circle at 50% 20%, rgba(0,255,220,0.15), rgba(20,20,40,0.65));}
 .clock-glow {animation: pulseGlow 1.8s ease-in-out infinite; font-family: 'Segoe UI', Inter, Arial;}
+.xeno-panel {border:1px solid rgba(116,208,255,0.42); border-radius:16px; padding:14px; background:radial-gradient(circle at 50% 20%, rgba(74,148,255,0.22), rgba(13,19,36,0.84));}
+.xeno-title {font-weight:800; color:#e9f5ff; margin-bottom:6px; letter-spacing:0.02rem;}
 div.stButton > button {border-radius: 12px; border: 1px solid rgba(117, 216, 255, 0.45); background: linear-gradient(135deg, rgba(31,50,86,0.9), rgba(18,26,48,0.95)); color: #eaf7ff; box-shadow: 0 0 10px rgba(112, 198, 255, 0.28);}
 div.stButton > button:hover {border-color: rgba(145, 233, 255, 0.82); box-shadow: 0 0 14px rgba(112, 198, 255, 0.42);}
 @keyframes pulseGlow {0% {transform: scale(1.0); text-shadow: 0 0 8px rgba(120,220,255,0.35);} 50% {transform: scale(1.03); text-shadow: 0 0 16px rgba(120,220,255,0.75);} 100% {transform: scale(1.0); text-shadow: 0 0 8px rgba(120,220,255,0.35);}}
@@ -99,8 +101,8 @@ def _render_center_nexus(
     center_score = _clamp01((growth * 0.30) + (maturity * 0.24) + ((1.0 - _clamp01((db_mb / 1024.0) + (wal_mb / 256.0))) * 0.20) + (collab * 0.26))
     st.markdown(
         f"""
-<div style="border:1px solid rgba(0,230,255,0.35); border-radius:16px; padding:14px; background:radial-gradient(circle at 50% 20%, rgba(74,148,255,0.22), rgba(13,19,36,0.84));">
-  <div style="font-weight:800; color:#e9f5ff; margin-bottom:6px;">AIHub / SQL / Fleet Nexus</div>
+<div class="xeno-panel">
+  <div class="xeno-title">Monado Core • AIHub / SQL / Fleet Nexus</div>
   <div style="display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px;">
     <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px;"><div style="font-size:0.72rem; color:#a7d6ff;">Nexus Score</div><div style="font-size:1.08rem; color:#ecf7ff;">{center_score * 100:.1f}%</div></div>
     <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px;"><div style="font-size:0.72rem; color:#a7d6ff;">Fleet Collaboration</div><div style="font-size:1.08rem; color:#ecf7ff;">{collab * 100:.1f}%</div></div>
@@ -125,9 +127,9 @@ def _render_center_sql_visual(sql_health: Dict[str, Any], evidence: Dict[str, An
     st.markdown("#### Center SQL Visual")
     st.markdown(
         """
-<div style="border:1px solid rgba(0,230,255,0.35); border-radius:16px; padding:14px; background:radial-gradient(circle at 50% 20%, rgba(40,90,170,0.22), rgba(13,19,36,0.84));">
-  <div style="font-weight:800; color:#e9f5ff; margin-bottom:6px;">SQL Core Pulse</div>
-  <div style="font-size:0.80rem; color:#d2e7ff;">Simple center view for SQL deployment + training readiness.</div>
+<div class="xeno-panel">
+  <div class="xeno-title">Monado SQL Core Pulse</div>
+  <div style="font-size:0.80rem; color:#d2e7ff;">Xenoblade-style center view for SQL deployment + training readiness.</div>
 </div>
 """,
         unsafe_allow_html=True,
@@ -152,7 +154,7 @@ def render_next_level_control_center(
     show_center_nexus: bool = False,
 ) -> None:
     _inject_next_level_theme()
-    st.markdown("### Level 5 AIHub + SQL Command Center")
+    st.markdown("### Level 5 Monado AIHub + SQL Command Center")
     st.markdown('<div class="hermes-glow"><span class="recommended-pill">LEVEL 5</span> <span class="cool-title">Enhanced visuals, center SQL design, richer bars/animations, fleet styling, and guided deployment</span></div>', unsafe_allow_html=True)
     st.markdown('<div class="monado-orbit"><span></span><span></span><span></span></div>', unsafe_allow_html=True)
     st.markdown('<div class="holo-scan"></div>', unsafe_allow_html=True)
@@ -162,7 +164,7 @@ def render_next_level_control_center(
     x5_brain_pack = bool(st.session_state.get("ctl_x5_brain_pack", False))
     x6_learning_pack = bool(st.session_state.get("ctl_x6_learning_pack", True))
 
-    tabs = st.tabs(["SQL Center", "AIHub Lab", "Fleet Table", "Evidence Advisor", "Security + Benchmark", "Clock + Style"])
+    tabs = st.tabs(["Monado SQL Center", "AIHub Lab", "Fleet Table", "Evidence Advisor", "Security + Benchmark", "Clock + Monado Style"])
     sql_health = sql_intel.get("sql_health", {}) if isinstance(sql_intel, dict) else {}
     if not isinstance(sql_health, dict):
         sql_health = {}
@@ -180,7 +182,7 @@ def render_next_level_control_center(
         st.progress(_clamp01(float(sql_health.get("db_mb", 0.0)) / 1024.0), text="SQL Design Bar • Storage")
         st.progress(_clamp01(float(sql_health.get("wal_mb", 0.0)) / 256.0), text="SQL Design Bar • Write Flow")
         st.progress(_clamp01(float(evidence.get("score", 0.0))), text="SQL Design Bar • Pattern Confidence")
-        st.markdown("#### Center Data Shape Studio")
+        st.markdown("#### Monado Center Data Shape Studio")
         shape = st.selectbox("Shape style", ["Monado Ring", "Hex Grid", "Pulse Sphere"], key="ctl_center_shape_style")
         shape_intensity = st.slider("Shape intensity", min_value=0.10, max_value=1.00, value=0.68, step=0.01, key="ctl_center_shape_intensity")
         shape_glow = int(10 + (shape_intensity * 26))
@@ -612,8 +614,8 @@ def render_next_level_control_center(
     with tabs[5]:
         now_struct = time.localtime()
         hhmmss = time.strftime("%H:%M:%S", now_struct)
-        st.markdown('<div class="clock-wrap"><h2 class="clock-glow" style="margin:0;">⏱️ ' + hhmmss + "</h2></div>", unsafe_allow_html=True)
-        st.caption("Animated Level 5 clock pulse tracks live training watch mode.")
+        st.markdown('<div class="clock-wrap"><h2 class="clock-glow" style="margin:0;">⏱️ MONADO CLOCK • ' + hhmmss + "</h2></div>", unsafe_allow_html=True)
+        st.caption("Animated Xenoblade-style Monado clock pulse tracks live training watch mode.")
 
     st.markdown("---")
     st.markdown("### AIHub Scroll Zone (standalone)")
