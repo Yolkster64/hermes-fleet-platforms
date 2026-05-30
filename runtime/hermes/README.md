@@ -33,6 +33,14 @@
 6. **Operate the fleet continuously**
    - Keep auto-learning active, monitor thinking/specialization tables, and use deploy/return cycles for controlled orchestration.
 
+### Web security + optimization add-on
+- Use **Security + Benchmark** tab to apply:
+  - **Web Security Profile**: strict headers, CSRF guard, secure cookie mode, rate-limit guard.
+  - **Optimization Profile**: web cache level, parallel rendering, SQL query optimization.
+- One-click actions:
+  - `Apply Web Security Shield`
+  - `Apply Web + Fleet Optimization`
+
 ## X-Everything Smart Guide (best mix by project)
 
 Use these mixes as baseline presets:

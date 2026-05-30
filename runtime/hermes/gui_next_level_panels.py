@@ -433,6 +433,64 @@ def render_next_level_control_center(
         shield += 0.33 if lock_remote_cli else 0.0
         st.progress(_clamp01(shield), text=f"Security shield score: {_clamp01(shield) * 100:.1f}%")
         st.caption("This panel enforces dashboard policy guidance and hardening checks for safe operation.")
+        st.markdown("#### Web Security Profile")
+        w1, w2, w3, w4 = st.columns(4)
+        strict_headers = w1.toggle("Strict security headers", value=True, key="ctl_web_strict_headers")
+        csrf_guard = w2.toggle("CSRF guard policy", value=True, key="ctl_web_csrf_guard")
+        secure_cookie = w3.toggle("Secure cookie mode", value=True, key="ctl_web_secure_cookie")
+        rate_guard = w4.toggle("Rate-limit guard", value=True, key="ctl_web_rate_guard")
+        web_security_score = (
+            (0.26 if strict_headers else 0.0)
+            + (0.24 if csrf_guard else 0.0)
+            + (0.24 if secure_cookie else 0.0)
+            + (0.26 if rate_guard else 0.0)
+        )
+        st.progress(_clamp01(web_security_score), text=f"Web security profile: {_clamp01(web_security_score) * 100:.1f}%")
+        if st.button("Apply Web Security Shield", use_container_width=True):
+            run_logged_post_action(
+                label="web-security-shield",
+                path="/ingest-signal",
+                payload={
+                    "source": "gui_web_security_profile",
+                    "signal_score": _clamp01(0.52 + (web_security_score * 0.48)),
+                    "payload": {
+                        "strict_headers": strict_headers,
+                        "csrf_guard": csrf_guard,
+                        "secure_cookie": secure_cookie,
+                        "rate_guard": rate_guard,
+                        "both_sides_training": both_sides_training,
+                        "smart_tools": smart_tools,
+                    },
+                },
+                success_message="Web security profile applied.",
+                error_prefix="Web security profile failed",
+                timeout=60,
+            )
+
+        st.markdown("#### Optimization Profile")
+        o1, o2, o3 = st.columns(3)
+        web_cache = o1.slider("Web cache level", min_value=0.0, max_value=1.0, value=0.74, step=0.01, key="ctl_web_cache_level")
+        render_parallel = o2.slider("Parallel rendering", min_value=0.0, max_value=1.0, value=0.78, step=0.01, key="ctl_render_parallel")
+        query_opt = o3.slider("SQL query optimization", min_value=0.0, max_value=1.0, value=0.82, step=0.01, key="ctl_query_opt_level")
+        opt_score = _clamp01((web_cache * 0.34) + (render_parallel * 0.33) + (query_opt * 0.33))
+        st.progress(opt_score, text=f"Optimization profile: {opt_score * 100:.1f}%")
+        if st.button("Apply Web + Fleet Optimization", use_container_width=True):
+            run_logged_post_action(
+                label="web-fleet-optimization",
+                path="/optimize-fleet",
+                payload={
+                    "specialty": "fleet:web-optimization",
+                    "candidates": int(240 + (opt_score * 260)),
+                    "web_cache_level": web_cache,
+                    "render_parallel": render_parallel,
+                    "query_opt_level": query_opt,
+                    "x6_learning_pack": x6_learning_pack,
+                    "smart_tools": smart_tools,
+                },
+                success_message="Web + fleet optimization triggered.",
+                error_prefix="Web + fleet optimization failed",
+                timeout=90,
+            )
 
         st.markdown("#### Benchmark")
         if st.button("Run Benchmark", use_container_width=True):
