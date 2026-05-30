@@ -1,3 +1,4 @@
+import html
 import json
 import os
 import time
@@ -78,6 +79,8 @@ def _render_center_nexus(
     collab = _clamp01((active / total) * 0.45 + (growth * 0.30) + (maturity * 0.25))
     cpp_ready = bool(cpp_kernel.get("available", cpp_kernel.get("cpp_ready", False))) if isinstance(cpp_kernel, dict) else False
     speed_band = "C++ Safe Path ON" if cpp_ready else "Python Fallback Path"
+    model_name = html.escape(str(unified.get("aihub_shared_model_id", "aihub-unified-v1")))
+    entry_name = html.escape(str(unified.get("single_exe_entrypoint", "hermes-gateway")))
     center_score = _clamp01((growth * 0.30) + (maturity * 0.24) + ((1.0 - _clamp01((db_mb / 1024.0) + (wal_mb / 256.0))) * 0.20) + (collab * 0.26))
     st.markdown(
         f"""
@@ -89,7 +92,7 @@ def _render_center_nexus(
     <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px;"><div style="font-size:0.72rem; color:#a7d6ff;">SQL Load</div><div style="font-size:1.08rem; color:#ecf7ff;">DB {db_mb:.1f}MB / WAL {wal_mb:.1f}MB</div></div>
     <div style="background:rgba(255,255,255,0.06); padding:8px; border-radius:10px;"><div style="font-size:0.72rem; color:#a7d6ff;">Speed Path</div><div style="font-size:1.08rem; color:#ecf7ff;">{speed_band}</div></div>
   </div>
-  <div style="margin-top:8px; font-size:0.78rem; color:#cfe6ff;">Model: {str(unified.get('aihub_shared_model_id', 'aihub-unified-v1'))} • Entry: {str(unified.get('single_exe_entrypoint', 'hermes-gateway'))}</div>
+  <div style="margin-top:8px; font-size:0.78rem; color:#cfe6ff;">Model: {model_name} • Entry: {entry_name}</div>
 </div>
 """,
         unsafe_allow_html=True,
