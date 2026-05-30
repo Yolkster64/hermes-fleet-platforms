@@ -296,6 +296,35 @@ with st.expander("Quick Guide", expanded=False):
         "3. Pick packs/modes/sliders.\n"
         "4. Click Deploy Agent."
     )
+with st.expander("Deep Guide: Hermes Types, X Forms, Hybrid, and 4 Models", expanded=False):
+    st.markdown(
+        "**Hermes Types**\n"
+        "- `hermes`: Balanced default for stable general orchestration.\n"
+        "- `ultimate-x`: Max-performance track for cross-agent learning and deployment speed.\n"
+        "- `analyst`: Higher signal quality and slower, more precise reasoning.\n"
+        "- `builder`: Build/ship biased; stronger deployment cadence.\n"
+        "- `optimizer`: Efficiency/perf tuning and adaptive training focus.\n"
+        "- `guardian`: Safety-first with higher stability bias.\n\n"
+        "**X Variants (Ultimate X Forms)**\n"
+        "- `ultimate-x5`: Fast, aggressive upgrade profile.\n"
+        "- `ultimate-x6`: Maximum depth profile with highest learning carry-over.\n\n"
+        "**Hybrid Forms**\n"
+        "- `hybrid-analyst-builder`: Insight + ship speed\n"
+        "- `hybrid-optimizer-guardian`: Performance + safety\n"
+        "- `hybrid-x6-hermes`: Ultimate + balanced control\n\n"
+        "**4 Model Profiles**\n"
+        "| Model | Best For | Strength |\n"
+        "|---|---|---|\n"
+        "| Model-1 Core | Daily orchestration | Stability |\n"
+        "| Model-2 Hybrid | Mixed workloads | Flexibility |\n"
+        "| Model-3 X5 | Fast scaling/deploy | Throughput |\n"
+        "| Model-4 X6 Ultimate | Deep learning + AIHub mesh | Maximum capability |\n\n"
+        "**How to use**\n"
+        "1. Pick Agent Type and Ultimate X Tier.\n"
+        "2. Enable Ultimate X bundle for full legacy-max behavior.\n"
+        "3. Use AIHub mesh + Learning/SQL pulse.\n"
+        "4. Run `Run Ultimate Everything Now` for full backend execution."
+    )
 
 b1, b2 = st.columns(2)
 with b1:
@@ -527,6 +556,41 @@ if st.button("Apply Ultimate AIHub for All Agents", use_container_width=True):
             st.success("Ultimate AIHub upgrade applied.")
         else:
             st.error(f"AIHub upgrade failed: {err}")
+
+st.divider()
+st.subheader("Brain Ultimate AI Upgrading")
+if st.button("Run Brain Ultimate AI Upgrading", use_container_width=True):
+    if not st.session_state["login_ok"]:
+        st.error("Log in first, then run brain upgrade.")
+    else:
+        brain_upgrade_specialty = f"brain-ultimate-{ultimate_x_tier}-{ai_mind_mode}"
+        aihub_ok, aihub_err = _apply_aihub_upgrade(
+            st.session_state["api_key"],
+            specialty=f"{brain_upgrade_specialty}-aihub",
+            steps=540,
+            candidates=220,
+            sql_signal=0.96,
+            internet_signal=0.55,
+            llm_signal=0.99,
+            stability_bias=0.95,
+        )
+        pulse_ok, pulse_err = _run_learning_sql_pulse(
+            st.session_state["api_key"],
+            specialty=f"{brain_upgrade_specialty}-learning",
+            steps=520,
+            candidates=220,
+            sql_signal=0.95,
+            internet_signal=0.90,
+            llm_signal=0.99,
+            stability_bias=0.94,
+        )
+        if aihub_ok and pulse_ok:
+            st.success("Brain Ultimate AI upgrading completed.")
+        else:
+            if not aihub_ok:
+                st.error(f"Brain AIHub phase failed: {aihub_err}")
+            if not pulse_ok:
+                st.error(f"Brain learning phase failed: {pulse_err}")
 
 st.divider()
 st.subheader("Ultimate Learning + SQL")
