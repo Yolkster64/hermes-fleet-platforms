@@ -145,6 +145,18 @@ HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
         "techniques": ["KNAA/QNAA reasoning", "GNAA adaptive memory", "Gaussian 3D evidence", "Cross-agent communication mesh", "Multi-armed Bayesian planning"],
         "specialty_tag": "ultimate-ml-x5",
     },
+    "idealist-strategist": {
+        "title": "Idealist Strategist",
+        "group": "Official Hermes",
+        "personality": "Principled high-standards profile balancing truth, safety, and long-horizon improvement.",
+        "description": "Best for ideal outcomes: strong quality control, consistent learning ethics, and resilient optimization under pressure.",
+        "swarm_strategy": "specialist-mix",
+        "micro_agents": 208,
+        "gaussian_pressure": 0.91,
+        "high_level_learning": 0.94,
+        "techniques": ["Chaos engine trials", "Multi-parallel swarm", "GNAA adaptive memory", "KNAA/QNAA reasoning"],
+        "specialty_tag": "idealist-strategist",
+    },
     "official-quick-thinker": {
         "title": "Quick Thinker",
         "group": "Official",
@@ -534,6 +546,7 @@ def _initialize_session_state() -> None:
         "last_chat": "",
         "ctl_study_areas": ["Optimization", "AIHub", "Truth & Safety", "Fleet Topology"],
         "ctl_techniques": ["KNAA/QNAA reasoning", "Quantized compression", "Multi-parallel swarm", "Multipolar ensemble", "Natural pressure adaptation"],
+        "ctl_smart_tools": ["code-analysis", "sql-pattern-mining", "fleet-deploy-ops"],
         "ctl_swarm_strategy": "hybrid",
         "ctl_micro_agents": 200,
         "ctl_gaussian_pressure": 0.88,
@@ -544,6 +557,8 @@ def _initialize_session_state() -> None:
         "ctl_enable_algorithmic_types": True,
         "ctl_operation_mode": "Programming + C++",
         "ctl_x5_brain_pack": False,
+        "ctl_auto_x10_setup": True,
+        "ctl_both_sides_training": True,
         "ctl_model_override": "hermes-fleet-latest",
     }
     for key, value in defaults.items():
@@ -1288,7 +1303,12 @@ if st.button("Force Training Pulse Now", use_container_width=True):
     run_logged_post_action(
         label="force-training-pulse",
         path="/learning-pulse",
-        payload={"specialty": _specialty_base(), "steps": pulse_steps, "candidates": pulse_candidates},
+        payload={
+            "specialty": _specialty_base(),
+            "steps": pulse_steps,
+            "candidates": pulse_candidates,
+            "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)),
+        },
         success_message="Training pulse triggered.",
         error_prefix="Training pulse failed",
         timeout=120,
@@ -1375,6 +1395,8 @@ mode = st.radio("Training Mode (4 modes)", list(OPERATION_MODES.keys()), horizon
 mode_cfg = OPERATION_MODES.get(mode, {})
 max_mode = mode in ("Intensive Throughput", "Learning Depth")
 x5_brain_pack = st.checkbox("Enable Ultimate Brain X5 Pack", key="ctl_x5_brain_pack")
+auto_x10_setup = st.checkbox("Auto setup X10 (training + brain + SQL)", key="ctl_auto_x10_setup")
+both_sides_training = st.checkbox("Both-sides training active", key="ctl_both_sides_training")
 st.caption("Hermes sizes: mini units focus speed; full-size units focus deep reasoning and retention.")
 st.markdown(
     f"**Best fit guidance:** {mode_cfg.get('description', 'Balanced operation profile.')} "
@@ -1402,6 +1424,10 @@ if x5_brain_pack:
         st.session_state["ctl_techniques"] = [str(t) for t in x5_preset.get("techniques", st.session_state.get("ctl_techniques", []))]
         st.success("Ultimate ML X5 type + brain setup applied.")
         st.rerun()
+if auto_x10_setup:
+    st.caption("Auto X10 setup keeps training, brain, and SQL optimization pipelines warm automatically.")
+if both_sides_training:
+    st.caption("Both-sides training is ON: offensive and defensive learning signals are trained together.")
 
 study_areas = st.multiselect(
     "Study Areas",
@@ -1443,6 +1469,26 @@ with st.expander("Advanced Intelligence Techniques"):
     )
     st.caption("High-level learning ideal range: 0.65-0.88 for best blend of performance + long-term adaptation.")
     render_variable_guide()
+st.markdown("#### Smart Skills + Tools")
+smart_tools = st.multiselect(
+    "Enable smart operational tools",
+    [
+        "code-analysis",
+        "sql-pattern-mining",
+        "fleet-deploy-ops",
+        "chaos-engine-lab",
+        "multi-parallel-orchestrator",
+        "idealist-policy-guard",
+        "aihub-routing-optimizer",
+        "brain-fusion-monitor",
+    ],
+    key="ctl_smart_tools",
+)
+st.caption(
+    "Smart stack active: "
+    f"{', '.join(smart_tools) if smart_tools else 'none'} | "
+    "Recommended for max setup: chaos-engine-lab + multi-parallel-orchestrator + brain-fusion-monitor."
+)
 
 st.subheader("Activity Goal Profile (Fast User Controls)")
 entry_defaults = default_user_entry_profile()
@@ -1499,6 +1545,8 @@ activity_profile = {
     "group_preference": group_preference,
     "solo_preference": solo_preference,
     "dynamic_response": dynamic_response,
+    "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)),
+    "smart_tools": list(st.session_state.get("ctl_smart_tools", [])),
 }
 if st.button("Apply Activity Profile Now", use_container_width=True):
     run_logged_post_action(
@@ -1508,6 +1556,7 @@ if st.button("Apply Activity Profile Now", use_container_width=True):
             "source": "gui_activity_profile",
             "signal_score": max(0.0, min(1.0, success_priority * 0.7 + (1.0 - wrongness_tolerance) * 0.3)),
             "payload": activity_profile,
+            "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)),
         },
         success_message="Activity profile applied to active brain.",
         error_prefix="Activity profile push failed",
@@ -1535,6 +1584,29 @@ if bool(st.session_state.get("ctl_x5_brain_pack", False)):
     if "X5 brain fusion pipeline" not in extra_techniques:
         extra_techniques.append("X5 brain fusion pipeline")
     technique_profile["techniques"] = extra_techniques[:8]
+if bool(st.session_state.get("ctl_auto_x10_setup", True)):
+    if "auto_x10_setup_done" not in st.session_state:
+        st.session_state["auto_x10_setup_done"] = False
+    if not bool(st.session_state.get("auto_x10_setup_done", False)):
+        _, auto_err = safe_post(
+            "/learning-pulse",
+            {
+                "specialty": "fleet:auto-x10-setup",
+                "steps": 680,
+                "candidates": 380,
+                "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)),
+                "sql_signal": 0.97,
+                "internet_signal": 0.06 if not OFFLINE_ONLY_MODE else 0.0,
+                "llm_signal": 0.95,
+                "stability_bias": 0.91,
+            },
+            timeout=120,
+        )
+        if auto_err:
+            st.warning(f"Auto X10 setup pending: {auto_err}")
+        else:
+            st.session_state["auto_x10_setup_done"] = True
+            st.success("Auto X10 setup applied for training + brain + SQL.")
 st.caption(
     "Active upgrades: "
     f"{', '.join(technique_profile['techniques']) if technique_profile['techniques'] else 'standard'} | "
@@ -1560,6 +1632,8 @@ with sync1:
                 "activity_profile": activity_profile,
                 "techniques": technique_profile["techniques"],
                 "study_areas": study_areas,
+                "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)),
+                "smart_tools": list(st.session_state.get("ctl_smart_tools", [])),
             },
         }
         _, sync_err = safe_post("/ingest-signal", gui_sync_payload, timeout=60)
@@ -1594,6 +1668,70 @@ with sync3:
         )
     else:
         st.caption("Carryover ready: run an auto cycle to generate learned profile signals.")
+
+st.subheader("Data I/O + Fleet Command Center")
+st.markdown(
+    "- **Get data** = read-only pull from runtime (snapshot/training/brain status) so you can inspect current state.\n"
+    "- **Send data** = write/command push to runtime (signals/deploy/return) so fleet behavior changes immediately."
+)
+io1, io2, io3, io4 = st.columns(4)
+with io1:
+    if st.button("Get Fleet Data", use_container_width=True):
+        pulled, pull_err = safe_get("/snapshot", timeout=30)
+        if pull_err:
+            st.error(f"Get fleet data failed: {pull_err}")
+        else:
+            st.session_state["io_last_data"] = pulled
+            st.success("Fleet snapshot loaded.")
+with io2:
+    if st.button("Get Training + Brain Data", use_container_width=True):
+        train_data, train_err = safe_get("/training-status", timeout=30)
+        growth_io, growth_io_err = safe_get("/growth-maturity", timeout=40)
+        if train_err or growth_io_err:
+            st.error(f"Get training/brain data failed: {train_err or growth_io_err}")
+        else:
+            st.session_state["io_last_data"] = {"training_status": train_data, "growth_maturity": growth_io}
+            st.success("Training + brain data loaded.")
+with io3:
+    if st.button("Send Data Signal", use_container_width=True):
+        send_payload = {
+            "source": "gui_data_io_send",
+            "signal_score": max(0.0, min(1.0, 0.55 + float(technique_profile.get("high_level_learning", 0.0)) * 0.35)),
+            "payload": {
+                "mode": str(st.session_state.get("ctl_operation_mode", "Programming + C++")),
+                "swarm_strategy": str(technique_profile.get("swarm_strategy", "hybrid")),
+                "micro_agents": int(technique_profile.get("micro_agents", 160)),
+                "gaussian_pressure": float(technique_profile.get("gaussian_pressure", 0.8)),
+                "high_level_learning": float(technique_profile.get("high_level_learning", 0.72)),
+                "x5_brain_pack": bool(st.session_state.get("ctl_x5_brain_pack", False)),
+                "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)),
+                "smart_tools": list(st.session_state.get("ctl_smart_tools", [])),
+            },
+        }
+        _, send_err = safe_post("/ingest-signal", send_payload, timeout=60)
+        if send_err:
+            st.error(f"Send data failed: {send_err}")
+        else:
+            st.success("Data signal sent to fleet.")
+with io4:
+    if st.button("Send Deploy + Return Cycle", use_container_width=True):
+        deploy_result, deploy_err = safe_post(
+            "/runtime-orchestrate/deploy",
+            {"mode": "deploy", "scope": "batch", "batch_size": 12, "specialty": _specialty_base(), "steps": 260, "candidates": 180, "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True))},
+            timeout=120,
+        )
+        return_result, return_err = safe_post(
+            "/runtime-orchestrate/return",
+            {"mode": "return", "units": 12, "specialty": _specialty_base(), "reason": "gui-data-io-cycle", "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True))},
+            timeout=120,
+        )
+        if deploy_err or return_err:
+            st.error(f"Deploy/return cycle failed: {deploy_err or return_err}")
+        else:
+            st.session_state["io_last_data"] = {"deploy": deploy_result, "return": return_result}
+            st.success("Deploy + return cycle completed.")
+if st.session_state.get("io_last_data") is not None:
+    st.text_area("Last Data I/O Result", value=json.dumps(st.session_state.get("io_last_data"), indent=2)[:12000], height=240)
 
 fleet_reward = pull_metric(snapshot, ("avg_reward_score", "reward_score", "reward"), default=0.0)
 fleet_truth = pull_metric(snapshot, ("avg_truth_score", "truth_score", "truth"), default=0.0)
@@ -1684,7 +1822,7 @@ with summary_right:
             log_text("fleet-health-report", chat)
             st.success("Fleet health report generated.")
     if show_extended_actions:
-        if st.button("🚀 Deploy All Hermes", use_container_width=True):
+        if st.button("🚀 Deploy Full Hermes Army", use_container_width=True):
             run_logged_post_action(
                 label="deploy-all-hermes",
                 path="/runtime-orchestrate/deploy",
@@ -1704,7 +1842,7 @@ with summary_right:
                 error_prefix="Deploy orchestration failed",
                 timeout=120,
             )
-        if st.button("🚚 Deploy 10 Hermes", use_container_width=True):
+        if st.button("🚚 Deploy Hermes Army Batch", use_container_width=True):
             run_logged_post_action(
                 label="deploy-batch-hermes",
                 path="/runtime-orchestrate/deploy",
@@ -1724,7 +1862,7 @@ with summary_right:
                 error_prefix="Batch deploy failed",
                 timeout=120,
             )
-        if st.button("↩️ Return Hermes", use_container_width=True):
+        if st.button("↩️ Bring Hermes Army Back", use_container_width=True):
             run_logged_post_action(
                 label="return-hermes",
                 path="/runtime-orchestrate/return",
@@ -2064,7 +2202,16 @@ t2.info("Tip: Use Study Areas to steer what Hermes learns next.")
 t3.info("Tip: Run Permanent Bonus Boost after major changes.")
 
 if not st.session_state["auto_boot_done"]:
-    warm, warm_err = safe_post("/learning-pulse", {"specialty": _specialty_base(), "steps": 260, "candidates": 180}, timeout=90)
+    warm, warm_err = safe_post(
+        "/learning-pulse",
+        {
+            "specialty": _specialty_base(),
+            "steps": 260,
+            "candidates": 180,
+            "both_sides_training": bool(st.session_state.get("ctl_both_sides_training", True)),
+        },
+        timeout=90,
+    )
     if not warm_err:
         log_text("auto-boot-warmstart", warm)
         st.session_state["auto_boot_done"] = True

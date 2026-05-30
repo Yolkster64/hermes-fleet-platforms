@@ -80,6 +80,8 @@ services:
     environment:
       HERMES_API_BASE_URL: http://hermes-gateway:8788
       HERMES_GUI_API_KEY: "local-hermes-ui-key"
+      HERMES_VOLUME_DATA_PATH: "/workspace/runtime/hermes_persist"
+      HERMES_TELEMETRY_DB_PATH: "/workspace/runtime/hermes_persist/hermes_super_orchestrator.db"
       HERMES_LOW_BANDWIDTH_MODE: "true"
       HERMES_OFFLINE_ONLY: "false"
       HERMES_USER_ROUTED_INTERNET: "true"
@@ -177,6 +179,7 @@ services:
       HERMES_BACKEND_URL: http://hermes-api:8787
       HERMES_API_KEY: "local-hermes-dev-key"
       HERMES_GATEWAY_KEY: "local-hermes-ui-key"
+      HERMES_VOLUME_DATA_PATH: "/workspace/runtime/hermes_persist"
       HERMES_LOW_BANDWIDTH_MODE: "true"
       HERMES_OFFLINE_ONLY: "false"
       HERMES_USER_ROUTED_INTERNET: "true"

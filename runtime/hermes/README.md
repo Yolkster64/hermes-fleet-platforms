@@ -137,6 +137,7 @@ This runtime enables:
   - GUI now includes a **cosmic fleet row carousel** (majestic Hermes personas by characteristics/tool subsets), **growth/teamwork calculator**, **evidence advisor guides**, and **entrance+building nexus with volume readiness**
   - SQL center now supports one-click Hermes snapshot save directly from dashboard for fast persistence handoff
   - Docker services now explicitly set `HERMES_VOLUME_DATA_PATH=/workspace/runtime/hermes_persist` so SQL setup is auto-initialized in the mounted volume
+  - GUI + gateway now also receive `HERMES_VOLUME_DATA_PATH` so SQL/volume resolution stays pinned to mounted runtime volume across services
   - API + GUI container startup now runs `runtime/hermes/apps/bootstrap_volume_sql.py` so volume manifest and training SQL are prepared before serving
   - GUI now auto-runs volume layout bootstrap on first load and surfaces container auto-setup status directly in the dashboard header
   - SQL intelligence now includes `strategy_leaderboard` + `super_training` (health/storage pressure/auto-setup guidance) for stronger training decisions
@@ -155,6 +156,8 @@ This runtime enables:
   - Hermes **type** and Hermes **species** are separate controls; species (`Hybrid`, `Normal`, `Mesh`) auto-adjusts recommended agents, Gaussian pressure, and learning focus
   - Level 4 center adds SQL/hub deployment buttons and sub-agent readiness bars with optimization tips
   - GUI now shows per-Hermes level/XP/speed bonus/token gain bars, GitHub CLI connection panel, and fleet lock/unlock controls for hard-problem mode
+  - Data I/O command center now separates **Get data** (read runtime state) vs **Send data** (push signals/commands) with deploy+return cycle controls
+  - Both-sides training control is now first-class in GUI and propagated to training/setup/deploy signals
   - Snapshot now includes `external_signals_tail` for learned-profile visibility in GUI
   - Deep Auto Learning Zone (`♾️`) with study-area targeting and multi-round comparison
   - Advanced intelligence controls: KNAA/QNAA, quantization, multi-parallel swarm, multipolar strategy, gaussian pressure, permanent memory mode

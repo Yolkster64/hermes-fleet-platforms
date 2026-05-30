@@ -16,12 +16,28 @@ def render_sql_intelligence_panels(
     )
     art_pattern = sql_intel.get("art_pattern", {}) if isinstance(sql_intel, dict) else {}
     if isinstance(art_pattern, dict) and art_pattern:
+        st.markdown("#### SQL Art Pattern Recognition (4-Star Visual)")
         ap1, ap2, ap3, ap4, ap5 = st.columns(5)
-        ap1.metric("Art Symmetry", f"{float(art_pattern.get('symmetry_index', 0.0)) * 100:.1f}%")
-        ap2.metric("Art Contrast", f"{float(art_pattern.get('contrast_index', 0.0)) * 100:.1f}%")
-        ap3.metric("Art Fractal Flow", f"{float(art_pattern.get('fractal_flow', 0.0)) * 100:.1f}%")
-        ap4.metric("Compression", f"{float(art_pattern.get('compression_ratio', 0.0)) * 100:.1f}%")
-        ap5.metric("3D Overlap", f"{float(art_pattern.get('overlap_3d', 0.0)) * 100:.1f}%")
+        symmetry = float(art_pattern.get("symmetry_index", 0.0))
+        contrast = float(art_pattern.get("contrast_index", 0.0))
+        fractal = float(art_pattern.get("fractal_flow", 0.0))
+        compression = float(art_pattern.get("compression_ratio", 0.0))
+        overlap = float(art_pattern.get("overlap_3d", 0.0))
+        ap1.metric("Art Symmetry", f"{symmetry * 100:.1f}%")
+        ap2.metric("Art Contrast", f"{contrast * 100:.1f}%")
+        ap3.metric("Art Fractal Flow", f"{fractal * 100:.1f}%")
+        ap4.metric("Compression", f"{compression * 100:.1f}%")
+        ap5.metric("3D Overlap", f"{overlap * 100:.1f}%")
+        render_xp_bar("Pattern Symmetry", min(1.0, max(0.0, symmetry)), "#5DADE2")
+        render_xp_bar("Pattern Contrast", min(1.0, max(0.0, contrast)), "#AF7AC5")
+        render_xp_bar("Pattern Fractal", min(1.0, max(0.0, fractal)), "#58D68D")
+        render_xp_bar("Pattern Compression", min(1.0, max(0.0, compression)), "#F5B041")
+        render_xp_bar("Pattern Overlap 3D", min(1.0, max(0.0, overlap)), "#48C9B0")
+        pattern_wave = [symmetry, contrast, fractal, compression, overlap, high_level_learning]
+        st.line_chart(pattern_wave)
+        star_score = (symmetry + contrast + fractal + compression + overlap) / 5.0
+        stars = "★" * max(1, min(4, int(round(star_score * 4.0))))
+        st.caption(f"SQL visual quality rating: {stars} ({star_score * 100:.1f}%)")
     latest_github = sql_intel.get("latest_github", {}) if isinstance(sql_intel, dict) else {}
     if isinstance(latest_github, dict) and latest_github:
         st.caption(
@@ -141,6 +157,7 @@ def render_sql_intelligence_panels(
                     "specialty": "fleet:sql-center-upgrade",
                     "steps": 420,
                     "candidates": 220,
+                    "both_sides_training": True,
                     "sql_signal": 0.96,
                     "internet_signal": 0.06,
                     "llm_signal": 0.93,
@@ -171,6 +188,7 @@ def render_sql_intelligence_panels(
                     "payload": {
                         "lock_mode": True,
                         "policy": "tough-other-side",
+                        "both_sides_training": True,
                         "goal": "stability-and-hard-problem-focus",
                         "high_level_learning": high_level_learning,
                     },
@@ -187,7 +205,7 @@ def render_sql_intelligence_panels(
                 {
                     "source": "gui_fleet_lock_mode",
                     "signal_score": 0.65,
-                    "payload": {"lock_mode": False, "policy": "balanced-adaptive"},
+                    "payload": {"lock_mode": False, "policy": "balanced-adaptive", "both_sides_training": True},
                 },
                 "Fleet lock released.",
                 "Failed to unlock fleet mode",
