@@ -1,30 +1,40 @@
 param(
-    [ValidateSet("AtLogon", "AtStartup")]
-    [string]$Trigger = "AtLogon"
+    [ValidateSet("Always", "AtLogon", "AtStartup")]
+    [string]$Trigger = "Always"
 )
 
 $ErrorActionPreference = "Stop"
 
-$scriptPath = Join-Path $PSScriptRoot "start_runtime.ps1"
+$scriptPath = Join-Path $PSScriptRoot "runtime_watchdog.ps1"
 if (-not (Test-Path $scriptPath)) {
-    throw "start_runtime.ps1 not found at $scriptPath"
+    throw "runtime_watchdog.ps1 not found at $scriptPath"
 }
 
-$action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -Mode local"
-if ($Trigger -eq "AtStartup") {
-    $taskTrigger = New-ScheduledTaskTrigger -AtStartup
-} else {
-    $taskTrigger = New-ScheduledTaskTrigger -AtLogOn
+$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
+$taskTriggers = @()
+if ($Trigger -in @("Always", "AtStartup")) {
+    $taskTriggers += New-ScheduledTaskTrigger -AtStartup
 }
-$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -StartWhenAvailable
+if ($Trigger -in @("Always", "AtLogon")) {
+    $taskTriggers += New-ScheduledTaskTrigger -AtLogOn
+}
+$settings = New-ScheduledTaskSettingsSet `
+    -AllowStartIfOnBatteries `
+    -StartWhenAvailable `
+    -RestartCount 999 `
+    -RestartInterval (New-TimeSpan -Minutes 1) `
+    -MultipleInstances IgnoreNew
 
 Register-ScheduledTask `
     -TaskName "HermesRuntimeAutostart" `
     -Action $action `
-    -Trigger $taskTrigger `
+    -Trigger $taskTriggers `
     -Settings $settings `
     -RunLevel Highest `
     -Force | Out-Null
+Start-ScheduledTask -TaskName "HermesRuntimeAutostart"
+$taskState = (Get-ScheduledTask -TaskName "HermesRuntimeAutostart").State
 
-Write-Host "Hermes autostart enabled with trigger: $Trigger"
+Write-Host "Hermes autostart watchdog enabled with trigger: $Trigger"
 Write-Host "Task name: HermesRuntimeAutostart"
+Write-Host "Task state: $taskState"

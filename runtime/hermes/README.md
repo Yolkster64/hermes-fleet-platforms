@@ -3,9 +3,9 @@
 1. Start stack:
    - `pwsh ./runtime/hermes/scripts/startup/start_runtime.ps1 -Mode local`
    - or one-command advanced fleet startup: `pwsh ./runtime/hermes/scripts/startup/start_runtime.ps1 -Mode super`
-   - default runtime image is `docker.io/yolkster1/dev_workflow:latest` (override with `HERMES_RUNTIME_IMAGE` and `HERMES_GATEWAY_IMAGE` before startup)
+   - default runtime image is `docker.io/yolkster1/dev_workflow:latest`; gateway default is `docker.io/yolkster1/dev_workflow-gateway:latest` (override with `HERMES_RUNTIME_IMAGE` / `HERMES_GATEWAY_IMAGE`)
    - startup scripts auto-enable `docker-compose.intel.yml` when `/dev/dri` is detected for Intel Arc/NPU acceleration
-   - one-time auto-start setup (so MCP/runtime starts itself): `pwsh ./runtime/hermes/scripts/startup/enable_hermes_autostart.ps1 -Trigger AtLogon`
+   - one-time auto-start setup (persistent watchdog that keeps reconnecting automatically): `pwsh ./runtime/hermes/scripts/startup/enable_hermes_autostart.ps1 -Trigger Always`
    - disable auto-start later if needed: `pwsh ./runtime/hermes/scripts/startup/disable_hermes_autostart.ps1`
 2. MCP Docker gateway (primary entry):
    - `http://localhost:${MCP_DOCKER_PORT:-8788}`
@@ -177,11 +177,11 @@ This runtime enables:
   - Full auto cycle button (simulate + pulse + optimize + curate + dedupe)
   - Built-in API key field in GUI sidebar (uses `X-Hermes-Key`) plus optional gateway session tokens (`X-Hermes-Session`)
 - Resource targeting via env vars:
-  - `HERMES_GPU_TARGET_UTILIZATION` (default `0.75`)
-  - `HERMES_CPU_TARGET_UTILIZATION` (default `0.95`)
+  - `HERMES_GPU_TARGET_UTILIZATION` (default `1.00`)
+  - `HERMES_CPU_TARGET_UTILIZATION` (default `1.00`)
 - Docker service resource envelope (current defaults):
-  - `hermes-trainer`: `cpus: 24.0`, `memory: 20G`
-  - `hermes-api`: `cpus: 24.0`, `memory: 20G`
+  - `hermes-trainer`: `memory: 30G`, GPU reservation: `all`
+  - `hermes-api`: `memory: 30G`, GPU reservation: `all`
   - `hermes-gateway`: `cpus: 24.0`, `memory: 3G`
   - `hermes-gui`: `cpus: 24.0`, `memory: 3G`
   - Persistent learning/data volume: `hermes-data` mounted at `/workspace/runtime/hermes_persist`

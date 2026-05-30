@@ -945,7 +945,7 @@ class HermesSuperOrchestrator:
 
     def _training_variable_vector(
         self,
-        agent: AgentState,
+        agent: AgentProfile,
         activity_model: Dict[str, Dict[str, float]],
         horizon_profile: Dict[str, float],
     ) -> Dict[str, float]:
@@ -956,7 +956,8 @@ class HermesSuperOrchestrator:
                 idx = i
                 break
         active_agents = max(1, len([a for a in self.agents if a.active]))
-        size_factor = max(0.0, min(1.0, active_agents / max(1.0, float(self.max_agents))))
+        total_agents = max(1, len(self.agents))
+        size_factor = max(0.0, min(1.0, active_agents / max(1.0, float(total_agents))))
         position_score = max(0.0, min(1.0, 1.0 - (idx / max(1.0, float(len(ranked) - 1)))))
         success_signal = activity_model["short"]["success"]
         wrongness_signal = activity_model["short"]["wrongness"]

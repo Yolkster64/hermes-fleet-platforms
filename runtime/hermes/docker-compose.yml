@@ -14,8 +14,8 @@ services:
     environment:
       HERMES_API_HOST: 0.0.0.0
       HERMES_API_PORT: "8787"
-      HERMES_GPU_TARGET_UTILIZATION: "0.99"
-      HERMES_CPU_TARGET_UTILIZATION: "0.99"
+      HERMES_GPU_TARGET_UTILIZATION: "1.00"
+      HERMES_CPU_TARGET_UTILIZATION: "1.00"
       HERMES_API_KEY: "local-hermes-dev-key"
       HERMES_CPP_NATIVE_LIB: "/workspace/core/native/hermes_learning_kernel.so"
       HERMES_LOW_BANDWIDTH_MODE: "true"
@@ -42,7 +42,6 @@ services:
       HERMES_ORCHESTRATOR_STATE_PATH: "/workspace/runtime/hermes_persist/hermes_orchestrator_state.json"
       HERMES_ORCHESTRATOR_STATE_SAVE_SECONDS: "10"
       HERMES_FLEET_MODEL_LABEL: "hermes-fleet-newest"
-      HERMES_VOLUME_DATA_PATH: "/workspace/runtime/hermes_persist"
       HERMES_SINGLE_EXE_ENTRYPOINT: "hermes-gateway"
       AIHUB_UNIFIED_ENABLED: "true"
       AIHUB_SHARED_MODEL_ID: "hermes-fleet-latest"
@@ -51,7 +50,7 @@ services:
       - ../../:/workspace
       - ../auto:/workspace/runtime/auto
       - hermes-data:/workspace/runtime/hermes_persist
-    restart: unless-stopped
+    restart: always
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=5).read()"]
       interval: 15s
@@ -61,13 +60,12 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "24.0"
-          memory: 20G
+          memory: 30G
         reservations:
-          memory: 6G
+          memory: 10G
           devices:
             - driver: nvidia
-              count: 1
+              count: all
               capabilities: [gpu]
 
   hermes-gui:
@@ -100,7 +98,7 @@ services:
       - ../../:/workspace
       - ../auto:/workspace/runtime/auto
       - hermes-data:/workspace/runtime/hermes_persist
-    restart: unless-stopped
+    restart: always
     deploy:
       resources:
         limits:
@@ -157,17 +155,20 @@ services:
       - ../../:/workspace
       - ../auto:/workspace/runtime/auto
       - hermes-data:/workspace/runtime/hermes_persist
-    restart: unless-stopped
+    restart: always
     deploy:
       resources:
         limits:
-          cpus: "24.0"
-          memory: 20G
+          memory: 30G
         reservations:
-          memory: 8G
+          memory: 10G
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
 
   hermes-gateway:
-    image: "${HERMES_GATEWAY_IMAGE:-docker.io/yolkster1/dev_workflow:latest}"
+    image: "${HERMES_GATEWAY_IMAGE:-docker.io/yolkster1/dev_workflow-gateway:latest}"
     build:
       context: ../..
       dockerfile: runtime/hermes/Dockerfile.gateway
@@ -189,7 +190,7 @@ services:
         condition: service_healthy
     ports:
       - "${MCP_DOCKER_PORT:-8788}:8788"
-    restart: unless-stopped
+    restart: always
     deploy:
       resources:
         limits:
