@@ -74,6 +74,8 @@ def _attempt_login(secret: str) -> tuple[bool, str]:
     secret = secret.strip()
     if not secret:
         return False, "API key is empty."
+    token_err = ""
+    login_err = ""
 
     # 1) Try key-based auth directly.
     ok, err = _health_with_headers({"X-Hermes-Key": secret})
@@ -109,10 +111,12 @@ def _attempt_login(secret: str) -> tuple[bool, str]:
         st.session_state["session_token"] = token
         st.session_state["auth_mode"] = "session"
         return True, ""
-    except requests.RequestException:
-        pass
+    except requests.RequestException as exc:
+        login_err = str(exc)
+    except ValueError as exc:
+        login_err = f"Invalid login response: {exc}"
 
-    return False, err or token_err or "Authentication failed."
+    return False, err or token_err or login_err or "Authentication failed."
 
 
 st.set_page_config(page_title="Hermes Control Center", page_icon="🛡️", layout="centered")
