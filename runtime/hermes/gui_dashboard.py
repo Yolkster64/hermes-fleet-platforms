@@ -8,7 +8,7 @@ from gui_api_client import current_api_base, log_text, run_logged_post_action, s
 from gui_evolution_panels import render_evolution_centerpiece, render_learning_graphs
 from gui_fleet_showcase import render_fleet_showcase_panels
 from gui_next_level_panels import render_next_level_control_center
-from gui_insights import fleet_score_history, latest_learned_profile, render_learning_diagram, render_xp_bar
+from gui_insights import fleet_score_history, latest_learned_profile, render_xp_bar
 from gui_sql_panels import render_sql_intelligence_panels
 from gui_watch_panels import render_aihub_watch_panels
 from gui_volume_tools import (
@@ -279,6 +279,61 @@ ALGORITHMIC_HERMES_TYPE_PRESETS: Dict[str, Dict[str, Any]] = {
         "techniques": ["Chaos engine trials", "GNAA adaptive memory", "Multi-parallel swarm"],
         "specialty_tag": "legacy-reinforcement",
     },
+    "legacy-gaussian-blur": {
+        "title": "Gaussian Blur",
+        "group": "Legacy Strategy",
+        "personality": "Smoothing-heavy optimizer for stable convergence under noisy training signals.",
+        "description": "Applies gaussian smoothing pressure to reduce spikes and improve consistent policy updates.",
+        "swarm_strategy": "normal",
+        "micro_agents": 184,
+        "gaussian_pressure": 0.93,
+        "high_level_learning": 0.83,
+        "techniques": ["Gaussian 3D evidence", "GNAA adaptive memory", "Natural pressure adaptation"],
+        "specialty_tag": "legacy-gaussian-blur",
+    },
+}
+CENTER_ACTIVE_TYPE_KEYS: List[str] = [
+    "hybrid-core",
+    "mesh-swarm",
+    "normal-steady",
+    "deep-thinker",
+    "legacy-parallel-swarm",
+    "legacy-linear-regression",
+    "legacy-gaussian-blur",
+]
+OPERATION_MODES: Dict[str, Dict[str, Any]] = {
+    "Programming + C++": {
+        "description": "Best for C++ heavy coding, compile loops, and deep refactor quality.",
+        "recommended_type": "deep-thinker",
+        "swarm": "multipolar",
+        "agents_delta": 12,
+        "gaussian_delta": 0.03,
+        "learning_delta": 0.08,
+    },
+    "GUI + Visual": {
+        "description": "Best for Streamlit/UI polish, smooth visuals, and fast visual iteration cycles.",
+        "recommended_type": "mesh-swarm",
+        "swarm": "mesh",
+        "agents_delta": 8,
+        "gaussian_delta": 0.01,
+        "learning_delta": 0.05,
+    },
+    "Intensive Throughput": {
+        "description": "Best for maximum throughput, heavy orchestration, and large parallel workloads.",
+        "recommended_type": "legacy-parallel-swarm",
+        "swarm": "swarm",
+        "agents_delta": 24,
+        "gaussian_delta": -0.02,
+        "learning_delta": 0.00,
+    },
+    "Learning Depth": {
+        "description": "Best for long-run learning, retention quality, and adaptive memory growth.",
+        "recommended_type": "legacy-gaussian-blur",
+        "swarm": "normal",
+        "agents_delta": 0,
+        "gaussian_delta": 0.05,
+        "learning_delta": 0.10,
+    },
 }
 MODEL_OPTIONS = [
     "hermes-fleet-latest",
@@ -356,6 +411,10 @@ def _active_hermes_presets() -> Dict[str, Dict[str, Any]]:
     if _use_algorithmic_presets():
         return {**HERMES_TYPE_PRESETS, **ALGORITHMIC_HERMES_TYPE_PRESETS}
     return dict(HERMES_TYPE_PRESETS)
+
+
+def _all_hermes_presets() -> Dict[str, Dict[str, Any]]:
+    return {**HERMES_TYPE_PRESETS, **ALGORITHMIC_HERMES_TYPE_PRESETS}
 
 
 def _species_profile(species: str) -> Dict[str, Any]:
@@ -458,7 +517,8 @@ def _initialize_session_state() -> None:
         "ctl_high_level_learning": 0.72,
         "ctl_hermes_type": "hybrid-core",
         "ctl_hermes_species": "Hybrid",
-        "ctl_enable_algorithmic_types": False,
+        "ctl_enable_algorithmic_types": True,
+        "ctl_operation_mode": "Programming + C++",
         "ctl_model_override": "hermes-fleet-latest",
     }
     for key, value in defaults.items():
@@ -491,6 +551,53 @@ def render_variable_guide() -> None:
         "- **High-level learning focus**: shifts from raw speed to long-term memory quality.\n"
         "- **SQL/Internet/LLM signals**: source weighting used for curation and orchestration decisions."
     )
+
+
+def _algorithm_bar_pack(preset: Dict[str, Any], optimized: Dict[str, Any], mode_name: str) -> List[Tuple[str, float, str]]:
+    techniques = [str(t) for t in preset.get("techniques", [])] if isinstance(preset, dict) else []
+    mode_cfg = OPERATION_MODES.get(mode_name, {})
+    gaussian = float(optimized.get("gaussian_pressure", preset.get("gaussian_pressure", 0.80)))
+    learning = float(optimized.get("high_level_learning", preset.get("high_level_learning", 0.72)))
+    micro = float(optimized.get("micro_agents", preset.get("micro_agents", 180)))
+    knaa = 0.92 if "KNAA/QNAA reasoning" in techniques else 0.66
+    gnaa = 0.90 if "GNAA adaptive memory" in techniques else 0.64
+    linear_reg = max(0.45, min(1.0, 0.52 + ((1.0 - abs(gaussian - 0.78)) * 0.28) + (learning * 0.20)))
+    knn_mesh = 0.90 if ("Cross-agent communication mesh" in techniques or str(preset.get("swarm_strategy", "")) in ("mesh", "swarm")) else 0.62
+    return [
+        ("Gaussian Blur", max(0.0, min(1.0, gaussian)), "Smoothing power for stable learning convergence."),
+        ("KNAA Reasoning", max(0.0, min(1.0, knaa)), "Knowledge-neighborhood reasoning strength."),
+        ("GNAA Memory", max(0.0, min(1.0, gnaa)), "Adaptive memory retention and recall consistency."),
+        ("Linear Regression", max(0.0, min(1.0, linear_reg)), "Directional trend fitting for iterative optimization."),
+        ("KNN Mesh", max(0.0, min(1.0, knn_mesh)), "Neighbor-based coordination and sub-agent similarity routing."),
+        ("Parallelism", max(0.0, min(1.0, micro / 256.0)), "Parallel throughput capacity from active micro agents."),
+        ("Mode Fit", max(0.0, min(1.0, 0.70 + float(mode_cfg.get("learning_delta", 0.0)))), "How strongly the current settings match selected operation mode."),
+    ]
+
+
+def render_modern_learning_canvas(agent_rows: List[Dict[str, Any]], growth_data: Dict[str, Any]) -> None:
+    st.markdown("#### Hermes Learning Matrix (Upgraded)")
+    growth = float(growth_data.get("growth_index", 0.0)) if isinstance(growth_data, dict) else 0.0
+    maturity = float(growth_data.get("maturity_index", 0.0)) if isinstance(growth_data, dict) else 0.0
+    integration = float(growth_data.get("integration_index", 0.0)) if isinstance(growth_data, dict) else 0.0
+    matrix_rows: List[Dict[str, Any]] = []
+    for row in agent_rows[:18]:
+        matrix_rows.append(
+            {
+                "Hermes": str(row.get("name", "hermes")),
+                "Zone": str(row.get("zone", "General Zone")),
+                "Mode": str(row.get("interaction", "hybrid")),
+                "Progress": f"{float(row.get('progress', 0.0)) * 100:.1f}%",
+                "Load": f"{float(row.get('load', 0.0)) * 100:.1f}%",
+            }
+        )
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Growth Matrix", f"{growth * 100:.1f}%")
+    m2.metric("Maturity Matrix", f"{maturity * 100:.1f}%")
+    m3.metric("Integration Matrix", f"{integration * 100:.1f}%")
+    if matrix_rows:
+        st.dataframe(matrix_rows, use_container_width=True, hide_index=True)
+    else:
+        st.caption("Learning matrix populates after fleet snapshots stream in.")
 
 
 def run_auto_cycle(max_mode: bool, technique: Dict[str, Any]) -> Dict[str, Any]:
@@ -689,8 +796,17 @@ with st.sidebar:
     refresh_seconds = st.slider("Refresh seconds", min_value=10, max_value=90, value=20, step=5)
     focused_layout = st.checkbox("Focused layout (clean view)", value=True)
     show_legacy_map_ui = st.checkbox("Show AIHub Hub + Map panels", value=True)
-    st.checkbox("Enable legacy strategy Hermes types", value=False, key="ctl_enable_algorithmic_types")
+    st.checkbox("Enable legacy strategy Hermes types", value=True, key="ctl_enable_algorithmic_types")
     st.selectbox("Hermes species", options=["Hybrid", "Normal", "Mesh"], key="ctl_hermes_species")
+    _sidebar_mode_current = str(st.session_state.get("ctl_operation_mode", "Programming + C++"))
+    _sidebar_mode_index = list(OPERATION_MODES.keys()).index(_sidebar_mode_current) if _sidebar_mode_current in OPERATION_MODES else 0
+    sidebar_mode = st.selectbox(
+        "Operation mode (4 modes)",
+        options=list(OPERATION_MODES.keys()),
+        index=_sidebar_mode_index,
+        key="ctl_operation_mode_sidebar",
+    )
+    st.session_state["ctl_operation_mode"] = sidebar_mode
     st.markdown("### Hermes Type + Model")
     active_type_presets = _active_hermes_presets()
     hermes_type_labels = {k: str(v.get("title", k)) for k, v in active_type_presets.items()}
@@ -698,7 +814,7 @@ with st.sidebar:
     current_type = _selected_hermes_type_key()
     hermes_type_index = hermes_type_keys.index(current_type) if current_type in hermes_type_keys else 0
     selected_hermes_type = st.selectbox(
-        "Choose Hermes type (custom + official)",
+        "Choose Hermes type (7 active + extended)",
         options=hermes_type_keys,
         index=hermes_type_index,
         format_func=lambda key: hermes_type_labels.get(key, key),
@@ -706,14 +822,21 @@ with st.sidebar:
     )
     selected_preset = active_type_presets.get(selected_hermes_type, {})
     optimized = _optimized_settings(selected_preset, str(st.session_state.get("ctl_hermes_species", "Hybrid")))
+    mode_name = str(st.session_state.get("ctl_operation_mode", "Programming + C++"))
+    mode_cfg = OPERATION_MODES.get(mode_name, {})
     st.caption(
         f"{selected_preset.get('group', 'Custom')} • "
         f"{selected_preset.get('personality', 'Adaptive Hermes profile.')}"
     )
     st.caption(str(selected_preset.get("description", "")))
+    st.caption(f"Mode: {mode_name} — {mode_cfg.get('description', 'Balanced operation profile.')}")
+    st.caption(f"Recommended type for this mode: {str(_all_hermes_presets().get(str(mode_cfg.get('recommended_type', 'hybrid-core')), {}).get('title', 'Hybrid'))}")
     st.progress(min(1.0, float(optimized.get("micro_agents", 0)) / 256.0), text="Auto Agent Scale")
     st.progress(min(1.0, float(optimized.get("gaussian_pressure", 0.0))), text="Auto Gaussian Pressure")
     st.progress(min(1.0, float(optimized.get("high_level_learning", 0.0))), text="Auto Learning Focus")
+    for algo_name, algo_value, algo_tip in _algorithm_bar_pack(selected_preset, optimized, mode_name):
+        st.progress(algo_value, text=f"{algo_name} {algo_value * 100:.1f}%")
+        st.caption(algo_tip)
     st.caption(f"Operating style: {optimized.get('operations', 'Balanced operations mode.')}")
     selected_model = st.selectbox(
         "Preferred model",
@@ -865,6 +988,42 @@ st.caption(
     f"gateway={int(float(bond_signals.get('gateway_link', 0.0)))} | volume={int(float(bond_signals.get('volume_link', 0.0)))} | "
     f"auto_setup={int(float(bond_signals.get('auto_setup', 0.0)))} | sql_load(db/wal)={float(bond.get('db_mb', 0.0)):.1f}/{float(bond.get('wal_mb', 0.0)):.1f}MB"
 )
+st.subheader("Hermes Type Deck (7 Active Types)")
+deck_presets = _all_hermes_presets()
+deck_keys = [key for key in CENTER_ACTIVE_TYPE_KEYS if key in deck_presets]
+deck_labels = {key: str(deck_presets.get(key, {}).get("title", key)) for key in deck_keys}
+current_type_key = _selected_hermes_type_key()
+if current_type_key not in deck_keys and deck_keys:
+    current_type_key = deck_keys[0]
+deck_pick = st.radio(
+    "Pick from the 7 active Hermes types",
+    options=deck_keys,
+    index=deck_keys.index(current_type_key) if current_type_key in deck_keys else 0,
+    format_func=lambda key: deck_labels.get(key, key),
+    horizontal=True,
+)
+deck_preset = deck_presets.get(deck_pick, {})
+deck_species = str(st.session_state.get("ctl_hermes_species", "Hybrid"))
+deck_optimized = _optimized_settings(deck_preset, deck_species)
+dcol1, dcol2 = st.columns([2, 1])
+with dcol1:
+    st.markdown(f"**{deck_preset.get('title', deck_pick)}** • {deck_preset.get('personality', 'Adaptive Hermes profile.')}")
+    st.caption(str(deck_preset.get("description", "")))
+    st.caption(f"Species: {deck_species} • Swarm: {deck_preset.get('swarm_strategy', 'hybrid')} • Group: {deck_preset.get('group', 'Custom')}")
+with dcol2:
+    if st.button("Apply Deck Type Now", use_container_width=True):
+        st.session_state["ctl_hermes_type"] = deck_pick
+        if deck_pick in ALGORITHMIC_HERMES_TYPE_PRESETS:
+            st.session_state["ctl_enable_algorithmic_types"] = True
+        auto = _optimized_settings(deck_preset, deck_species)
+        st.session_state["ctl_swarm_strategy"] = str(deck_preset.get("swarm_strategy", st.session_state.get("ctl_swarm_strategy", "hybrid")))
+        st.session_state["ctl_micro_agents"] = int(auto.get("micro_agents", st.session_state.get("ctl_micro_agents", 160)))
+        st.session_state["ctl_gaussian_pressure"] = float(auto.get("gaussian_pressure", st.session_state.get("ctl_gaussian_pressure", 0.8)))
+        st.session_state["ctl_high_level_learning"] = float(auto.get("high_level_learning", st.session_state.get("ctl_high_level_learning", 0.72)))
+        st.success(f"Applied {deck_labels.get(deck_pick, deck_pick)} from the center deck.")
+for algo_name, algo_value, algo_tip in _algorithm_bar_pack(deck_preset, deck_optimized, str(st.session_state.get("ctl_operation_mode", "Programming + C++"))):
+    st.progress(algo_value, text=f"{algo_name} {algo_value * 100:.1f}%")
+    st.caption(algo_tip)
 with st.expander("Hermes Type Catalog + Optimization Tips", expanded=False):
     catalog_presets = _active_hermes_presets()
     st.dataframe(
@@ -890,8 +1049,8 @@ with st.expander("Hermes Type Catalog + Optimization Tips", expanded=False):
     else:
         st.caption("Legacy strategy modes are auto-calibrated with species-aware bars and applied as optimized settings.")
     st.markdown(
-        "- **Optimization tip:** use Quick/Hybrid for deployment speed, Mesh/Creative for collaboration breadth, and Deep modes for harder reasoning.\n"
-        "- **Stability tip:** keep gaussian pressure in 0.78-0.90 for consistent SQL growth quality.\n"
+        "- **Optimization tip:** use Parallel/Hybrid for deployment speed, Mesh for collaboration breadth, and Deep modes for harder reasoning.\n"
+        "- **Algorithm tip:** Gaussian Blur + GNAA improve stability; KNAA + Linear Regression improve directional optimization quality.\n"
         "- **Scale tip:** increase micro agents gradually (+16 to +32) while watching SQL storage pressure."
     )
 if not watch_err and isinstance(watch_payload, dict):
@@ -955,7 +1114,10 @@ if st.button("Run Ultimate Entrance Upgrade", use_container_width=True):
         timeout=180,
     )
 if not focused_layout:
-    render_learning_diagram()
+    render_modern_learning_canvas(
+        agent_rows=agent_rows,
+        growth_data=growth_data if isinstance(growth_data, dict) else {},
+    )
     render_evolution_centerpiece(
         agent_rows=agent_rows,
         sql_intel=live_sql_intel if isinstance(live_sql_intel, dict) else {},
@@ -1140,9 +1302,20 @@ else:
             hide_index=True,
         )
 
-mode = st.radio("Training Level", ["Easy", "Near Max Hermes"], horizontal=True, index=1)
-max_mode = mode == "Near Max Hermes"
+mode = st.radio("Training Mode (4 modes)", list(OPERATION_MODES.keys()), horizontal=True, key="ctl_operation_mode")
+mode_cfg = OPERATION_MODES.get(mode, {})
+max_mode = mode in ("Intensive Throughput", "Learning Depth")
 st.caption("Hermes sizes: mini units focus speed; full-size units focus deep reasoning and retention.")
+st.markdown(
+    f"**Best fit guidance:** {mode_cfg.get('description', 'Balanced operation profile.')} "
+    f"Recommended Hermes type: **{_all_hermes_presets().get(str(mode_cfg.get('recommended_type', 'hybrid-core')), {}).get('title', 'Hybrid')}**."
+)
+st.markdown(
+    "- **Programming + C++:** use for heavy compile/debug/refactor loops; favors deeper reasoning and structure.\n"
+    "- **GUI + Visual:** use for Streamlit/UI flow and smooth visuals; favors mesh collaboration and visual iteration.\n"
+    "- **Intensive Throughput:** use for large parallel workloads and mass operations; favors swarm speed.\n"
+    "- **Learning Depth:** use for long-horizon retention and adaptive growth; favors gaussian smoothing + memory quality."
+)
 
 study_areas = st.multiselect(
     "Study Areas",
@@ -1263,6 +1436,11 @@ technique_profile = build_technique_profile(
     permanent_intelligence=permanent_intelligence,
     high_level_learning=high_level_learning,
 )
+mode_cfg = OPERATION_MODES.get(str(st.session_state.get("ctl_operation_mode", "Programming + C++")), {})
+technique_profile["swarm_strategy"] = str(mode_cfg.get("swarm", technique_profile.get("swarm_strategy", "hybrid")))
+technique_profile["micro_agents"] = int(max(16, min(256, int(technique_profile.get("micro_agents", 160)) + int(mode_cfg.get("agents_delta", 0)))))
+technique_profile["gaussian_pressure"] = float(max(0.40, min(1.00, float(technique_profile.get("gaussian_pressure", 0.80)) + float(mode_cfg.get("gaussian_delta", 0.0)))))
+technique_profile["high_level_learning"] = float(max(0.0, min(1.0, float(technique_profile.get("high_level_learning", 0.72)) + float(mode_cfg.get("learning_delta", 0.0)))))
 st.caption(
     "Active upgrades: "
     f"{', '.join(technique_profile['techniques']) if technique_profile['techniques'] else 'standard'} | "
