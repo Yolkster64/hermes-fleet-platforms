@@ -566,6 +566,27 @@ def render_next_level_control_center(
                 error_prefix="GPU turbo apply failed",
                 timeout=90,
             )
+        if st.button("Run GPU Saturation Training", use_container_width=True):
+            run_logged_post_action(
+                label="gpu-saturation-training",
+                path="/learning-pulse",
+                payload={
+                    "specialty": "fleet:gpu-saturation",
+                    "steps": 1600,
+                    "candidates": 1200,
+                    "sql_signal": 0.98,
+                    "internet_signal": 0.10,
+                    "llm_signal": 0.99,
+                    "stability_bias": 0.93,
+                    "x5_brain_pack": True,
+                    "x6_learning_pack": True,
+                    "gpu_target_utilization": 1.00,
+                    "smart_tools": smart_tools,
+                },
+                success_message="GPU saturation training started.",
+                error_prefix="GPU saturation training failed",
+                timeout=220,
+            )
         st.caption("GPU Turbo needs a host GPU runtime (NVIDIA Container Toolkit / Docker GPU support) to deliver gains.")
 
         st.markdown("#### Benchmark")

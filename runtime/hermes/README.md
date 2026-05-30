@@ -53,6 +53,10 @@
   4. In dashboard -> **Security + Benchmark** -> click **Enable GPU Turbo (All Available)**.
 - For mixed stability + performance, use:
   - `Apply Max Power CPU/RAM/GPU` first, then `Enable GPU Turbo (All Available)`.
+- Important: Docker cannot force a fixed GPU percentage by itself; GPU usage rises when workload is heavy enough.
+- To drive utilization higher, run:
+  - `pwsh ./runtime/hermes/scripts/startup/run_gpu_saturation_training.ps1 -BaseUrl http://localhost:8787 -Rounds 3`
+  - or use dashboard button: `Run GPU Saturation Training`.
 
 ### Monado interactive UX upgrades
 - Standalone **AIHub Scroll Zone** now appears below tabs (not only in tab layout).
