@@ -60,6 +60,7 @@ Control API extensions:
 - `GET /api/engines/recommend` - meta-learning engine mix recommendation (security + optimization + fleet-size aware).
 - `GET /api/setup/tracker` - full merged setup tracker with copyable commands, difficulty labels, and upgrade paths.
 - `GET /api/setup/autoboot-plan` - autoboot/self-heal phase details and forward stubs.
+- `GET /api/hyperv/phase1` - Hyper-V phase1 status/capacity panel data with runtime profile linkage.
 
 C++ source-of-truth integration:
 
@@ -67,3 +68,4 @@ C++ source-of-truth integration:
 - `artifacts/polyglot/super_integrated_report.json` now includes `cpp_source_of_truth` and is used by AIHub summary scoring + GUI metrics.
 - C++ now also emits security watch plans, quarantine thresholds, alert channels, and folder permission/compression governance data.
 - C# frontend contract output (`csharp_security_frontend_map.json`) is generated from C++ report data and exposed through AIHub security endpoints for fleetwide UI consistency.
+- Runtime profile and capacity defaults are now centralized in `config/x-tier/aihub-control.json` (`runtime_profile`, `hyperv_phase1`) and consumed by both API and GUI.

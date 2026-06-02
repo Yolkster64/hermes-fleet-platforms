@@ -5,7 +5,19 @@
     "artifacts_root": "artifacts",
     "training_log": "artifacts\\aihub\\training-jobs.log",
     "security_profile": "balanced",
-    "cuda_enabled": true
+    "cuda_enabled": true,
+    "runtime_profile": {
+      "name": "max-gpu-cpu-40gb",
+      "target_cpu_cores": 30,
+      "target_memory_gb": 40,
+      "target_gpu_mode": "max"
+    },
+    "hyperv_phase1": {
+      "enabled": true,
+      "target_vms": 6,
+      "gpu_partitioning_mode": "aggressive",
+      "agent_capacity_scale": "high"
+    }
   },
   "services": {
     "polyglot_report": "artifacts\\polyglot\\super_integrated_report.json",

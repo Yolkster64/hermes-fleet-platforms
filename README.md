@@ -18,9 +18,20 @@ This repository consolidates Hermes Fleet, HELIOS Platform, and Monado Blade-ali
 ## Key documentation
 
 - [`docs/README.md`](./docs/README.md)
+- [`docs/x-tier/PROJECT_WORKFLOW_WIKI_GUIDE.md`](./docs/x-tier/PROJECT_WORKFLOW_WIKI_GUIDE.md)
 - [`docs/GETTING_STARTED.md`](./docs/GETTING_STARTED.md)
 - [`docs/HERMES_AGENTS_SQL_GHCLI.md`](./docs/HERMES_AGENTS_SQL_GHCLI.md)
 - [`SQL_LEARNING_GROUND.md`](./SQL_LEARNING_GROUND.md)
+
+## Unified operator path
+
+1. Build/rebuild integrated tri-language artifacts with `scripts/x-tier/build_all_polyglot.ps1`.
+2. Start control-plane APIs and GUI via `scripts/x-tier/Start-AIHubControl.ps1` or `runtime/hermes/docker-compose.yml`.
+3. Operate from `runtime/hermes/apps/gui_control_center.py` tabs:
+   - fleets + easy optimized mix trigger
+   - SQL-learning progression bars
+   - Hyper-V phase1 capacity panel
+   - setup tracker/autoboot flow
 
 ## Quick workflow
 

@@ -966,6 +966,7 @@ ok_engines, engines_payload = _fetch_json(f"{control_base}/api/engines/catalog")
 ok_reco, reco_payload = _fetch_json(f"{control_base}/api/engines/recommend")
 ok_tracker, tracker_payload = _fetch_json(f"{control_base}/api/setup/tracker")
 ok_autoboot, autoboot_payload = _fetch_json(f"{control_base}/api/setup/autoboot-plan")
+ok_hyperv, hyperv_payload = _fetch_json(f"{control_base}/api/hyperv/phase1")
 ok_report, report_payload = _fetch_json(f"{control_base}/api/report")
 ok_conv, conv_payload = _fetch_json(f"{control_base}/api/conversation/report")
 
@@ -979,6 +980,7 @@ tabs = st.tabs(
         "Unified Setup Tracker",
         "Knowledge Mesh",
         "Docker + Runtime Control",
+        "Hyper-V + Agent Capacity",
     ]
 )
 
@@ -1033,10 +1035,20 @@ with tabs[2]:
         with f4:
             st.metric("XCore", fleet_payload.get("xcore_agents", 0))
         st.json({"profiles": fleet_payload.get("profiles", {})})
+
+        total_agents = max(1, int(fleet_payload.get("total_agents", 0)))
+        deployed_agents = int(fleet_payload.get("deployed_agents", 0))
+        deploy_ratio = max(0.0, min(1.0, deployed_agents / total_agents))
+        sql_learning_ratio = max(0.0, min(1.0, (deployed_agents * 0.7 + total_agents * 0.3) / 500.0))
+        level_ratio = max(0.0, min(1.0, (total_agents + deployed_agents) / 800.0))
+        st.caption("Fleet progression and SQL-learning progression")
+        st.progress(deploy_ratio, text=f"Deployment progress: {deployed_agents}/{total_agents}")
+        st.progress(sql_learning_ratio, text=f"SQL learning progression: {int(sql_learning_ratio * 100)}%")
+        st.progress(level_ratio, text=f"Fleet level progression: {int(level_ratio * 100)}%")
     else:
         st.warning("Fleet live data unavailable.")
 
-    t1, t2 = st.columns(2)
+    t1, t2, t3 = st.columns(3)
     with t1:
         if st.button("Trigger Unified AIHub Training", use_container_width=True):
             ok, payload = _post_json(f"{control_base}/api/train/trigger")
@@ -1049,6 +1061,13 @@ with tabs[2]:
         if ok_summary and isinstance(summary_payload, dict):
             training = summary_payload.get("training", {})
             st.metric("Training Events (Recent)", training.get("training_events_recent_window", 0))
+    with t3:
+        if st.button("Deploy Easy Optimized Mix", use_container_width=True):
+            ok, payload = _post_json(f"{control_base}/api/train/trigger")
+            if ok:
+                st.success("Easy optimized mix started (training + adaptive fleet bias).")
+            else:
+                st.error(f"Optimized mix trigger failed: {payload}")
 
 with tabs[3]:
     if ok_security and isinstance(security_payload, dict):
@@ -1210,3 +1229,19 @@ with tabs[7]:
 
     if ok_docker:
         st.json(docker_payload)
+
+with tabs[8]:
+    if ok_hyperv and isinstance(hyperv_payload, dict):
+        h1, h2, h3, h4 = st.columns(4)
+        with h1:
+            st.metric("Phase", hyperv_payload.get("phase", "phase1"))
+        with h2:
+            st.metric("Target VMs", hyperv_payload.get("target_vms", 0))
+        with h3:
+            st.metric("GPU Partitioning", hyperv_payload.get("gpu_partitioning_mode", "balanced"))
+        with h4:
+            st.metric("Agent Capacity Scale", hyperv_payload.get("agent_capacity_scale", "medium"))
+        st.json(hyperv_payload)
+        st.caption("Phase 1 control scope: visibility and planning controls. VM lifecycle actions are reserved for phase 2.")
+    else:
+        st.warning("Hyper-V phase1 endpoint unavailable.")

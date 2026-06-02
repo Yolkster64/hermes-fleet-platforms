@@ -14,36 +14,36 @@
     "score": 100
   },
   "security_watch_plan": {
-    "internet_watch_interval_seconds": 8,
-    "port_watch_interval_seconds": 5,
-    "permission_drift_scan_seconds": 45,
-    "quarantine_trigger_score": 58,
-    "alert_escalation_threshold": 52,
-    "auto_isolation_level": 0.92,
-    "egress_lockdown_factor": 0.82
+    "internet_watch_interval_seconds": 15,
+    "port_watch_interval_seconds": 12,
+    "permission_drift_scan_seconds": 120,
+    "quarantine_trigger_score": 72,
+    "alert_escalation_threshold": 68,
+    "auto_isolation_level": 0.75,
+    "egress_lockdown_factor": 0.58
   },
   "folder_governance_plan": {
-    "sort_priority_score": 0.84,
-    "compression_level": 0.78,
-    "dedupe_intensity": 0.88,
-    "permission_enforcement_level": 0.96,
-    "suspicious_folder_quarantine_level": 0.93,
-    "readonly_guard_ratio": 0.91,
-    "filesystem_watch_depth": 0.95
+    "sort_priority_score": 0.76,
+    "compression_level": 0.66,
+    "dedupe_intensity": 0.72,
+    "permission_enforcement_level": 0.82,
+    "suspicious_folder_quarantine_level": 0.74,
+    "readonly_guard_ratio": 0.7,
+    "filesystem_watch_depth": 0.8
   },
   "cpp_resource_telemetry": {
-    "cpu_utilization": 35.5,
-    "memory_mb": 5805.76,
-    "gpu_utilization": 16.2,
-    "net_egress_mb_s": 100.4,
-    "compression_pressure": 0.0939039,
-    "multitask_pressure": 0.234168,
-    "lightweight_score": 0.813135,
-    "kernel_cpu_clamp": 0.82,
-    "kernel_memory_compaction": 0.9,
-    "kernel_gpu_scheduling": 0.74,
-    "kernel_network_throttle": 0.58,
-    "kernel_parallel_lane_utilization": 0.68
+    "cpu_utilization": 10,
+    "memory_mb": 4427.92,
+    "gpu_utilization": 15,
+    "net_egress_mb_s": 50,
+    "compression_pressure": 0.0596606,
+    "multitask_pressure": 0.111013,
+    "lightweight_score": 0.902096,
+    "kernel_cpu_clamp": 0.94,
+    "kernel_memory_compaction": 0.78,
+    "kernel_gpu_scheduling": 0.92,
+    "kernel_network_throttle": 0.9,
+    "kernel_parallel_lane_utilization": 0.96
   },
   "alert_channels": [
     "cpp_runtime_watchdog",

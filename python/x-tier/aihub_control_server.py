@@ -75,6 +75,18 @@ class AIHubServer(BaseHTTPRequestHandler):
         clipped = lines[-max_lines:]
         return len(lines), len([ln for ln in clipped if ln.strip()])
 
+    @staticmethod
+    def _score(base: float, bonus: float, ceiling: float = 100.0) -> float:
+        return round(min(ceiling, base + bonus), 2)
+
+    @staticmethod
+    def _safe_float(data: dict[str, Any], key: str, default: float = 0.0) -> float:
+        value = data.get(key, default)
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
     def _build_fleet_live(self) -> dict[str, Any]:
         agents = self._load_agents()
         total = len(agents)
@@ -108,16 +120,13 @@ class AIHubServer(BaseHTTPRequestHandler):
         estimated_tokens = max(1200, (req_count * 240) + (milestone_count * 170))
         token_efficiency = round(min(100.0, 55.0 + (uniq_req_count / max(1, req_count)) * 45.0), 2)
         estimated_cost_usd = round((estimated_tokens / 1000.0) * 0.0035, 4)
-        perf_speed_score = round(min(100.0, 40.0 + (coverage.get("optimization", 0) * 3.8) + (coverage.get("runtime", 0) * 2.1)), 2)
-        power_efficiency_score = round(min(100.0, 45.0 + (coverage.get("optimization", 0) * 3.4)), 2)
-        security_score = round(min(100.0, 50.0 + (coverage.get("security", 0) * 3.8) + (coverage.get("vhdx", 0) * 1.5)), 2)
+        perf_speed_score = self._score(40.0, (coverage.get("optimization", 0) * 3.8) + (coverage.get("runtime", 0) * 2.1))
+        power_efficiency_score = self._score(45.0, coverage.get("optimization", 0) * 3.4)
+        security_score = self._score(50.0, (coverage.get("security", 0) * 3.8) + (coverage.get("vhdx", 0) * 1.5))
         if cpp_resource:
-            perf_speed_score = round(min(100.0, perf_speed_score + (float(cpp_resource.get("kernel_parallel_lane_utilization", 0.0)) * 5.0)), 2)
-            power_efficiency_score = round(
-                min(100.0, power_efficiency_score + (float(cpp_resource.get("lightweight_score", 0.0)) * 35.0)),
-                2,
-            )
-            security_score = round(min(100.0, security_score + (float(cpp_resource.get("kernel_cpu_clamp", 0.0)) * 8.0)), 2)
+            perf_speed_score = self._score(perf_speed_score, self._safe_float(cpp_resource, "kernel_parallel_lane_utilization") * 5.0)
+            power_efficiency_score = self._score(power_efficiency_score, self._safe_float(cpp_resource, "lightweight_score") * 35.0)
+            security_score = self._score(security_score, self._safe_float(cpp_resource, "kernel_cpu_clamp") * 8.0)
 
         training_log = Path(self.config["aihub"]["training_log"])
         training_total, training_recent = self._tail_jsonl_count(training_log)
@@ -173,6 +182,7 @@ class AIHubServer(BaseHTTPRequestHandler):
                 "gui": self.config["services"].get("hermes_gui_url"),
                 "api": self.config["services"].get("hermes_api_url"),
             },
+            "runtime_profile": self.config["aihub"].get("runtime_profile", {}),
             "sources": {
                 "polyglot_report": self.config["services"]["polyglot_report"],
                 "conversation_report": self.config["services"]["conversation_report"],
@@ -201,6 +211,22 @@ class AIHubServer(BaseHTTPRequestHandler):
             "cpp_folder_governance": cpp_core.get("folder_governance_plan", {}),
             "cpp_alert_channels": cpp_core.get("alert_channels", []),
             "csharp_frontend_contract": csharp_contract,
+        }
+
+    def _build_hyperv_phase1(self) -> dict[str, Any]:
+        hp = self.config["aihub"].get("hyperv_phase1", {})
+        profile = self.config["aihub"].get("runtime_profile", {})
+        return {
+            "enabled": bool(hp.get("enabled", True)),
+            "target_vms": int(hp.get("target_vms", 4)),
+            "gpu_partitioning_mode": str(hp.get("gpu_partitioning_mode", "balanced")),
+            "agent_capacity_scale": str(hp.get("agent_capacity_scale", "medium")),
+            "runtime_profile": profile,
+            "phase": "phase1_controls",
+            "notes": [
+                "Expose GPU-capacity toggles and VM targets in GUI first.",
+                "Bind lifecycle actions in phase2 after policy hardening.",
+            ],
         }
 
     def _json(self, payload: dict, status: int = 200) -> None:
@@ -271,6 +297,10 @@ class AIHubServer(BaseHTTPRequestHandler):
 
         if self.path == "/api/security/watch/live":
             self._json(self._build_security_live())
+            return
+
+        if self.path == "/api/hyperv/phase1":
+            self._json(self._build_hyperv_phase1())
             return
 
         if self.path == "/api/knowledge/summary":

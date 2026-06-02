@@ -49,6 +49,9 @@ services:
       AIHUB_UNIFIED_ENABLED: "true"
       AIHUB_SHARED_MODEL_ID: "hermes-fleet-latest"
       AIHUB_SHARED_ML_PROFILE: "global-learning"
+      HERMES_RUNTIME_PROFILE: "max-gpu-cpu-40gb"
+      HERMES_RUNTIME_TARGET_CPU_CORES: "30"
+      HERMES_RUNTIME_TARGET_MEMORY_GB: "40"
     volumes:
       - ../../:/workspace
       - ../auto:/workspace/runtime/auto
@@ -64,9 +67,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 30G
+          cpus: "30.0"
+          memory: 40G
         reservations:
-          memory: 10G
+          memory: 14G
           devices:
             - driver: nvidia
               count: all
@@ -97,6 +101,9 @@ services:
       AIHUB_SHARED_MODEL_ID: "hermes-fleet-latest"
       AIHUB_SHARED_ML_PROFILE: "global-learning"
       STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+      HERMES_RUNTIME_PROFILE: "max-gpu-cpu-40gb"
+      HERMES_RUNTIME_TARGET_CPU_CORES: "30"
+      HERMES_RUNTIME_TARGET_MEMORY_GB: "40"
     depends_on:
       hermes-gateway:
         condition: service_started
@@ -110,8 +117,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "24.0"
-          memory: 3G
+          cpus: "12.0"
+          memory: 6G
         reservations:
           memory: 1G
     healthcheck:
@@ -160,6 +167,9 @@ services:
       AIHUB_UNIFIED_ENABLED: "true"
       AIHUB_SHARED_MODEL_ID: "hermes-fleet-latest"
       AIHUB_SHARED_ML_PROFILE: "global-learning"
+      HERMES_RUNTIME_PROFILE: "max-gpu-cpu-40gb"
+      HERMES_RUNTIME_TARGET_CPU_CORES: "30"
+      HERMES_RUNTIME_TARGET_MEMORY_GB: "40"
     depends_on:
       hermes-gateway:
         condition: service_started
@@ -172,9 +182,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 30G
+          cpus: "30.0"
+          memory: 40G
         reservations:
-          memory: 10G
+          memory: 14G
           devices:
             - driver: nvidia
               count: all
@@ -228,6 +239,7 @@ services:
       AIHUB_FLEET_AGENTS_PATH: "/workspace/runtime/hermes_persist/agents/simple_agents.json"
       AIHUB_SETUP_TRACKER_PATH: "/workspace/config/x-tier/unified-super-system-tracker.json"
       AIHUB_CUDA_ENABLED: "true"
+      AIHUB_RUNTIME_PROFILE_NAME: "max-gpu-cpu-40gb"
       HERMES_GATEWAY_URL: "http://hermes-gateway:8788"
       HERMES_GUI_URL: "http://hermes-gui:8501"
       HERMES_API_URL: "http://hermes-api:8787"

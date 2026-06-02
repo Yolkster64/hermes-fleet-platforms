@@ -1,5 +1,5 @@
 {
-  "source": "artifacts\\polyglot\\winre_combined_transcript.txt",
+  "source": "docs\\x-tier\\imported\\paste-1780421883688.txt",
   "outputs": {
     "python": "artifacts\\polyglot\\python_master_brief.json",
     "csharp": "artifacts\\polyglot\\csharp_master_brief.json",
@@ -11,89 +11,89 @@
   "consensus": {
     "line_count": {
       "values": {
-        "python": 2621,
-        "csharp": 2621,
-        "cpp": 2621
+        "python": 321,
+        "csharp": 321,
+        "cpp": 321
       },
       "all_equal": true
     },
     "word_count": {
       "values": {
-        "python": 21306,
-        "csharp": 21372,
-        "cpp": 21372
+        "python": 4112,
+        "csharp": 4149,
+        "cpp": 4149
       },
       "all_equal": false
     },
     "heading_count": {
       "values": {
-        "python": 6,
-        "csharp": 6,
-        "cpp": 16
+        "python": 2,
+        "csharp": 2,
+        "cpp": 3
       },
       "all_equal": false
     },
     "section_count": {
       "values": {
-        "python": 3,
-        "csharp": 3,
-        "cpp": 3
+        "python": 1,
+        "csharp": 1,
+        "cpp": 1
       },
       "all_equal": true
     },
     "appendix_count": {
       "values": {
-        "python": 3,
-        "csharp": 3,
-        "cpp": 3
+        "python": 1,
+        "csharp": 1,
+        "cpp": 1
       },
       "all_equal": true
     },
     "task_mentions": {
       "values": {
-        "python": 78,
-        "csharp": 78,
-        "cpp": 78
+        "python": 9,
+        "csharp": 9,
+        "cpp": 9
       },
       "all_equal": true
     },
     "skill_mentions": {
       "values": {
-        "python": 1,
-        "csharp": 1,
-        "cpp": 1
+        "python": 0,
+        "csharp": 0,
+        "cpp": 0
       },
       "all_equal": true
     },
     "connector_mentions": {
       "values": {
-        "python": 1,
-        "csharp": 1,
-        "cpp": 1
+        "python": 0,
+        "csharp": 0,
+        "cpp": 0
       },
       "all_equal": true
     },
     "phase_mentions": {
       "values": {
-        "python": 7,
-        "csharp": 7,
-        "cpp": 7
+        "python": 0,
+        "csharp": 0,
+        "cpp": 0
       },
       "all_equal": true
     },
     "mode_mentions": {
       "values": {
-        "python": 17,
-        "csharp": 17,
-        "cpp": 17
+        "python": 0,
+        "csharp": 0,
+        "cpp": 0
       },
       "all_equal": true
     },
     "auto_mentions": {
       "values": {
-        "python": 350,
-        "csharp": 350,
-        "cpp": 350
+        "python": 88,
+        "csharp": 88,
+        "cpp": 88
       },
       "all_equal": true
     },
@@ -124,29 +124,29 @@
   },
   "conversation": {
     "python_summary": {
-      "total_turns": 233,
-      "user_turns": 185,
-      "assistant_turns": 48,
-      "line_count": 2621
+      "total_turns": 69,
+      "user_turns": 58,
+      "assistant_turns": 11,
+      "line_count": 321
     },
     "csharp_summary": {
-      "total_turns": 233,
-      "user_turns": 185,
-      "assistant_turns": 48,
-      "line_count": 2621
+      "total_turns": 69,
+      "user_turns": 58,
+      "assistant_turns": 11,
+      "line_count": 321
     },
     "component_coverage": {
-      "winre": 17,
-      "vhdx": 49,
-      "security": 39,
-      "networking": 20,
-      "ai_ml": 31,
-      "runtime": 26,
-      "optimization": 24
+      "winre": 0,
+      "vhdx": 8,
+      "security": 8,
+      "networking": 4,
+      "ai_ml": 4,
+      "runtime": 4,
+      "optimization": 2
     },
-    "requirements_count": 185,
-    "unique_requirements_count": 34,
-    "milestones_count": 48
+    "requirements_count": 58,
+    "unique_requirements_count": 13,
+    "milestones_count": 11
   },
   "cpp_source_of_truth": {
     "runtime_decision": {
@@ -155,25 +155,25 @@
       "score": 100
     },
     "optimization_plan": {
-      "cpu_scheduler_boost": 0.75,
-      "memory_gc_pressure": 0.65,
-      "gpu_queue_depth": 2,
-      "network_egress_factor": 0.5,
-      "model_hotset_prefetch": 0.6
+      "cpu_scheduler_boost": 1,
+      "memory_gc_pressure": 0.82,
+      "gpu_queue_depth": 3,
+      "network_egress_factor": 1,
+      "model_hotset_prefetch": 0.95
     },
     "security_optimization_data": {
-      "cpu_utilization": 35.5,
-      "memory_mb": 5805.76,
-      "gpu_utilization": 16.2,
-      "net_egress_mb_s": 100.4,
-      "compression_pressure": 0.0939039,
-      "multitask_pressure": 0.234168,
-      "lightweight_score": 0.813135,
-      "kernel_cpu_clamp": 0.82,
-      "kernel_memory_compaction": 0.9,
-      "kernel_gpu_scheduling": 0.74,
-      "kernel_network_throttle": 0.58,
-      "kernel_parallel_lane_utilization": 0.68
+      "cpu_utilization": 10,
+      "memory_mb": 4427.92,
+      "gpu_utilization": 15,
+      "net_egress_mb_s": 50,
+      "compression_pressure": 0.0596606,
+      "multitask_pressure": 0.111013,
+      "lightweight_score": 0.902096,
+      "kernel_cpu_clamp": 0.94,
+      "kernel_memory_compaction": 0.78,
+      "kernel_gpu_scheduling": 0.92,
+      "kernel_network_throttle": 0.9,
+      "kernel_parallel_lane_utilization": 0.96
     },
     "major_parallelization_types": [
       "task-parallel",
@@ -188,22 +188,22 @@
       "async-event-parallel"
     ],
     "security_watch_plan": {
-      "internet_watch_interval_seconds": 8,
-      "port_watch_interval_seconds": 5,
-      "permission_drift_scan_seconds": 45,
-      "quarantine_trigger_score": 58,
-      "alert_escalation_threshold": 52,
-      "auto_isolation_level": 0.92,
-      "egress_lockdown_factor": 0.82
+      "internet_watch_interval_seconds": 15,
+      "port_watch_interval_seconds": 12,
+      "permission_drift_scan_seconds": 120,
+      "quarantine_trigger_score": 72,
+      "alert_escalation_threshold": 68,
+      "auto_isolation_level": 0.75,
+      "egress_lockdown_factor": 0.58
     },
     "folder_governance_plan": {
-      "sort_priority_score": 0.84,
-      "compression_level": 0.78,
-      "dedupe_intensity": 0.88,
-      "permission_enforcement_level": 0.96,
-      "suspicious_folder_quarantine_level": 0.93,
-      "readonly_guard_ratio": 0.91,
-      "filesystem_watch_depth": 0.95
+      "sort_priority_score": 0.76,
+      "compression_level": 0.66,
+      "dedupe_intensity": 0.72,
+      "permission_enforcement_level": 0.82,
+      "suspicious_folder_quarantine_level": 0.74,
+      "readonly_guard_ratio": 0.7,
+      "filesystem_watch_depth": 0.8
     },
     "alert_channels": [
       "cpp_runtime_watchdog",
@@ -230,36 +230,36 @@
       "score": 100
     },
     "security_watch_plan": {
-      "internet_watch_interval_seconds": 8,
-      "port_watch_interval_seconds": 5,
-      "permission_drift_scan_seconds": 45,
-      "quarantine_trigger_score": 58,
-      "alert_escalation_threshold": 52,
-      "auto_isolation_level": 0.92,
-      "egress_lockdown_factor": 0.82
+      "internet_watch_interval_seconds": 15,
+      "port_watch_interval_seconds": 12,
+      "permission_drift_scan_seconds": 120,
+      "quarantine_trigger_score": 72,
+      "alert_escalation_threshold": 68,
+      "auto_isolation_level": 0.75,
+      "egress_lockdown_factor": 0.58
     },
     "folder_governance_plan": {
-      "sort_priority_score": 0.84,
-      "compression_level": 0.78,
-      "dedupe_intensity": 0.88,
-      "permission_enforcement_level": 0.96,
-      "suspicious_folder_quarantine_level": 0.93,
-      "readonly_guard_ratio": 0.91,
-      "filesystem_watch_depth": 0.95
+      "sort_priority_score": 0.76,
+      "compression_level": 0.66,
+      "dedupe_intensity": 0.72,
+      "permission_enforcement_level": 0.82,
+      "suspicious_folder_quarantine_level": 0.74,
+      "readonly_guard_ratio": 0.7,
+      "filesystem_watch_depth": 0.8
     },
     "cpp_resource_telemetry": {
-      "cpu_utilization": 35.5,
-      "memory_mb": 5805.76,
-      "gpu_utilization": 16.2,
-      "net_egress_mb_s": 100.4,
-      "compression_pressure": 0.0939039,
-      "multitask_pressure": 0.234168,
-      "lightweight_score": 0.813135,
-      "kernel_cpu_clamp": 0.82,
-      "kernel_memory_compaction": 0.9,
-      "kernel_gpu_scheduling": 0.74,
-      "kernel_network_throttle": 0.58,
-      "kernel_parallel_lane_utilization": 0.68
+      "cpu_utilization": 10,
+      "memory_mb": 4427.92,
+      "gpu_utilization": 15,
+      "net_egress_mb_s": 50,
+      "compression_pressure": 0.0596606,
+      "multitask_pressure": 0.111013,
+      "lightweight_score": 0.902096,
+      "kernel_cpu_clamp": 0.94,
+      "kernel_memory_compaction": 0.78,
+      "kernel_gpu_scheduling": 0.92,
+      "kernel_network_throttle": 0.9,
+      "kernel_parallel_lane_utilization": 0.96
     },
     "alert_channels": [
       "cpp_runtime_watchdog",
