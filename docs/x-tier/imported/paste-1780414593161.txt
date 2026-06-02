@@ -1,0 +1,886 @@
+3.4 — Secrets Management Policy
+All secrets used by the Hermes system follow a strict tiered management policy. No secret is ever stored in plaintext on disk, committed to Git, or passed as a command-line argument visible in process listings.
+
+Secret Type    Storage Location    Access Method    Rotation Schedule
+GitHub PAT    Windows Credential Manager (wincred)    gh auth token    Every 90 days
+Azure SP Client Secret    Azure Key Vault (hermes-kv)    az keyvault secret show    Every 180 days
+Postgres Password    Windows Credential Manager or Key Vault    PowerShell SecretManagement module    Every 90 days
+Qdrant API Key    Azure Key Vault (hermes-kv)    az keyvault secret show    Every 90 days
+OpenAI / Azure OpenAI Key    Azure Key Vault (hermes-kv)    SDK key vault reference    Every 90 days
+Docker secrets.env    D:\DevDrive\hermes\configs\secrets.env    Docker --env-file; chmod 600; never committed    Per-component schedule
+PowerShell: Secret helper functions using SecretManagement module
+# Install SecretManagement and SecretStore modules (one-time)
+# Install-Module Microsoft.PowerShell.SecretManagement -Scope CurrentUser
+# Install-Module Microsoft.PowerShell.SecretStore       -Scope CurrentUser
+# Register-SecretVault -Name HermesLocalVault -ModuleName Microsoft.PowerShell.SecretStore
+
+function Get-HermesSecret {
+    param([string]$SecretName)
+    return Get-Secret -Name $SecretName -Vault HermesLocalVault -AsPlainText
+}
+
+function Set-HermesSecret {
+    param([string]$SecretName, [string]$SecretValue)
+    Set-Secret -Name $SecretName -Secret $SecretValue -Vault HermesLocalVault
+    Write-Host "Secret '$SecretName' stored in HermesLocalVault."
+}
+
+# Example usage:
+# $pgPass = Get-HermesSecret -SecretName "postgres-password"
+# $env:POSTGRES_PASSWORD = $pgPass
+.gitignore entries (add to D:\DevDrive\repos\hermes\.gitignore):
+# Secrets — never commit
+secrets.env
+*.key
+*.pem
+*.p12
+*.pfx
+*.env.local
+credentials.json
+service_account.json
+
+# DevDrive paths — exclude large artifacts
+/data/raw/
+/data/processed/
+/ai-hub/models/
+/ai-hub/checkpoints/
+/caches/
+/postgres/
+/qdrant/
+3.5 — WSL2 and Docker Isolation Configuration
+FILE: .wslconfig additions for Mode C and B (in %USERPROFILE%\.wslconfig)
+[wsl2]
+memory=32GB
+processors=16
+swap=8GB
+swapFile=D:\\DevDrive\\wsl2\\swap.vhd
+localhostForwarding=true
+nestedVirtualization=true
+kernelCommandLine=quiet splash
+
+# Mode B: mirrored networking with host firewall enforcement
+networkingMode=mirrored
+firewall=true
+dnsTunneling=false
+
+# Mode C override (applied via registry + reboot):
+# networkingMode=none
+# Set: HKLM\SYSTEM\CurrentControlSet\Services\WslService\Parameters\NetworkingMode = 0
+FILE: daemon.json — Full hardened Docker configuration (C:\ProgramData\docker\config\daemon.json)
+{
+  "data-root": "D:\\DevDrive\\docker",
+  "userns-remap": "default",
+  "no-new-privileges": true,
+  "live-restore": true,
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m",
+    "max-file": "3"
+  },
+  "default-runtime": "nvidia",
+  "runtimes": {
+    "nvidia": {
+      "path": "nvidia-container-runtime",
+      "runtimeArgs": []
+    }
+  },
+  "features": {
+    "buildkit": true
+  },
+  "ip": "127.0.0.1",
+  "ipv6": false,
+  "fixed-cidr": "172.20.0.0/16"
+}
+3.6 — Windows Sandbox Config for Hermes Testing
+FILE: hermes_sandbox.wsb
+<Configuration>
+  <VGpu>Enable</VGpu>
+  <Networking>Disable</Networking>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>D:\DevDrive\sandbox</HostFolder>
+      <SandboxFolder>C:\SandboxShare</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <Command>powershell -ExecutionPolicy Bypass -File C:\SandboxShare\sandbox_init.ps1</Command>
+  </LogonCommand>
+</Configuration>
+Sandbox Notes
+The sandbox VHD is ephemeral — all state is lost on Sandbox closure. Use D:\DevDrive\sandbox\ as the read-only share for scripts and test data. sandbox_init.ps1 should install only the minimum Python environment needed for the test, then run the target module. Never map the full DevDrive read-write into the Sandbox.
+Deliverable 4 — Wiring Diagrams (Text-Based)
+The following ASCII wiring diagrams document the primary data flows and integration paths in the Hermes XCore system. These diagrams represent the logical flow, not network topology. All connections operate on localhost (127.0.0.1) in Mode B. External connections (Azure, GitHub) are only active in Mode A.
+
+4.1 — Log Flow: Hermes Nodes to SQL and Vector DB
+[Hermes Node n (WSL2 / Hyper-V VM)]
+  |
+  |-- Task executes (inference | training | feature_eng)
+  |
+  +--[Python structlog StructuredLogHandler]
+        |-- Serializes log record to JSON (level, msg, run_id, node_id, ts, payload_hash)
+        |
+        +--[Local file sink]
+        |     --> D:/DevDrive/hermes/nodes/node_n/logs/current.log  (rotated daily, max 100 MB)
+        |
+        +--[LogForwarder thread (async queue, non-blocking)]
+              |
+              +--[TCP socket --> Orchestrator 127.0.0.1:8700 (persistent connection)]
+                    |
+                    +--[Orchestrator LogAggregator (asyncio consumer)]
+                          |
+                          +--[DB Writer (psycopg2, connection pool)]
+                          |     --> PostgreSQL 127.0.0.1:5432
+                          |         hermes_logs.hermes_run_log     (per-run status)
+                          |         hermes_logs.hermes_feature_log  (per-feature stats)
+                          |
+                          +--[Embedding Writer (sentence-transformers on GPU/CPU)]
+                                |-- Encodes log payload context field to 128-dim latent
+                                |
+                                +--[Qdrant Upsert --> 127.0.0.1:6333]
+                                      Collection: embeddings_v1
+                                      Payload: {run_id, node_id, task_type, ts, model_version}
+
+FAILURE HANDLING:
+  If DB write fails:
+    --> Buffer log in local SQLite at D:\DevDrive\hermes\nodes\node_n\logs\fallback.db
+    --> Orchestrator LogAggregator retries DB write on reconnect (exponential backoff)
+    --> Fallback.db is drained and then replayed to Postgres on reconnect success
+
+  If Qdrant write fails:
+    --> Log payload is queued in memory (max 10,000 entries)
+    --> Retry every 30 seconds until success
+    --> If queue > 10,000: oldest entries are discarded, WARNING logged to hermes_run_log
+4.2 — Routing Policy Update and Deployment Flow
+[Feedback Ingester]
+  Receives reward signal from user action or downstream evaluation system
+  |
+  +--> FeedbackIngester.validate_reward(reward)
+  |       Checks: float, not NaN, range [-1.0, 1.0]
+  |
+  +--> INSERT INTO hermes_feedback_log (session_id, model_id, input_hash, output_hash, reward, context)
+  |
+  +--> [FeedbackStats aggregator — runs every 5 minutes via scheduled asyncio task]
+          |
+          +--> SELECT recent unresolved routing decisions JOIN feedback_log
+          |
+          +--> ContextualBanditRouter.update(arm, context_vector, reward)
+          |       LinUCB Sherman-Morrison update:
+          |         A_inv[arm] -= (A_inv x)(A_inv x)^T / (1 + x^T A_inv x)
+          |         b[arm]     += reward * x
+          |
+          +--> [Trigger condition check]
+                 if accumulated_updates >= N  (config: update_interval_seconds = 300)
+                 OR scheduled policy refresh time reached:
+                 |
+                 +--> policy_manager.save_policy(path)
+                 |         --> JSON to D:/DevDrive/hermes/configs/routing_policy.json
+                 |
+                 +--> deploy_policy(policy_dict, node_endpoints=[
+                 |         "http://127.0.0.1:8701",
+                 |         "http://127.0.0.1:8702",
+                 |         "http://127.0.0.1:8703"
+                 |     ])
+                 |         --> POST /policy/update to each node
+                 |         --> Each node validates JSON schema (pydantic)
+                 |         --> Hot-reloads ContextualBanditRouter in-process
+                 |         --> Returns HTTP 200 OK | 422 Validation Error
+                 |
+                 +--> health_check_all()
+                 |         --> If any node returns non-200:
+                 |             --> deploy_policy(previous_policy_dict, all_endpoints)  [ROLLBACK]
+                 |             --> Log CRITICAL to hermes_run_log
+                 |
+                 +--> INSERT INTO hermes_model_registry (policy version, deployed_at)
+4.3 — Copilot / Agent / Azure AI Foundry Integration Flow
+[User / Copilot Chat / Semantic Kernel Agent]
+  |
+  +--> HermesRouterPlugin.route_task(context_vector, task_type, payload)
+        (Semantic Kernel plugin, registered in kernel.add_plugin())
+        |
+        +--> HTTP POST http://127.0.0.1:8700/v1/route   (localhost only in Mode B)
+              Body: { "context_vector": [...128 floats...], "task_type": "inference", "payload": {...} }
+              |
+              +--> Orchestrator.dispatch_task(HermesTask)
+                    |
+                    +--> ContextualBanditRouter.select_arm(context)
+                    |         Returns: arm="node_01_inference", confidence=0.87
+                    |
+                    +--> POST http://127.0.0.1:8701/v1/infer
+                                { task_id, payload }
+                                |
+                                +--> node_01 GPU inference (HermesAutoencoder / loaded LLM)
+                                +--> Returns ScoringResult {output, confidence, output_hash}
+              |
+              +--> Orchestrator returns JSON result to SK plugin
+                    { "result": {...}, "node_used": "node_01", "confidence": 0.87 }
+              |
+              +--> SK plugin returns structured result into Semantic Kernel context window
+  |
+  +--> [Optional feedback] Agent POSTs reward to http://127.0.0.1:8700/v1/feedback
+              --> FeedbackIngester.ingest(session_id, model_id, input_hash, output_hash, reward, context)
+
+---
+
+[Azure AI Foundry Tool Registration — Mode A only]
+  |
+  +--> Foundry function tool schema registered in Azure AI Foundry project:
+        {
+          "tool_name":   "hermes_route",
+          "description": "Route a task to the optimal Hermes node based on context",
+          "parameters":  { "context_vector": "array[float]", "task_type": "string" }
+        }
+  |
+  +--> Foundry invokes tool --> Semantic Kernel function call
+  +--> SK --> HTTP POST to local Hermes endpoint (via ngrok secure tunnel or VPN in Mode A)
+  +--> Returns structured JSON back into Foundry conversation context
+
+---
+
+[GitHub Actions CI/CD — triggered on push]
+  |
+  +--> git push to D:\DevDrive\repos\hermesxcore\ (main branch via PR)
+        |
+        +--> git hook: pre-push runs local lint + type-check (mypy, ruff)
+        |
+        +--> gh workflow run hermes-test.yml
+              Steps:
+                1. Set up Python 3.12 in WSL2 (ubuntu-22.04)
+                2. pip install -r requirements.txt (from D:\DevDrive\ai-hub\venvs\hermes-core)
+                3. pytest tests/ --cov=hermes --cov-report=xml
+                4. mypy hermes/ --strict
+                5. ruff check hermes/
+              On success:
+                +--> Trigger model staging: retraining_loop.py --mode=stage --run-id=ci-{commit_sha}
+                +--> Artifacts pushed to D:\DevDrive\ai-hub\checkpoints\ci\{commit_sha}\
+              On failure:
+                +--> Block PR merge (branch protection rule: require status checks)
+                +--> Notify via GitHub notification
+4.4 — Azure and GitHub Integration Provisioning Flow
+[Initial Setup — Mode A or Mode B]
+
+STEP 1: Authentication
+  +--> az login --use-device-code
+        --> Browser: https://microsoft.com/devicelogin -> Enter code
+        --> Select subscription from list
+        --> az account set --subscription {subscription-id}
+  |
+  +--> gh auth login --web
+        --> Browser OAuth flow
+        --> Token stored in Windows Credential Manager (wincred keychain)
+        --> Verify: gh auth status
+
+STEP 2: Azure Resource Provisioning
+  +--> az group create --name hermes-rg --location eastus
+  +--> az keyvault create --name hermes-kv --resource-group hermes-rg --enable-rbac-authorization true
+  +--> az keyvault secret set --vault-name hermes-kv --name postgres-password --value {from-env-not-cli}
+  +--> az keyvault secret set --vault-name hermes-kv --name qdrant-api-key    --value {from-env-not-cli}
+  +--> az keyvault secret set --vault-name hermes-kv --name openai-api-key    --value {from-env-not-cli}
+
+STEP 3: Purview Integration
+  +--> az purview account create --name hermes-purview --resource-group hermes-rg --location eastus
+  +--> Register local data sources:
+        hermes-purview scan D:\DevDrive\data\ as custom data source
+        Apply sensitivity labels: "Internal", "Confidential" to model artifacts
+        Enable DLP policies for Mode A: prevent exfiltration of labeled files
+  +--> Weekly Purview scan scheduled via az purview scan create
+
+STEP 4: Entra ID Integration
+  +--> Device registration:
+        dsregcmd /join  (joins workstation to Entra tenant)
+        dsregcmd /status  (verify: AzureAdJoined=YES, DeviceAuthStatus=SUCCESS)
+  +--> Conditional Access Policy (configured in Entra admin portal):
+        Rule: Only Entra-joined devices with compliant posture can access hermes-kv and Azure OpenAI
+  +--> Service Principal for Hermes orchestrator:
+        az ad sp create-for-rbac --name "hermes-orchestrator-sp" --role "Key Vault Secrets User"
+                                  --scopes /subscriptions/{sub-id}/resourceGroups/hermes-rg/providers/...
+        Store SP credentials in hermes-kv: az keyvault secret set --name sp-client-secret ...
+        Never write SP secret to disk.
+
+STEP 5: GitHub Repository Setup
+  +--> gh repo create hermesxcore --private
+  +--> Configure branch protection on main:
+        Require PR review (1 approver)
+        Require status checks: hermes-test (pytest, mypy, ruff)
+        Restrict direct push to main
+  +--> Add GitHub repository secrets:
+        gh secret set AZURE_SP_CLIENT_ID    --body {sp-client-id}
+        gh secret set AZURE_SP_CLIENT_SECRET --body {from-keyvault-not-cli}
+        gh secret set AZURE_TENANT_ID       --body {tenant-id}
+        gh secret set AZURE_SUBSCRIPTION_ID --body {subscription-id}
+  +--> Configure .gitignore (see Deliverable 3.4)
+  +--> Push initial skeleton from D:\DevDrive\repos\hermesxcore\
+Deliverable 5 — Prioritized Rollout Plan
+Phase 0 — Prerequisites and Hardware Validation (Day 0, 2–4 hours)
+This phase confirms that the hardware and base OS are in the correct state before any software changes. No scripts are run during this phase.
+
+Verify BIOS/UEFI settings per Deliverable 6.8 checklist: Secure Boot, TPM 2.0, VT-x/VT-d, 4G Decoding, Re-Size BAR, XMP enabled.
+Confirm all NVMe drives are detected: C: (OS), D: (DevDrive target), E: (optional).
+Verify Windows 11 23H2 or later (build 22631+) with all Windows Update quality updates applied.
+Run nvidia-smi to confirm GPU detection and driver version.
+Disable Hibernation: powercfg /h off (recovers ~64 GB on C:).
+Disable Fast Startup in Power Options (ensures clean Hyper-V state on reboot).
+Move page file to D: after DevDrive is created (System Properties > Advanced > Performance > Virtual Memory).
+Phase 0 Checkpoints
+CP-0.1: nvidia-smi output confirms correct GPU model and driver version.
+CP-0.2: All NVMe drives visible in Disk Management with correct capacities.
+CP-0.3: Windows build number confirmed ≥ 22631 (winver command).
+CP-0.4: BIOS checklist from Deliverable 6.8 signed off (all items).
+Rollback: N/A — this is a read-only validation phase. No changes made.
+Phase 1 — DevDrive and Environment Setup (Day 1, 4–6 hours)
+Run 01_phase1_devdrive_layout.ps1 as Administrator in PowerShell 7.
+
+Format D: as ReFS DevDrive with 64K cluster size and label "DevDrive".
+Create full folder tree under D:\DevDrive\ as specified.
+Set all developer cache environment variables (machine scope).
+Export and relocate WSL2 distros to D:\DevDrive\wsl2\.
+Write .wslconfig with memory, processor, swap, and networking settings.
+Relocate Docker data-root to D:\DevDrive\docker\ using robocopy.
+If E: drive is present, create junction from D:\DevDrive\ai-hub\models to E:\models.
+Phase 1 Checkpoints
+CP-1.1: D:\DevDrive\ folder tree exists with all 20+ subfolders.
+CP-1.2: C: free space > 40 GB after DevDrive creation.
+CP-1.3: wsl --list shows distros in D:\DevDrive\wsl2\; wsl starts cleanly.
+CP-1.4: Docker Desktop starts cleanly with data-root at D:\DevDrive\docker\.
+CP-1.5: pip install requests in a test venv — confirm pip cache lands on D: (check PIP_CACHE_DIR).
+Rollback: Restore WSL2 distros from exported .tar files at D:\DevDrive\logs\wsl_backup_*.tar. Restore daemon.json from .bak file. Restart Docker Desktop.
+Phase 2 — Tools, SDKs, and GPU Setup (Day 1–2, 3–5 hours)
+Run 02_phase2_tools_sdks.ps1 as Administrator in PowerShell 7.
+
+Install all winget packages (Git, VSCode, Python 3.12, Node.js LTS, Rust, Go, Azure CLI, GitHub CLI, Docker Desktop, PowerShell 7).
+Install Miniforge to D:\DevDrive\caches\conda\miniforge.
+Verify CUDA Toolkit 12.x: nvidia-smi, nvcc --version.
+Verify cuDNN headers present in CUDA include directory.
+Configure Docker daemon for NVIDIA runtime.
+Validate GPU in WSL2: /dev/dxg present, torch.cuda.is_available() = True.
+Authenticate GitHub CLI and Azure CLI.
+Create Copilot SDK venv at D:\DevDrive\ai-hub\venvs\copilot-sdk.
+Phase 2 Checkpoints
+CP-2.1: git --version, python --version (3.12.x), node --version, az --version, gh --version — all return without error.
+CP-2.2: nvidia-smi shows correct GPU; CUDA 12.x displayed.
+CP-2.3: In WSL2: python3 -c "import torch; print(torch.cuda.is_available())" returns True.
+CP-2.4: docker run --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi succeeds.
+CP-2.5: gh auth status — logged in. az account show — correct subscription.
+Rollback: Use winget uninstall for specific failed packages. Roll back GPU driver via Device Manager if CUDA validation fails.
+Phase 3 — Hyper-V, Postgres, Qdrant, Hermes Skeleton (Day 2, 4–6 hours)
+Run 03_phase3_hyperv_services.ps1 as Administrator. A reboot may be required after Hyper-V enablement before continuing.
+
+Enable Hyper-V (Microsoft-Hyper-V-All) and Windows Sandbox.
+Create HermesNet (external) and HermesInternal vSwitches.
+Deploy Postgres 16 Docker container; create all 4 databases; apply DDL from Deliverable 2.1.
+Deploy Qdrant Docker container; create all 3 collections.
+Create Hermes runtime skeleton: orchestrator.py, node_template/runner.py, hermes_global.yaml.
+Phase 3 Checkpoints
+CP-3.1: Get-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All shows State=Enabled.
+CP-3.2: Get-VMSwitch shows HermesNet (External) and HermesInternal (Internal).
+CP-3.3: docker exec hermes-postgres pg_isready -U postgres returns "accepting connections".
+CP-3.4: GET http://127.0.0.1:6333/healthz returns HTTP 200 and JSON {"result":"ok"}.
+CP-3.5: Qdrant collections embeddings_v1, routing_contexts, feature_signatures all present.
+CP-3.6: python D:\DevDrive\hermes\orchestrator\orchestrator.py runs without error (exits cleanly from asyncio loop).
+Rollback: docker stop hermes-postgres hermes-qdrant; docker rm hermes-postgres hermes-qdrant. Disable Hyper-V feature via DISM. Restore pre-Phase-3 checkpoint from D:\DevDrive\logs\.
+Phase 4 — Security Modes and Hardening (Day 3, 2–4 hours)
+Run configure_bitlocker.ps1 -SecurityMode B to enable BitLocker TPM-only on C: and D:.
+Run set_security_mode.ps1 -Mode B to apply Mode B firewall rules and WSL2/Docker isolation.
+Test Mode C toggle: run toggle script, verify network blocked, toggle back to Mode B.
+Configure Docker daemon.json with full security hardening (userns-remap, no-new-privileges).
+Verify secrets management: store Postgres password in Windows Credential Manager using SecretManagement module.
+Phase 4 Checkpoints
+CP-4.1: manage-bde -status C: shows "Protection Status: Protection On", "Encryption Method: XTS-AES 256".
+CP-4.2: manage-bde -status D: shows same.
+CP-4.3: Mode B active: Invoke-WebRequest https://github.com succeeds; inbound connection attempt from another host is blocked.
+CP-4.4: Mode C toggle: after applying Mode C, Invoke-WebRequest https://github.com fails. Toggle back to Mode B restores access.
+CP-4.5: Get-HermesSecret "postgres-password" returns correct value from SecretManagement vault.
+Rollback: manage-bde -pause C: and D: to suspend BitLocker. Restore firewall defaults: netsh advfirewall reset.
+Phase 5 — Hermes XCore Pipeline (Day 3–5, 8–12 hours)
+Create hermes-core venv: python -m venv D:\DevDrive\ai-hub\venvs\hermes-core
+Install all dependencies from requirements.txt (Appendix B).
+Deploy all 8 Python modules: feature_pipeline.py, correlation_search.py, autoencoder_pipeline.py, routing_policy.py, retraining_loop.py, scoring_feedback.py, vector_store.py, orchestrator.py.
+Apply SQL DDL from Deliverable 2.1 to Postgres.
+Run unit tests for each module against sample data.
+Run integration test: dispatch a full pipeline run from FeaturePipeline.run() through to Qdrant upsert.
+Phase 5 Checkpoints
+CP-5.1: FeaturePipeline.run() on 100-row sample DataFrame returns FeatureSet with non-null fields.
+CP-5.2: CorrelationSearch.search_secondary_variables() identifies at least one secondary variable on synthetic data.
+CP-5.3: AutoencoderTrainer.fit() completes 1 training epoch on sample data; checkpoint file saved to D:\DevDrive\ai-hub\checkpoints\.
+CP-5.4: ContextualBanditRouter.select_arm() returns valid arm name from configured arm list.
+CP-5.5: HermesVectorStore.upsert_embeddings() adds 10 vectors to embeddings_v1; .search() returns top-5 with scores.
+CP-5.6: Orchestrator dispatches test HermesTask to node_01; TaskResult returns status="success".
+Rollback: git checkout HEAD~1 in D:\DevDrive\repos\hermes\; reinstall dependencies from previous requirements.txt; re-run unit tests.
+Phase 6 — Integration and Azure/GitHub Wiring (Day 5–7, 4–6 hours)
+Provision Azure resources per Deliverable 4.4 flow: resource group, Key Vault, Purview, Entra SP.
+Store all secrets in Azure Key Vault; verify access from Hermes orchestrator using SP credentials.
+Register HermesRouterPlugin in Semantic Kernel; test route_task() call from Python script.
+Configure GitHub Actions workflow file .github/workflows/hermes-test.yml and push to trigger first CI run.
+Register Hermes endpoint as Azure AI Foundry tool (Mode A only).
+Phase 6 Checkpoints
+CP-6.1: az keyvault secret show --name postgres-password --vault-name hermes-kv returns value (from orchestrator SP context).
+CP-6.2: Semantic Kernel HermesRouterPlugin.route_task() returns valid ScoringResult JSON.
+CP-6.3: GitHub Actions run (hermes-test.yml) passes all steps on first test commit to branch.
+CP-6.4: Purview scan completes without error on D:\DevDrive\data\ (Mode A only).
+Rollback: az group delete --name hermes-rg --yes --no-wait (destroys all Azure resources). gh secret remove to clean GitHub secrets. Restore to Phase 5 checkpoint.
+Phase 7 — Continuous Operation and Monitoring (Ongoing)
+Verify ContinuousRetrainingOrchestrator.run_loop() starts on system boot (register as Windows Service or WSL2 systemd service).
+Monitor hermes_run_log for error_rate > 5% per 24-hour window.
+Weekly: review DriftReport outputs; review secondary variable candidates in hermes_secondary_vars.
+Monthly: rotate GitHub PAT (90-day max), rotate Azure SP secret (180-day max), prune checkpoints beyond rollback_versions_to_keep=3.
+Quarterly: review routing policy arm performance; evaluate adding or removing Hermes nodes.
+Verify backup procedures from Deliverable 7.2 run weekly.
+Rollback Plan — All Phases
+Always maintain 3 previous champion model checkpoints in D:\DevDrive\ai-hub\checkpoints\. One-command rollback via: python orchestrator.py --rollback --to-model-id {model_id}. The rollback() method in ContinuousRetrainingOrchestrator is designed for immediate execution without restart.
+Deliverable 6 — Hardware Checklist
+6.1 — CPU
+Requirement    Specification
+Minimum    Intel Core i9-13th Gen (i9-13900K) or AMD Ryzen 9 7950X; 12+ cores, 24+ threads
+Recommended    Intel Core i9-14900KS or AMD Ryzen 9 7950X3D; 24 cores, 32 threads
+BIOS: Virtualization    Enable VT-x (Intel) / AMD-V; Enable VT-d (Intel) / AMD-Vi / IOMMU for GPU passthrough
+BIOS: Hyper-Threading / SMT    Enable (required for full WSL2 + Hyper-V concurrency)
+C-states for Training    Optional: Disable C-states (C6/C8) for reduced wake latency during sustained GPU training workloads
+TDP / Power Limits    Set PL1 and PL2 to maximum motherboard-supported values for training workloads
+6.2 — GPU
+Requirement    Specification
+Minimum    NVIDIA RTX 3090 (24 GB VRAM, GDDR6X)
+Recommended    NVIDIA RTX 4090 (24 GB VRAM, GDDR6X, 1008 GB/s bandwidth)
+Professional / Large Models    NVIDIA A100 80 GB SXM or H100 80 GB for models > 20B parameters
+Driver    Latest Game Ready Driver (GRD) or Studio Driver; CUDA 12.x compatible (527.x or newer)
+BIOS: 4G Decoding    Enable "Above 4G Memory Decoding" (required for >8 GB VRAM cards)
+BIOS: Re-Size BAR    Enable Re-Size BAR / Smart Access Memory (SAM) — improves PCIe bandwidth utilization
+NVIDIA Container Toolkit    Required for Docker GPU passthrough (nvidia-container-runtime)
+CUDA on WSL2    NVIDIA WSL2 CUDA driver (separate from host driver; managed by NVIDIA; install via NVIDIA developer portal)
+GPU Slot    Install in PCIe 5.0 x16 slot closest to CPU for maximum bandwidth
+6.3 — RAM
+Requirement    Specification
+Minimum    64 GB DDR5
+Recommended    128 GB DDR5 (ECC if supported by motherboard and workload demands it)
+Speed    DDR5-5600 or higher; enable XMP 3.0 / EXPO profile in BIOS
+Configuration    Dual-channel minimum; quad-channel preferred for X670E/Z790 platforms
+WSL2 Allocation    Set memory= in .wslconfig to 32–64 GB; leave minimum 16 GB for Windows host
+Page File    Move page file to D:\DevDrive\ after Phase 1; set 8–16 GB fixed size
+6.4 — NVMe Storage
+Drive    Minimum    Recommended    Suggested Model    Purpose
+C: (OS)    512 GB PCIe 4.0    1 TB NVMe PCIe 4.0    Samsung 990 Pro 1 TB or WD Black SN850X 1 TB    OS and system only; keep < 60% full
+D: (DevDrive)    2 TB PCIe 4.0    4 TB NVMe PCIe 4.0    Samsung 990 Pro 4 TB or WD Black SN850X 4 TB    All development, models, containers, WSL2, Docker
+E: (Optional)    2 TB PCIe 5.0    8 TB NVMe PCIe 5.0    Crucial T705 8 TB or Seagate FireCuda 540    Heavy model weights > 30 GB; symlinked from D:\DevDrive\ai-hub\models
+NVMe Placement
+Install D: (DevDrive) in the M.2 slot closest to the CPU with PCIe 5.0 support (if available) for maximum sequential throughput during model I/O. C: (OS) can be in a PCIe 4.0 slot further from CPU. E: should be PCIe 5.0 if available for model weight loading throughput.
+6.5 — Motherboard
+Feature    Requirement
+Chipset (Intel)    Z790 or Z790E; supports DDR5, PCIe 5.0
+Chipset (AMD)    X670E; supports DDR5, PCIe 5.0 GPU + NVMe
+PCIe Slots    Minimum 1x PCIe 5.0 x16 (GPU) + 1x PCIe 4.0 x16 or x4 (secondary)
+M.2 Slots    Minimum 3x M.2 (for C:, D:, E: drives); prefer PCIe 5.0 for primary and secondary
+TPM    TPM 2.0 firmware module (fTPM) or discrete TPM 2.0 header — required for BitLocker
+USB    USB 3.2 Gen 2x2 (20 Gbps) on rear panel for external NVMe backup
+Network    Intel I225-V 2.5 GbE minimum; Intel I226-V preferred; optional 10 GbE for lab network
+VRM    High-quality VRM (16+ phases) for sustained CPU turbo under training load
+6.6 — Power Supply
+Requirement    Specification
+Minimum    1000W 80+ Gold certified; fully modular
+Recommended (RTX 4090)    1200W+ 80+ Platinum; fully modular; 12VHPWR connector native
+Recommended (A100)    1600W+ 80+ Titanium with 12VHPWR or EPS12V
+Rail Design    Single 12V rail preferred for GPU stability under transient peak loads
+6.7 — Windows Post-Install Settings Checklist
+Setting    Action    Why
+Windows 11 23H2+    Verify build ≥ 22631 (winver)    DevDrive requires 22621+; 22631 adds performance improvements
+Developer Mode    Settings > System > For Developers > ON    Required for DevDrive and symlink creation without elevation
+Virtualization-Based Security    msinfo32 > Virtualization-based security = Running    Required for Hyper-V isolation and Credential Guard
+Hyper-V    Enable via Phase 3 script or Windows Features    Required for WSL2 and Hermes Hyper-V nodes
+WSL2 Kernel    wsl --update (get 5.15+ kernel)    Required for CUDA on WSL2 and latest mirrored networking
+PowerShell 7    Set as default in Windows Terminal settings    All scripts require PS 7+
+Windows Update    Apply all quality + driver updates before Phase 1    Ensures DevDrive drivers and WSL2 kernel patches are current
+Disable Hibernation    powercfg /h off (Admin)    Recovers ~64 GB on C: (hiberfil.sys); also required for clean Hyper-V state
+Disable Fast Startup    Control Panel > Power Options > Turn on fast startup = OFF    Prevents Hyper-V state corruption on reboot
+Page File    Move to D: after Phase 1; 8–16 GB fixed    Reduces C: pressure; D: ReFS handles large page file efficiently
+Delivery Optimization    Set cache to D:\DevDrive\caches\delivery    Moves Windows Update cache off C:
+6.8 — BIOS/UEFI Checklist
+Setting    Required Value    Notes
+Secure Boot    Enabled    Required for BitLocker with TPM; use Standard key database
+TPM    Enabled (TPM 2.0 / fTPM)    Must show TPM 2.0 in tpm.msc after boot
+VT-x / AMD-V    Enabled    CPU virtualization — required for Hyper-V and WSL2
+VT-d / AMD-Vi (IOMMU)    Enabled    Required for GPU passthrough to Hyper-V VMs and proper device isolation
+Above 4G Memory Decoding    Enabled    Required for GPUs with > 8 GB VRAM to fully map BAR address space
+Re-Size BAR / Smart Access Memory    Enabled    Improves CPU-GPU transfer bandwidth; requires Above 4G Decoding to be enabled first
+XMP / EXPO Profile    Enabled (profile 1)    Enables rated DDR5 speed; verify POST stability before proceeding
+NVMe Boot Drive Slot    PCIe 5.0 x4 (closest to CPU)    D: DevDrive gets maximum sequential bandwidth
+Fan Curve    Aggressive (GPU + CPU)    Set high fan RPM at 70°C GPU for sustained training workloads
+CPU Power Limits (PL1/PL2)    Maximum / Unlimited    Prevents CPU throttling during training; verify thermal headroom first
+C-States    Disable C6/C8 for training (optional)    Reduces wake latency for GPU compute requests; increases idle power
+6.9 — Driver Version Checklist
+Component    Minimum Version    Recommended Version    How to Verify
+NVIDIA GPU Driver (Windows)    527.x    Latest Studio/GRD (2024/2025)    nvidia-smi — Driver Version column
+CUDA Toolkit    12.0    12.4 or 12.5    nvcc --version
+cuDNN    8.9.x    9.x    Verify cudnn.h header version in CUDA include dir
+WSL2 Linux Kernel    5.15.90.1    Latest (wsl --update)    uname -r inside WSL2
+Docker Desktop    4.25    Latest stable    docker --version
+NVIDIA Container Toolkit    1.14    Latest    nvidia-ctk --version
+PowerShell    7.3    7.4 or 7.5    $PSVersionTable.PSVersion
+Python    3.12.0    3.12.x latest    python --version
+Azure CLI    2.60    Latest    az --version
+GitHub CLI    2.40    Latest    gh --version
+Deliverable 7 — Script Quality Standards and Backup Procedures
+7.1 — Error Handling Standards (All Scripts)
+PowerShell Scripts
+Every script begins with $ErrorActionPreference = "Stop" — all errors become terminating.
+Every destructive operation (format, delete, move, overwrite) is wrapped in try { ... } catch { ... } with an explicit rollback call and log write.
+Non-fatal failures (e.g., optional tool install) log a WARNING and continue. Fatal failures (e.g., CUDA not found) call throw and halt the script.
+All external command exit codes are checked: if ($LASTEXITCODE -ne 0) { throw "Command failed with exit $LASTEXITCODE" }.
+Logs are written to timestamped files at D:\DevDrive\logs\ and echoed to console via Tee-Object.
+Before any phase script runs, a state snapshot is written (disk usage, service states, firewall rules) to D:\DevDrive\logs\pre_phase_snapshot_{datetime}.txt.
+Python Modules
+All modules use structlog or Python logging with a JSON formatter (StructuredFormatter) — every log record includes run_id, node_id, timestamp, and level.
+Training loops: catch Exception in the outer fit() loop; log full traceback with run_id; save emergency checkpoint if epoch > 0; exit with code 1.
+CUDA OOM: always caught with specific handling (fall back to CPU, clear cache, log warning).
+Database failures: use connection pooling (psycopg2.pool.ThreadedConnectionPool); retry with exponential backoff (max 3 attempts); if all fail, buffer to SQLite fallback.
+HTTP failures (Qdrant, node endpoints): retry with exponential backoff; raise after max_retries; log full exception chain.
+Python: Standard module error handling pattern
+import logging
+import traceback
+
+logger = logging.getLogger("hermes.module")
+
+def safe_execute(fn, *args, run_id: str = "", **kwargs):
+    """
+    Wraps any callable with structured error logging.
+    Returns (result, None) on success, (None, error_msg) on failure.
+    """
+    try:
+        return fn(*args, **kwargs), None
+    except Exception as e:
+        tb = traceback.format_exc()
+        logger.error(
+            "Unhandled exception in %s",
+            fn.__name__,
+            extra={"run_id": run_id, "traceback": tb, "error": str(e)}
+        )
+        return None, str(e)
+Docker Container Failures
+Check container exit code after start: docker inspect --format '{{.State.ExitCode}}' {container}.
+On non-zero exit: retrieve logs with docker logs {container}, write to D:\DevDrive\logs\docker_errors_{datetime}.log.
+For persistent containers (Postgres, Qdrant): configure --restart unless-stopped for automatic recovery.
+7.2 — Backup Procedures (Pre-Script Execution)
+Execute the following backup steps before running any phase script. This can be wrapped in a PowerShell function Invoke-HermesBackup called at the top of each phase script.
+
+Snapshot disk usage: Get-PSDrive output to D:\DevDrive\logs\disk_snapshot_{date}.txt.
+Export WSL2 distros: wsl --export {distro} D:\DevDrive\logs\wsl_backup_{distro}_{date}.tar for each running distro.
+Docker container backup: docker commit {container} hermes-backup-{date} for all running containers; docker save to D:\DevDrive\logs\docker_backup_{date}\.
+Postgres dump: docker exec hermes-postgres pg_dump -U postgres -Fc hermes_logs > D:\DevDrive\logs\postgres_backup_{date}.dump — repeat for all 4 databases.
+Qdrant snapshot: POST http://127.0.0.1:6333/collections/embeddings_v1/snapshots — save snapshot name returned in response.
+Git commit: In D:\DevDrive\repos\, run git add -A && git commit -m "pre-phase-backup {date}" for all repos with uncommitted changes.
+Write backup manifest: JSON to D:\DevDrive\logs\backup_manifest_{date}.json listing all backup file paths, sizes, and SHA-256 hashes.
+7.3 — Integrity Verification
+After every file move operation (WSL2 relocation, Docker data-root move, cache relocation), verify integrity by comparing SHA-256 checksums of source and destination. Mismatches must halt the script and trigger rollback.
+
+PowerShell: SHA-256 file integrity check
+function Assert-FileIntegrity {
+    param(
+        [string]$SourcePath,
+        [string]$DestPath,
+        [string]$LogFile
+    )
+    $srcHash  = (Get-FileHash -Algorithm SHA256 -Path $SourcePath).Hash
+    $destHash = (Get-FileHash -Algorithm SHA256 -Path $DestPath).Hash
+    if ($srcHash -ne $destHash) {
+        $msg = "INTEGRITY FAILURE: $SourcePath vs $DestPath (src=$srcHash, dest=$destHash)"
+        $msg | Out-File $LogFile -Append
+        throw $msg
+    }
+    "OK: $DestPath matches source." | Out-File $LogFile -Append
+}
+
+# Usage example (after robocopy):
+# Get-ChildItem D:\DevDrive\docker -Recurse -File | ForEach-Object {
+#     $relative = $_.FullName.Replace("D:\DevDrive\docker\", "")
+#     Assert-FileIntegrity `
+#         -SourcePath "C:\ProgramData\docker\$relative" `
+#         -DestPath   $_.FullName `
+#         -LogFile    "D:\DevDrive\logs\integrity_check.log"
+# }
+Python: Checkpoint file integrity verification
+import hashlib
+from pathlib import Path
+
+def verify_checkpoint_integrity(checkpoint_path: str, expected_hash: str = None) -> str:
+    """
+    Computes SHA-256 of checkpoint file.
+    If expected_hash provided, asserts match.
+    Returns computed hash.
+    """
+    h = hashlib.sha256()
+    with open(checkpoint_path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    computed = h.hexdigest()
+    if expected_hash and computed != expected_hash:
+        raise ValueError(
+            f"Checkpoint integrity FAILED: {checkpoint_path}\n"
+            f"  Expected: {expected_hash}\n"
+            f"  Got:      {computed}"
+        )
+    return computed
+For Postgres migrations, verify row counts in each table before and after: SELECT COUNT(*) FROM {table}. For Qdrant migrations, verify vector count before and after: GET http://127.0.0.1:6333/collections/embeddings_v1 and compare vectors_count.
+
+7.4 — Copilot and Semantic Kernel Integration Notes
+Python: Hermes SK Plugin Registration
+# semantic_kernel_integration.py — Hermes XCore SK Plugin Registration
+# Pseudo-code: review and implement before use.
+
+import semantic_kernel as sk
+from semantic_kernel.functions import kernel_function
+from pydantic import BaseModel
+import httpx
+
+class HermesRouterPlugin:
+    """
+    Semantic Kernel plugin that exposes Hermes routing, feedback,
+    and history query capabilities as SK functions.
+    """
+    def __init__(self, endpoint: str = "http://127.0.0.1:8700"):
+        self.endpoint = endpoint
+        self.client   = httpx.AsyncClient(base_url=endpoint, timeout=30.0)
+
+    @kernel_function(
+        name="route_task",
+        description="Route a task to the optimal Hermes node based on context vector and task type"
+    )
+    async def route_task(self, context_vector: list, task_type: str, payload: dict) -> dict:
+        r = await self.client.post("/v1/route", json={
+            "context_vector": context_vector,
+            "task_type":      task_type,
+            "payload":        payload
+        })
+        r.raise_for_status()
+        return r.json()
+
+    @kernel_function(
+        name="get_feedback",
+        description="Submit a reward signal for a completed Hermes task"
+    )
+    async def get_feedback(
+        self, session_id: str, reward: float, context_vector: list
+    ) -> dict:
+        r = await self.client.post("/v1/feedback", json={
+            "session_id":     session_id,
+            "reward_signal":  reward,
+            "context_vector": context_vector
+        })
+        r.raise_for_status()
+        return r.json()
+
+    @kernel_function(
+        name="query_history",
+        description="Query recent routing decisions and reward statistics"
+    )
+    async def query_history(self, lookback_hours: int = 24) -> dict:
+        r = await self.client.get(f"/v1/history?lookback_hours={lookback_hours}")
+        r.raise_for_status()
+        return r.json()
+
+# --- Registration ---
+# kernel = sk.Kernel()
+# kernel.add_plugin(
+#     plugin_name = "HermesRouter",
+#     plugin      = HermesRouterPlugin(endpoint="http://127.0.0.1:8700")
+# )
+# result = await kernel.invoke("HermesRouter", "route_task",
+#     context_vector=[...128 floats...],
+#     task_type="inference",
+#     payload={"input": "..."}
+# )
+Azure AI Foundry Tool Registration (Mode A)
+In Mode A, the HermesRouterPlugin can be registered as an Azure AI Foundry function tool. Register the tool manifest in the Foundry project settings, then bind the local Hermes endpoint via a secure tunnel (e.g., Azure Application Gateway with private endpoint, or an ngrok tunnel scoped to your subscription for development purposes). Never expose the Hermes endpoint on a public IP address. The tool schema must be validated against the Foundry function tool specification before registration.
+7.5 — Purview and Entra Operational Notes
+Microsoft Purview
+Register D:\DevDrive\data\ as a custom data source in the Purview catalog using the Purview CLI or Azure Portal.
+Configure weekly automated scan: tag all .parquet, .csv, .jsonl files under D:\DevDrive\data\raw\ with sensitivity label "Internal".
+Apply "Confidential" label to all files under D:\DevDrive\ai-hub\checkpoints\ that contain model weights derived from proprietary data.
+Enable DLP policies in Mode A to block exfiltration of Confidential-labeled files via browser upload, email attachment, or USB copy.
+Review Purview scan reports monthly; triage any new PII detections within 48 hours.
+Microsoft Entra ID
+All Hermes service principals must use workload identity federation (OIDC) where the backing identity provider supports it, eliminating the need for client secrets entirely.
+Where client secrets are unavoidable (legacy integrations), store exclusively in Azure Key Vault (hermes-kv); never cache on disk or in environment variables beyond the current process lifetime.
+Client secret rotation: automate via Azure Automation runbook triggered 14 days before expiry; new secret written to hermes-kv; old secret disabled after 7-day grace period.
+Enable Entra audit log forwarding to Azure Monitor Log Analytics workspace; configure alert for: any SP login from unexpected IP, any permission escalation, any new role assignment on hermes-rg.
+Conditional Access: Require MFA for all human logins to Azure resources; require Entra-joined compliant device for access to hermes-kv and Azure OpenAI endpoints.
+Appendix A — Quick Reference: D:\DevDrive\ Directory Structure
+D:\DevDrive\                          # ReFS DevDrive root (64K cluster, developer-optimized)
+  |
+  +-- ai-hub\                         # AI model and runtime artifacts
+  |     +-- models\                   # Large model weights (symlink to E:\ if present)
+  |     +-- embeddings\               # Pre-computed static embeddings
+  |     +-- checkpoints\              # Training checkpoints (ae_*.pt, model_*.pt)
+  |     |     +-- ci\                 # CI/CD-generated staging checkpoints
+  |     +-- venvs\                    # Python virtual environments
+  |     |     +-- hermes-core\        # Primary Hermes XCore venv
+  |     |     +-- copilot-sdk\        # Azure AI / Semantic Kernel venv
+  |     +-- cuda\                     # CUDA Toolkit install target (if not system-wide)
+  |
+  +-- hermes\                         # Hermes fleet system root
+  |     +-- orchestrator\             # Orchestrator service files
+  |     |     +-- orchestrator.py
+  |     +-- nodes\                    # Per-node directories
+  |     |     +-- node_template\      # Canonical node template
+  |     |     |     +-- runner.py
+  |     |     |     +-- health.py
+  |     |     |     +-- config.yaml
+  |     |     +-- node_01\            # Instance of node_template for inference
+  |     |     +-- node_02\            # Feature engineering node
+  |     |     +-- node_03\            # Training node (Hyper-V VM)
+  |     +-- configs\                  # Hermes configuration files
+  |     |     +-- hermes_global.yaml  # Global fleet config
+  |     |     +-- routing_policy.json # Serialized LinUCB policy state
+  |     |     +-- secrets.env         # [chmod 600, .gitignored] Runtime secrets
+  |     +-- logs\                     # Hermes-level log aggregation
+  |     +-- scripts\                  # Hermes automation scripts
+  |
+  +-- data\                           # Data pipeline directories
+  |     +-- raw\                      # Unprocessed ingested data
+  |     +-- processed\                # Post-feature-pipeline output
+  |     +-- features\                 # Computed feature sets (.parquet)
+  |     +-- exports\                  # Data exports for Azure / external consumers
+  |
+  +-- postgres\                       # Postgres Docker volume data
+  |     +-- data\                     # PostgreSQL PGDATA directory
+  |
+  +-- qdrant\                         # Qdrant Docker volume data
+  |     +-- storage\                  # Qdrant storage segments
+  |     +-- config\                   # Qdrant config.yaml
+  |
+  +-- wsl2\                           # WSL2 distro VHDs (relocated from default)
+  |     +-- Ubuntu-22.04\             # Imported distro location
+  |     +-- swap.vhd                  # WSL2 swap file (8 GB)
+  |     +-- .wslconfig                # [symlink or copy] WSL2 config
+  |
+  +-- docker\                         # Docker data-root (relocated)
+  |     +-- volumes\                  # Named Docker volumes
+  |     +-- overlay2\                 # Container layer storage
+  |
+  +-- caches\                         # Developer tool caches (off C:)
+  |     +-- pip\                      # pip wheel/sdist cache
+  |     +-- conda\                    # Conda packages + Miniforge install
+  |     +-- npm\                      # npm global cache
+  |     +-- nuget\                    # NuGet package cache
+  |     +-- cargo\                    # Rust crate cache
+  |     +-- gradle\                   # Gradle build cache
+  |     +-- tmp\                      # TEMP / TMP (system temp files)
+  |     +-- delivery\                 # Windows Delivery Optimization cache
+  |
+  +-- sandbox\                        # Windows Sandbox shared folder (read-only from Sandbox)
+  |
+  +-- repos\                          # Git repositories
+  |     +-- hermesxcore\              # Primary Hermes XCore codebase
+  |     +-- infrastructure\           # IaC (bicep/terraform for Azure resources)
+  |
+  +-- scripts\                        # System automation scripts
+  |     +-- 01_phase1_devdrive_layout.ps1
+  |     +-- 02_phase2_tools_sdks.ps1
+  |     +-- 03_phase3_hyperv_services.ps1
+  |     +-- set_security_mode.ps1
+  |     +-- configure_bitlocker.ps1
+  |
+  +-- logs\                           # System-level logs and backups
+        +-- bootstrap_errors.log      # Aggregated fatal error log
+        +-- pre_bootstrap_snapshot_*.txt
+        +-- backup_manifest_*.json
+        +-- wsl_backup_*.tar
+        +-- postgres_backup_*.dump
+        +-- firewall_snapshot_*.txt
+        +-- security_mode_*.log
+        +-- phase1_*.log
+        +-- phase2_install_*.log
+        +-- phase3_services_*.log
+Appendix B — Python Dependencies Manifest
+FILE: requirements.txt — D:\DevDrive\ai-hub\venvs\hermes-core\requirements.txt
+# Hermes XCore — Python Dependencies Manifest
+# Install into D:\DevDrive\ai-hub\venvs\hermes-core
+# pip install -r requirements.txt
+# Generated: 2026-06-02 | Python 3.12.x | CUDA 12.4
+
+# --- PyTorch (install separately for CUDA support) ---
+# pip install torch>=2.2.0 torchvision>=0.17.0 --index-url https://download.pytorch.org/whl/cu124
+
+# --- Core ML / Data Science ---
+torch>=2.2.0
+torchvision>=0.17.0
+transformers>=4.40.0
+sentence-transformers>=3.0.0
+scikit-learn>=1.4.0
+pandas>=2.2.0
+numpy>=1.26.0
+scipy>=1.13.0
+
+# --- Vector Database ---
+qdrant-client>=1.9.0
+
+# --- Database ---
+psycopg2-binary>=2.9.9
+
+# --- Azure / Copilot / OpenAI ---
+azure-ai-inference>=1.0.0
+azure-identity>=1.16.0
+azure-keyvault-secrets>=4.8.0
+openai>=1.30.0
+semantic-kernel>=1.0.0
+
+# --- API / Web ---
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+httpx>=0.27.0
+
+# --- Configuration / Secrets ---
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
+
+# --- Logging / Observability ---
+structlog>=24.1.0
+rich>=13.7.0
+
+# --- Development / Quality ---
+pytest>=8.2.0
+pytest-asyncio>=0.23.0
+pytest-cov>=5.0.0
+mypy>=1.10.0
+ruff>=0.4.0
+Appendix C — Glossary
+Term    Definition
+Arm    In the contextual bandit context, one selectable action — here, one Hermes node or model endpoint (e.g., node_01_inference). LinUCB maintains separate regression parameters per arm.
+Champion Model    The currently deployed, production-active model in the hermes_model_registry (is_active = TRUE). Only one champion per model_name can be active at a time.
+Challenger Model    A newly trained candidate model being evaluated against the champion. Promoted only if its eval_score exceeds champion by the configured margin.
+Cluster Size (ReFS)    The allocation unit size for the ReFS file system on D:. Set to 64 KB (65,536 bytes) to optimize large-file sequential I/O for model weight files and checkpoint archives.
+Context Vector    A 128-dimensional floating-point vector representing the current task context, derived from the latent space of the HermesAutoencoder. Used as input to the LinUCB routing policy.
+DevDrive    Windows 11 feature enabling a ReFS-formatted volume with antivirus filter bypass for trusted paths, optimized for developer I/O. Requires Windows 11 22621+ and Developer Mode.
+Drift (Data)    Statistical change in the distribution of input features between training time and serving time. Measured by PSI (numeric), Chi-square (categorical), and cosine similarity (embeddings).
+DKMS    Dynamic Kernel Module Support — Linux framework allowing kernel modules (e.g., NVIDIA drivers) to automatically rebuild when the kernel is updated, maintaining CUDA on WSL2 across kernel upgrades.
+Entra ID    Microsoft's cloud identity and access management platform (formerly Azure Active Directory). Used for device registration, conditional access, and service principal authentication.
+Feature Signature    A compact representation of a feature set's statistical properties, stored in Qdrant's feature_signatures collection for fast similarity lookup during drift detection.
+Fleet    The collective set of Hermes nodes (node_01, node_02, node_03, etc.) managed by the HermesOrchestrator. Each node is a specialized compute unit.
+GPU Passthrough    Mechanism by which a physical NVIDIA GPU is accessible inside a Hyper-V VM or WSL2 environment, enabling GPU-accelerated training within virtualized compute.
+Hermes    The custom multi-node AI orchestration framework that routes inference, training, and feature engineering tasks across named compute nodes using a contextual bandit policy.
+HermesInternal vSwitch    Hyper-V internal virtual network switch used to interconnect Hermes nodes in isolation, without external network access. Used in Mode B and Mode C.
+HermesNet vSwitch    Hyper-V external virtual network switch bound to the physical NIC, providing full internet/Azure access for VMs. Used in Mode A only.
+Latent Space    The compressed representation produced by the HermesAutoencoder encoder; a 128-dimensional space capturing the essential structure of raw feature inputs.
+LinUCB    Linear Upper Confidence Bound — a contextual bandit algorithm that models reward as a linear function of context features, selecting arms with the highest upper confidence bound on predicted reward.
+MAML    Model-Agnostic Meta-Learning — a meta-learning algorithm that optimizes model initialization parameters for fast adaptation to new tasks with few gradient steps.
+Mode A / B / C    The three security operating modes of the Hermes workstation: A (Active/Cloud), B (Balanced/Developer, default), C (Locked/Air-gap-like). Toggled via set_security_mode.ps1.
+PSI    Population Stability Index — a metric quantifying distributional shift between two samples. PSI > 0.20 indicates significant drift and triggers retraining in the Hermes pipeline.
+Purview    Microsoft Purview — cloud-based data governance platform used to catalog, classify, and enforce compliance policies on data assets in the D:\DevDrive\data\ and model artifact directories.
+Qdrant    Open-source vector database engine providing ANN (approximate nearest neighbor) similarity search over dense float vectors. Used by Hermes for embedding storage and retrieval.
+ReFS    Resilient File System — Microsoft's modern file system used for the DevDrive. Supports large cluster sizes, data integrity checksums, and virtual disk scenarios, but does not support all NTFS features.
+Reward Signal    A scalar value in [-1.0, 1.0] representing the quality of a model output as judged by downstream evaluation or user action. Used to update the LinUCB policy and trigger retraining.
+SecretManagement    PowerShell module (Microsoft.PowerShell.SecretManagement) providing a unified API for storing and retrieving secrets from various vaults (SecretStore, Windows Credential Manager, Azure Key Vault).
+Sherman-Morrison    Matrix identity used for efficient rank-1 updates of the inverse of A in the LinUCB algorithm, avoiding full matrix inversion on each update step.
+VHD / VHDX    Virtual Hard Disk format used by Hyper-V and WSL2 to store VM disk images. WSL2 distros are stored as VHDX files relocated to D:\DevDrive\wsl2\ in this build.
+Workload Identity Federation    Entra ID feature that allows a service principal to authenticate using a trusted external OIDC token (e.g., from GitHub Actions), eliminating the need for a client secret.
+WSL2    Windows Subsystem for Linux 2 — a Hyper-V-backed, full Linux kernel environment on Windows. Used for GPU-accelerated Python training and inference workloads in Hermes nodes.
+XCore    The Hermes variant described in this document: the cross-core continuous training loop integrating feature pipeline, autoencoder compression, contextual bandit routing, and feedback-driven retraining.
+Appendix D — Change Log
+Version    Date    Author    Description
+1.0    02 June 2026    John    Initial release. All 7 deliverables complete.
+Phase 0–7 rollout plan with checkpoints and rollback steps.
+Full pseudo-script bundle (Phases 1–3).
+Hermes XCore pipeline design (Sections 2.1–2.9).
+Security mode framework (Modes A, B, C) with toggle script.
+ASCII wiring diagrams for all major data flows.
+Hardware checklist with BIOS, driver, and Windows settings.
+Error handling standards, backup procedures, and integrity checks.
+Appendices A–D: directory structure, requirements, glossary, change log.

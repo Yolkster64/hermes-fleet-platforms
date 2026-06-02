@@ -1,0 +1,125 @@
+{
+  "name": "Unified Super-System Tracker",
+  "version": "v4.1",
+  "goal": "Single integrated setup path across Sandbox, WSL2, Hyper-V, Docker, Dev Drive, AIHub, Hermes/XCore, security hardening, and autoboot operations.",
+  "phases": [
+    {
+      "id": "phase-0",
+      "title": "Easy Wins Before Merge",
+      "difficulty": "low",
+      "objective": "Capture immediate low-risk setup wins while larger integration code continues.",
+      "commands": [
+        "docker compose -f runtime\\hermes\\docker-compose.yml ps",
+        "python python\\x-tier\\aihub_control_server.py --config config\\x-tier\\aihub-control.json --health-check",
+        "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\\x-tier\\build_all_polyglot.ps1 -SourcePath artifacts\\polyglot\\winre_combined_transcript.txt"
+      ],
+      "upgrade_path": "Promote successful checks into startup automation + recurring validation task."
+    },
+    {
+      "id": "phase-0b",
+      "title": "Task Board + Evidence Sync",
+      "difficulty": "low",
+      "objective": "Keep active task dashboards, summaries, and source citations synchronized with engineering changes.",
+      "commands": [
+        "python python\\x-tier\\polyglot\\super_integrator.py --source artifacts\\polyglot\\winre_combined_transcript.txt --out-dir artifacts\\polyglot",
+        "python -c \"import json, pathlib; d=json.loads(pathlib.Path('artifacts/polyglot/python_conversation_map.json').read_text()); print(d.get('summary', {}))\""
+      ],
+      "upgrade_path": "Automate weekly refresh and diff against previous artifact snapshots."
+    },
+    {
+      "id": "phase-1",
+      "title": "Disk + Dev Drive Foundation",
+      "difficulty": "medium",
+      "objective": "Move dev/data workloads off C and establish deterministic folder topology.",
+      "commands": [
+        "New-Item \"D:\\src\",\"D:\\pkg\",\"D:\\tools\",\"D:\\ai\",\"D:\\docker\",\"D:\\wsl\",\"D:\\vm\",\"D:\\hermes\",\"D:\\data\",\"D:\\azure\",\"D:\\github\" -ItemType Directory -Force",
+        "npm config set cache D:\\pkg\\npm-cache --global",
+        "nuget config -set globalPackagesFolder=D:\\pkg\\nuget-global"
+      ],
+      "upgrade_path": "Enable ReFS Dev Drive policies + scheduled drift checks."
+    },
+    {
+      "id": "phase-2",
+      "title": "Runtime Substrate (WSL2/Hyper-V/Sandbox/Docker)",
+      "difficulty": "hard",
+      "objective": "Deploy isolation-capable substrate for dev + AI workloads with rollback-friendly layout.",
+      "commands": [
+        "wsl --install -d Ubuntu",
+        "docker compose -f runtime\\hermes\\docker-compose.yml up -d",
+        "Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -All -NoRestart"
+      ],
+      "upgrade_path": "Add automated VM and WSL image checkpoint rotation."
+    },
+    {
+      "id": "phase-3",
+      "title": "Core Toolchain + SDK Bulk Setup",
+      "difficulty": "medium",
+      "objective": "Install VSCode, GitHub/Azure tooling, Python/.NET/Node, and secure build stack.",
+      "commands": [
+        "winget install Microsoft.VisualStudioCode Git.Git GitHub.cli Microsoft.AzureCLI Microsoft.DotNet.SDK.8 Python.Python.3.12 NodeJS.NodeJS",
+        "az extension add -n ml"
+      ],
+      "upgrade_path": "Pre-cache SDKs on Dev Drive to reduce reinstall time."
+    },
+    {
+      "id": "phase-4",
+      "title": "AIHub + SQL + Vector + Fleet Mesh",
+      "difficulty": "hard",
+      "objective": "Create shared AIHub knowledge plane used by Hermes/XCore fleets and subagents.",
+      "commands": [
+        "docker run -d --name qdrant -p 6333:6333 -v /mnt/d/hermes/vectors:/qdrant/storage qdrant/qdrant",
+        "python runtime\\hermes\\apps\\bootstrap_volume_sql.py"
+      ],
+      "upgrade_path": "Enable fleet-wide SQL feature snapshots and vector replay validation."
+    },
+    {
+      "id": "phase-5",
+      "title": "Meta-Learning + Deep Engines",
+      "difficulty": "expert",
+      "objective": "Activate 30-engine deep learning fabric + 10 parallelization families with C++ optimization grounding.",
+      "commands": [
+        "pwsh -File scripts\\x-tier\\build_all_polyglot.ps1 -SourcePath artifacts\\polyglot\\winre_combined_transcript.txt",
+        "python python\\x-tier\\polyglot\\super_integrator.py --source artifacts\\polyglot\\winre_combined_transcript.txt --out-dir artifacts\\polyglot"
+      ],
+      "upgrade_path": "Promote adaptive policy from recommendation to live autonomous scheduler."
+    },
+    {
+      "id": "phase-6",
+      "title": "Security, Watches, Quarantine, Governance",
+      "difficulty": "expert",
+      "objective": "Use C++ source-of-truth controls for internet watch, ports, quarantine, folder permissions, and compression governance.",
+      "commands": [
+        "python python\\x-tier\\aihub_control_server.py --config config\\x-tier\\aihub-control.json --health-check",
+        "curl http://127.0.0.1:8789/api/security/watch/live"
+      ],
+      "upgrade_path": "Attach live watchdog automation to fleet rollback + isolation hooks."
+    },
+    {
+      "id": "phase-7",
+      "title": "GUI Unification + Operator Flow",
+      "difficulty": "medium",
+      "objective": "Run one clean GUI for setup, metrics, deep engines, security watches, and training controls.",
+      "commands": [
+        "streamlit run runtime\\hermes\\apps\\gui_control_center.py --server.port 8501 --server.address 0.0.0.0"
+      ],
+      "upgrade_path": "Add role-based views for operator, researcher, and security analyst personas."
+    },
+    {
+      "id": "phase-8",
+      "title": "Autoboot, Self-Heal, and Upgrade Stubs",
+      "difficulty": "hard",
+      "objective": "Lay stubs for single-exe orchestration, startup checks, rollback, and rapid integration of future modules.",
+      "commands": [
+        "schtasks /Create /TN HermesAutoBoot /TR \"pwsh -File scripts\\x-tier\\Build-SuperSystem.ps1\" /SC ONSTART /RL HIGHEST /F",
+        "docker compose -f runtime\\hermes\\docker-compose.yml ps"
+      ],
+      "upgrade_path": "Compile signed bootstrap launcher with health-gated module sequencing."
+    }
+  ],
+  "stubs_for_later": [
+    "Single EXE launcher wrapping PowerShell + C# control host.",
+    "Automated BIOS/hardware profile inference with safe mode constraints.",
+    "Secure online model fetch + signature verification flow.",
+    "Adaptive installer retries with mirror fallback and quarantine isolation."
+  ]
+}

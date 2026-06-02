@@ -1,0 +1,290 @@
+{
+  "source": "artifacts\\polyglot\\winre_combined_transcript.txt",
+  "outputs": {
+    "python": "artifacts\\polyglot\\python_master_brief.json",
+    "csharp": "artifacts\\polyglot\\csharp_master_brief.json",
+    "cpp": "artifacts\\polyglot\\cpp_master_brief.json",
+    "python_conversation": "artifacts\\polyglot\\python_conversation_map.json",
+    "csharp_conversation": "artifacts\\polyglot\\csharp_conversation_map.json",
+    "csharp_security_frontend": "artifacts\\polyglot\\csharp_security_frontend_map.json"
+  },
+  "consensus": {
+    "line_count": {
+      "values": {
+        "python": 2621,
+        "csharp": 2621,
+        "cpp": 2621
+      },
+      "all_equal": true
+    },
+    "word_count": {
+      "values": {
+        "python": 21306,
+        "csharp": 21372,
+        "cpp": 21372
+      },
+      "all_equal": false
+    },
+    "heading_count": {
+      "values": {
+        "python": 6,
+        "csharp": 6,
+        "cpp": 16
+      },
+      "all_equal": false
+    },
+    "section_count": {
+      "values": {
+        "python": 3,
+        "csharp": 3,
+        "cpp": 3
+      },
+      "all_equal": true
+    },
+    "appendix_count": {
+      "values": {
+        "python": 3,
+        "csharp": 3,
+        "cpp": 3
+      },
+      "all_equal": true
+    },
+    "task_mentions": {
+      "values": {
+        "python": 78,
+        "csharp": 78,
+        "cpp": 78
+      },
+      "all_equal": true
+    },
+    "skill_mentions": {
+      "values": {
+        "python": 1,
+        "csharp": 1,
+        "cpp": 1
+      },
+      "all_equal": true
+    },
+    "connector_mentions": {
+      "values": {
+        "python": 1,
+        "csharp": 1,
+        "cpp": 1
+      },
+      "all_equal": true
+    },
+    "phase_mentions": {
+      "values": {
+        "python": 7,
+        "csharp": 7,
+        "cpp": 7
+      },
+      "all_equal": true
+    },
+    "mode_mentions": {
+      "values": {
+        "python": 17,
+        "csharp": 17,
+        "cpp": 17
+      },
+      "all_equal": true
+    },
+    "auto_mentions": {
+      "values": {
+        "python": 350,
+        "csharp": 350,
+        "cpp": 350
+      },
+      "all_equal": true
+    },
+    "self_heal_mentions": {
+      "values": {
+        "python": 0,
+        "csharp": 0,
+        "cpp": 0
+      },
+      "all_equal": true
+    },
+    "section_symbol_count": {
+      "values": {
+        "python": 0,
+        "csharp": 0,
+        "cpp": 0
+      },
+      "all_equal": true
+    },
+    "section_symbol_max": {
+      "values": {
+        "python": 0,
+        "csharp": 0,
+        "cpp": 0
+      },
+      "all_equal": true
+    }
+  },
+  "conversation": {
+    "python_summary": {
+      "total_turns": 233,
+      "user_turns": 185,
+      "assistant_turns": 48,
+      "line_count": 2621
+    },
+    "csharp_summary": {
+      "total_turns": 233,
+      "user_turns": 185,
+      "assistant_turns": 48,
+      "line_count": 2621
+    },
+    "component_coverage": {
+      "winre": 17,
+      "vhdx": 49,
+      "security": 39,
+      "networking": 20,
+      "ai_ml": 31,
+      "runtime": 26,
+      "optimization": 24
+    },
+    "requirements_count": 185,
+    "unique_requirements_count": 34,
+    "milestones_count": 48
+  },
+  "cpp_source_of_truth": {
+    "runtime_decision": {
+      "allow": false,
+      "reason": "risk threshold exceeded, lock high-risk egress and throttle non-critical workloads",
+      "score": 100
+    },
+    "optimization_plan": {
+      "cpu_scheduler_boost": 0.75,
+      "memory_gc_pressure": 0.65,
+      "gpu_queue_depth": 2,
+      "network_egress_factor": 0.5,
+      "model_hotset_prefetch": 0.6
+    },
+    "security_optimization_data": {
+      "cpu_utilization": 35.5,
+      "memory_mb": 5805.76,
+      "gpu_utilization": 16.2,
+      "net_egress_mb_s": 100.4,
+      "compression_pressure": 0.0939039,
+      "multitask_pressure": 0.234168,
+      "lightweight_score": 0.813135,
+      "kernel_cpu_clamp": 0.82,
+      "kernel_memory_compaction": 0.9,
+      "kernel_gpu_scheduling": 0.74,
+      "kernel_network_throttle": 0.58,
+      "kernel_parallel_lane_utilization": 0.68
+    },
+    "major_parallelization_types": [
+      "task-parallel",
+      "data-parallel",
+      "pipeline-parallel",
+      "tensor-parallel",
+      "model-parallel",
+      "fleet-swarm-parallel",
+      "multi-llm-routing-parallel",
+      "subagent-specialist-parallel",
+      "hybrid-mesh-parallel",
+      "async-event-parallel"
+    ],
+    "security_watch_plan": {
+      "internet_watch_interval_seconds": 8,
+      "port_watch_interval_seconds": 5,
+      "permission_drift_scan_seconds": 45,
+      "quarantine_trigger_score": 58,
+      "alert_escalation_threshold": 52,
+      "auto_isolation_level": 0.92,
+      "egress_lockdown_factor": 0.82
+    },
+    "folder_governance_plan": {
+      "sort_priority_score": 0.84,
+      "compression_level": 0.78,
+      "dedupe_intensity": 0.88,
+      "permission_enforcement_level": 0.96,
+      "suspicious_folder_quarantine_level": 0.93,
+      "readonly_guard_ratio": 0.91,
+      "filesystem_watch_depth": 0.95
+    },
+    "alert_channels": [
+      "cpp_runtime_watchdog",
+      "fleet_security_bus",
+      "aihub_knowledge_alerts",
+      "quarantine_signal_stream",
+      "folder_permission_guard"
+    ],
+    "generated_by": "cpp_native"
+  },
+  "csharp_frontend_contract": {
+    "source": "artifacts\\polyglot\\cpp_master_brief.json",
+    "ui_panels": [
+      "Security Watch Center",
+      "Internet + Port Guard",
+      "Quarantine and Isolation",
+      "Folder Permission Governance",
+      "Compression and Sorting",
+      "Fleetwide Alert Bus"
+    ],
+    "runtime_decision": {
+      "allow": false,
+      "reason": "risk threshold exceeded, lock high-risk egress and throttle non-critical workloads",
+      "score": 100
+    },
+    "security_watch_plan": {
+      "internet_watch_interval_seconds": 8,
+      "port_watch_interval_seconds": 5,
+      "permission_drift_scan_seconds": 45,
+      "quarantine_trigger_score": 58,
+      "alert_escalation_threshold": 52,
+      "auto_isolation_level": 0.92,
+      "egress_lockdown_factor": 0.82
+    },
+    "folder_governance_plan": {
+      "sort_priority_score": 0.84,
+      "compression_level": 0.78,
+      "dedupe_intensity": 0.88,
+      "permission_enforcement_level": 0.96,
+      "suspicious_folder_quarantine_level": 0.93,
+      "readonly_guard_ratio": 0.91,
+      "filesystem_watch_depth": 0.95
+    },
+    "cpp_resource_telemetry": {
+      "cpu_utilization": 35.5,
+      "memory_mb": 5805.76,
+      "gpu_utilization": 16.2,
+      "net_egress_mb_s": 100.4,
+      "compression_pressure": 0.0939039,
+      "multitask_pressure": 0.234168,
+      "lightweight_score": 0.813135,
+      "kernel_cpu_clamp": 0.82,
+      "kernel_memory_compaction": 0.9,
+      "kernel_gpu_scheduling": 0.74,
+      "kernel_network_throttle": 0.58,
+      "kernel_parallel_lane_utilization": 0.68
+    },
+    "alert_channels": [
+      "cpp_runtime_watchdog",
+      "fleet_security_bus",
+      "aihub_knowledge_alerts",
+      "quarantine_signal_stream",
+      "folder_permission_guard"
+    ],
+    "major_parallelization_types": [
+      "task-parallel",
+      "data-parallel",
+      "pipeline-parallel",
+      "tensor-parallel",
+      "model-parallel",
+      "fleet-swarm-parallel",
+      "multi-llm-routing-parallel",
+      "subagent-specialist-parallel",
+      "hybrid-mesh-parallel",
+      "async-event-parallel"
+    ],
+    "scopes": [
+      "hermes",
+      "xcore",
+      "aihub",
+      "fleet_global"
+    ]
+  }
+}

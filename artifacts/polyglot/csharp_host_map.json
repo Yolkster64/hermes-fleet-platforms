@@ -1,0 +1,29 @@
+{
+  "runtime": {
+    "gateway": "http://127.0.0.1:8788",
+    "gui": "http://127.0.0.1:8501",
+    "control": "http://127.0.0.1:8789"
+  },
+  "orchestration": {
+    "languages": [
+      "python",
+      "csharp",
+      "cpp",
+      "powershell"
+    ],
+    "pipelines": [
+      "build_all_polyglot",
+      "aihub_upgrade",
+      "docker_runtime"
+    ]
+  },
+  "security": {
+    "posture": "zero-trust-balanced",
+    "controls": [
+      "closed_inbound",
+      "smart_egress",
+      "training_guardrails",
+      "drift_alerts"
+    ]
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "system": {
+    "name": "XTier Super Integrated AIHub",
+    "version": "1.0.0",
+    "security_mode_default": "balanced",
+    "optimization_mode_default": "aggressive-safe"
+  },
+  "runtime": {
+    "cpp_core": {
+      "cpu_target_utilization": 0.92,
+      "memory_guard_limit_mb": 65536,
+      "anomaly_threshold": 0.78
+    },
+    "csharp_host": {
+      "docker_stack_name": "hermes-runtime",
+      "gateway_url": "http://127.0.0.1:8788",
+      "gui_url": "http://127.0.0.1:8501",
+      "control_url": "http://127.0.0.1:8789"
+    },
+    "python_ai": {
+      "training_profiles": [
+        "contextual-bandit",
+        "autoencoder-shape",
+        "drift-detection",
+        "ensemble-routing",
+        "anomaly-guard",
+        "meta-policy"
+      ],
+      "vm_backends": [
+        "wsl2",
+        "hyperv",
+        "docker"
+      ]
+    }
+  }
+}
+

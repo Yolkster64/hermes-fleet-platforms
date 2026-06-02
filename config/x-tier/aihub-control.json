@@ -1,0 +1,20 @@
+{
+  "aihub": {
+    "name": "XTier AIHub Control",
+    "storage_root": "D:\\DevDrive\\hermes",
+    "artifacts_root": "artifacts",
+    "training_log": "artifacts\\aihub\\training-jobs.log",
+    "security_profile": "balanced",
+    "cuda_enabled": true
+  },
+  "services": {
+    "polyglot_report": "artifacts\\polyglot\\super_integrated_report.json",
+    "conversation_report": "artifacts\\polyglot\\python_conversation_map.json",
+    "fleet_agents_path": "runtime\\hermes_persist\\agents\\simple_agents.json",
+    "setup_tracker_path": "config\\x-tier\\unified-super-system-tracker.json",
+    "dashboard_port": 8787,
+    "hermes_gateway_url": "http://127.0.0.1:8788",
+    "hermes_gui_url": "http://127.0.0.1:8501",
+    "hermes_api_url": "http://127.0.0.1:8787"
+  }
+}

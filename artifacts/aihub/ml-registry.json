@@ -1,0 +1,37 @@
+[
+  {
+    "name": "contextual-bandit-router",
+    "family": "bandit",
+    "objective": "model routing",
+    "cadence_minutes": 5,
+    "backend": "python"
+  },
+  {
+    "name": "autoencoder-shape-guard",
+    "family": "autoencoder",
+    "objective": "shape compression + anomaly",
+    "cadence_minutes": 15,
+    "backend": "python"
+  },
+  {
+    "name": "drift-detector",
+    "family": "statistical",
+    "objective": "feature drift",
+    "cadence_minutes": 10,
+    "backend": "python"
+  },
+  {
+    "name": "security-anomaly-core",
+    "family": "heuristic",
+    "objective": "runtime anomaly security",
+    "cadence_minutes": 2,
+    "backend": "cpp"
+  },
+  {
+    "name": "integration-policy-host",
+    "family": "rules",
+    "objective": "cross-service policy",
+    "cadence_minutes": 5,
+    "backend": "csharp"
+  }
+]

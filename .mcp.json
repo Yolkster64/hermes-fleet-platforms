@@ -128,7 +128,7 @@
       "id": "arg20",
       "type": "promptString",
       "description": "Repeat to enable specific domains: core, work, work-items, search, test-plans, repositories, wiki, pipelines, advanced-security.",
-      "default": ""
+      "default": "core"
     },
     {
       "id": "arg21",
@@ -342,7 +342,7 @@
         "Authorization": "${input:arg27}"
       },
       "internalMetadata": {
-        "description": "Extract data from any website with thousands of scrapers, crawlers, and automations on Apify Store ⚡",
+        "description": "Extract data from any website with thousands of scrapers, crawlers, and automations on Apify Store \u26a1",
         "version": "0.10.2",
         "repository": "https://github.com/apify/apify-mcp-server",
         "displayName": "Apify",

@@ -1,0 +1,26 @@
+[
+  {
+    "backend": "docker",
+    "role": "gateway+api",
+    "gpu": true,
+    "memory_gb": 8
+  },
+  {
+    "backend": "docker",
+    "role": "gui+control",
+    "gpu": false,
+    "memory_gb": 4
+  },
+  {
+    "backend": "wsl2",
+    "role": "trainer",
+    "gpu": true,
+    "memory_gb": 16
+  },
+  {
+    "backend": "hyperv",
+    "role": "security-isolation",
+    "gpu": false,
+    "memory_gb": 4
+  }
+]

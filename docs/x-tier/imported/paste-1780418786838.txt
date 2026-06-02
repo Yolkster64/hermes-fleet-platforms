@@ -1,0 +1,743 @@
+
+Task:
+Auto-verify WinRE after Updates
+
+You said
+
+yes do those both and have it automatically do it all and set it up
+You said
+
+yes do those both and have it automatically do it all and set it up
+You said
+
+yes do those both and have it automatically do it all and set it up
+You said
+
+yes do those both and have it automatically do it all and set it up
+Copilot said
+Write Part 5 — File sanitizer, junk cleaner, permission fixer, duplicate detector, multi-VHDX quarantine containment
+Write Part 6 — Active smart port controller: risk scoring, process kill, auto-block, continuous watch loop
+Write Part 7 — Active resource enforcer: CPU/RAM/VM/GPU/power/internet leech detection and termination + updated orchestrator and entry point
+Assemble final WinRE-Complete v3.1 by stripping old entry point, appending new parts, re-exporting
+Writing all three parts simultaneously now — no waiting between them.
+
+Parts 6 and 7 writing in parallel now.
+
+Assembling the final script and upgrading the dashboard in parallel now.
+
+All 15 new functions verified ✔ — script assembles cleanly at 3,537 lines / 105 functions. Now upgrading the dashboard with the 3 new panels.
+
+WinRE Auto-Verify v3.1.0 is fully assembled and ready. Here's what was built and merged in this pass:
+
+✅ What's New in v3.1.0
+Script: WinRE-Complete.ps1
+Metric    v3.0.0    v3.1.0
+Lines    1,902    3,537
+Functions    63    105
+Sections/Regions    14    19
+Pipeline Stages    8    12
+Modes    9    13
+
+
+Part 5 — File Sanitizer & Multi-VHDX Quarantine (Section 15)
+Junk cleaner — scans Temp, CBS logs, SoftwareDistribution, WER, prefetch, thumbcache; auto-deletes with sizing report
+
+Deep suspicious file scanner — scoring system (double extensions, unsigned user-space EXEs, hash-like filenames, zero-byte executables) — score ≥30 = quarantined, ≥60 = contained
+
+Permission fixer — strips Everyone/Users Write/FullControl from System32 and program paths, restores SYSTEM+Admins-only ACLs
+
+Duplicate detector — SHA-256 hash grouping across WinRE paths, keeps newest, removes wasted copies
+
+Quarantine VHDX (1 GB BitLocker) + Containment VHDX (2 GB BitLocker, sealed) — files escalate through the containment chain
+
+Outputs: FileSanitizerReport.json, QuarantineManifest.json, DuplicateReport.json
+
+Part 6 — Active Smart Port Controller (Section 16)
+Risk scoring engine — 8 risk factors (known-bad port, unsigned process, user-space executable, fan-out connections, suspicious binary name, approved-list membership)
+
+Auto-block via New-NetFirewallRule both inbound + outbound for ports scoring ≥65
+
+Process kill for ports scoring ≥80 (with protected-process guard for lsass/csrss/svchost etc.)
+
+Continuous 30-second watch loop running in a background MTA runspace
+
+Exfiltration detection — flags processes with >10 MB/s sustained outbound I/O not on the approved list
+
+Port history — rolling 500-entry PortControlLog.json
+
+Part 7 — Active Resource Enforcer (Section 17)
+Three-strike system — Warned → BelowNormal priority → Stop-Process -Force after third offence
+
+CPU leech — any non-system process holding >80% of a core for >60s enters the strike system
+
+RAM leech — >500 MB growth in 60s triggers immediate strike
+
+VM detection — hypervisor identification (Hyper-V/VMware/QEMU/VirtualBox), VMs-on-host enumeration, vmmem overhead calculation
+
+GPU leech — nvidia-smi + WMI GPU Engine counters; flags crypto miners and unauthorized compute processes
+
+Power drain — powercfg /requests sleep-blocker detection, high-performance plan detection
+
+Bandwidth leech — per-process I/O rate via Win32_PerfRawData_PerfProc_Process; kills unapproved processes exceeding 5 MB/s
+
+Outputs: ResourceEnforcerLog.json, StrikeTable.json, VMDetectionReport.json, PowerDrainReport.json
+
+12-Stage Pipeline (Section 18) + Updated Entry Point (Section 19)
+Four new modes: Sanitize, Quarantine, Enforce, PortControl
+
+Stages 2, 4, 10, 12 are the new additions (enforcer, file sanitizer, port control, final sweep)
+
+Dashboard — 3 New Panels
+File Health & Quarantine — junk table, quarantine/containment VHDX contents, permission fix log, duplicate report, animated "Scan Now" button
+
+Active Port Control — live risk-scored colour-coded port table (green → red), actions log, connection tracker with exfil alert highlighting
+
+Resource Enforcer — three-strike tracker with pip indicators, kill log, VM detection card, GPU miner alerts, bandwidth/power drain sections; all auto-refresh every 30 s
+
+If you'd like, I can export the final WinRE-Complete.ps1 as a downloadable .txt file, or wire up a scheduled task registration so v3.1.0 auto-deploys itself after the next Windows Update event fires.
+
+
+WinRE Health Dashboard
+Open app
+Open
+
+
+
+
+
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+Copilot said
+Verify assembled script is intact and export as downloadable file
+Write a self-bootstrapping auto-deploy launcher that registers everything on first run
+WinRE-Complete.txt
+
+Plain Text
+
+
+Deploy-WinRE.txt
+
+Plain Text
+
+
+Both files are ready for download above — here's exactly what to do with them:
+
+📦 What You Got
+File    Size    Purpose
+WinRE-Complete.txt    172 KB · 3,537 lines    The full v3.1.0 script — 105 functions, 19 sections
+Deploy-WinRE.txt    16 KB · 295 lines    One-shot bootstrap launcher
+
+
+🚀 How to Deploy — One Command
+powershell
+
+
+Copy
+# 1. Rename both files (Windows Explorer or PowerShell):
+Rename-Item .\WinRE-Complete.txt  .\WinRE-Complete.ps1
+Rename-Item .\Deploy-WinRE.txt    .\Deploy-WinRE.ps1
+
+# 2. Put both in the same folder, then run:
+.\Deploy-WinRE.ps1
+The launcher self-elevates to Administrator automatically — no extra steps needed.
+
+⚙️ What Happens Automatically
+Step    What it does
+Install    Creates the 4-partition secure VHDX, registers event-log source, deploys Quarantine + Containment VHDXes, sets firewall rules, generates DPAPI API token, starts API Guard + IPC pipe + port-watch loop
+Run (immediate)    Executes the full 12-stage pipeline right now — sanitizes junk, checks WinRE, audits ports, enforces resources
+Bootstrap task    Registers a one-shot scheduled task that fires on the very next Windows Update event and then self-deletes
+Permanent tasks    UpdateTrigger (fires 5 min after every WU event) and StartupCheck (fires 3 min after every boot) stay registered forever
+Dashboard    Opens WinREHealthDashboard.html in your browser automatically
+
+
+After that first run, you never touch it again — every future update triggers it automatically.
+
+If you want, I can generate a full printed PDF quick-reference card with all 13 modes, event IDs, and config keys — handy to keep alongside the script.
+
+
+
+
+
+
+You said
+
+also isnt there some special kernel for dev performance, and yes
+You said
+
+also isnt there some special kernel for dev performance, and yes
+You said
+
+also isnt there some special kernel for dev performance, and yes
+You said
+
+also isnt there some special kernel for dev performance, and yes
+You said
+
+also isnt there some special kernel for dev performance, and yes
+You said
+
+also isnt there some special kernel for dev performance, and yes
+You said
+
+Create a self‑registering scheduled task that runs the WinRE migration script automatically after major Windows updates. It should detect update completion events, verify WinRE integrity, and re‑run the migration if needed. Include event‑log reporting and GUI progress feedback.
+Copilot said
+I'll build a comprehensive PowerShell solution that self-registers as a scheduled task, monitors for Windows update events, verifies WinRE integrity, and provides GUI progress feedback with event-log reporting.
+
+Design architecture and script structure
+Write the core WinRE verification and migration engine
+Build the self-registration installer and event trigger logic
+Add GUI progress feedback and event-log reporting
+Assemble final package and export
+WinREAutoVerify-Config.json
+
+JSON
+
+
+Install-WinREAutoVerify.txt
+
+Plain Text
+
+
+Invoke-WinREVerify.txt
+
+Plain Text
+
+
+README.txt
+
+Plain Text
+
+
+Your WinRE Auto-Verify solution is complete and ready to deploy. Here's what was delivered — rename the .txt files back to their original extensions before use:
+
+📦 Package Contents
+File (rename from .txt)    Role
+Install-WinREAutoVerify.ps1    Run once as Admin — deploys everything
+Invoke-WinREVerify.ps1    Core engine called by both scheduled tasks
+WinREAutoVerify-Config.json    Tunable settings (partition size, retries, paths)
+README.txt    Full reference documentation
+
+
+🚀 One-Time Setup
+Place all four files in the same folder, then run:
+
+powershell
+
+
+Copy
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\Install-WinREAutoVerify.ps1
+What Runs Automatically After That
+WinREAutoVerify_UpdateTrigger — fires 5 minutes after any of these events:
+
+Microsoft-Windows-WindowsUpdateClient Event IDs 19 (success), 20 (failure), 43 (download complete)
+
+Microsoft-Windows-SetupHost Event ID 1 (feature update complete)
+
+WinREAutoVerify_StartupCheck — fires 3 minutes after every boot as a safety net for patch-Tuesday reboots that slip past the event trigger.
+
+Both tasks run as SYSTEM / Highest Privileges.
+
+What the Engine Does Each Run
+Code
+
+
+Copy
+reagentc /info          → Is WinRE enabled?
+Partition check         → Size ≥ 512 MB, free space ≥ 100 MB?
+DISM /Check-ImageHealth → winre.wim intact? (auto-repairs if "Repairable")
+        ↓ Issues found?
+reagentc /disable + /enable  (up to 3 retries)
+        ↓ Still broken?
+Extract winre.wim from install.wim/ESD if media is present
+        ↓
+Write result to Application event log (EIDs 1000–1099) + WPF progress window
+Key Commands to Know
+powershell
+
+
+Copy
+# Trigger manually for testing
+Start-ScheduledTask -TaskName 'WinREAutoVerify_UpdateTrigger' `
+                    -TaskPath '\Microsoft\Windows\WinREAutoVerify'
+
+# Force a migration cycle even if WinRE looks healthy
+powershell -File "C:\ProgramData\WinREAutoVerify\Invoke-WinREVerify.ps1" -ForceMigration
+
+# View the last 20 events
+Get-EventLog -LogName Application -Source WinREAutoVerify -Newest 20 | Format-List
+
+# Uninstall everything cleanly
+.\Install-WinREAutoVerify.ps1 -Uninstall
+If you'd like, I can build a companion WinRE Health Dashboard — an HTML app that parses your Application event log exports and visualises migration history, pass/fail rates, and event timelines at a glance.
+
+
+
+
+
+
+Today
+You said
+
+yes sure and combine all of that into the project above
+Copilot said
+I'll build the WinRE Health Dashboard app and bundle everything into a complete, unified package!
+
+
+
+
+
+
+You said
+
+put in optimization for cpu ram gpu memory data lost files aswell and easy ports and porotecting the vhdx with the enviroments and apis
+Copilot said
+Expanding the project significantly — adding resource optimization, VHDX protection, data-loss prevention, port management, and API security, plus the Health Dashboard app. Building everything in parallel now.
+
+Write resource optimizer: CPU / RAM / GPU throttling and memory reclamation
+Write VHDX protection, port manager, and API security scripts
+Build the WinRE Health Dashboard web app with all subsystem panels
+Update config JSON and README for the full extended project
+Assemble and export complete unified package
+Writing all scripts simultaneously now — resource optimizer, VHDX protector, port manager, API guard, then building the dashboard and packaging everything.
+
+Continuing — writing the data protection script and building the full Health Dashboard simultaneously.
+
+Building the dashboard app and updating the config + README all in parallel now.
+
+WinREAutoVerify-Config.json
+
+JSON
+
+
+Install-WinREAutoVerify.txt
+
+Plain Text
+
+
+Invoke-WinREVerify.txt
+
+Plain Text
+
+
+Invoke-ResourceOptimizer.txt
+
+Plain Text
+
+
+Protect-VHDX.txt
+
+Plain Text
+
+
+Invoke-PortManager.txt
+
+Plain Text
+
+
+Invoke-APIGuard.txt
+
+Plain Text
+
+
+Invoke-DataProtection.txt
+
+Plain Text
+
+
+WinREAutoVerify-Config.json
+
+JSON
+
+
+WinREHealthDashboard.html
+
+File
+
+
+README.txt
+
+Plain Text
+
+
+The complete WinRE Auto-Verify v2.1.0 suite is ready — all 10 files delivered above. Here's a full map of what you have:
+
+📦 Complete File List
+Rename all .txt files back to .ps1 before running
+
+File (rename .txt → .ps1)    Role
+Install-WinREAutoVerify.ps1    Run once as Admin — deploys everything, registers tasks & event log
+Invoke-WinREVerify.ps1    Core engine: checks WinRE, runs DISM, migrates, shows WPF GUI
+Invoke-ResourceOptimizer.ps1    CPU/RAM/GPU throttle, standby-memory flush, disk guard, process snapshot
+Protect-VHDX.ps1    VHDX create · BitLocker AES-256 · VSS snapshot · hash sentinel · restore · seal
+Invoke-PortManager.ps1    Port audit · firewall lockdown · unexpected-listener alerts · FW rules
+Invoke-APIGuard.ps1    DPAPI-auth REST API on localhost:57891 · rate limiting · token rotation
+Invoke-DataProtection.ps1    Pre/post-migration checkpoints · write-lock detect · BCD backup · diff verify
+WinREAutoVerify-Config.json    Master config for all 6 subsystems — edit values, no reinstall needed
+WinREHealthDashboard.html    Open in any browser — live panels for all subsystems
+README.txt    Full reference: flow diagram, event IDs, config table, all switches
+
+
+⚡ What Happens Automatically After One Install
+Code
+
+
+Copy
+Windows Update completes (EID 19/20/43)
+    └─► 5-min delay → ResourceOptimizer snapshots CPU/RAM/GPU
+         └─► DataProtection checkpoints winre.wim + BCD
+              └─► VHDX VSS snapshot taken
+                   └─► reagentc + DISM verify / repair
+                        └─► PortManager refreshes port report
+                             └─► All JSON feeds update → Dashboard live
+🔑 Key One-Liners
+powershell
+
+
+Copy
+# Deploy everything
+.\Install-WinREAutoVerify.ps1
+
+# Test the full pipeline right now
+.\Invoke-WinREVerify.ps1 -ForceMigration
+
+# Protect your VHDX container
+.\Protect-VHDX.ps1 -Action Protect
+
+# Audit all listening ports
+.\Invoke-PortManager.ps1 -Action Audit
+
+# Start the live API for the dashboard
+.\Invoke-APIGuard.ps1 -Action Start
+
+# Create a manual data checkpoint
+.\Invoke-DataProtection.ps1 -Action Checkpoint
+
+# View all subsystem events
+Get-EventLog -LogName Application -Source WinREAutoVerify -Newest 30 | Format-List
+A natural next step would be scheduling a weekly full health report — automatically running all subsystems, generating a fresh EventSummary.json, and emailing you a summary — so you always have a Monday-morning snapshot of your WinRE environment's state without needing to check manually.
+
+
+WinRE Health Dashboard
+Open app
+Open
+
+
+
+
+
+You said
+
+ok make sure to upgrade and add features and integrate it and make sure all of this is nerged and integrated into the second from last task and made fully integrated and complete so its not missing out on parts that add ver ylittle time and connect and set everything uo and fully integrae everything into one script executable
+Copilot said
+Download all source files and reconstruct complete content
+Downloading all source files in parallel to reconstruct the complete content before merging.
+
+Writing the complete merged script now — splitting into sequential parts to build the full file, then upgrading the dashboard in parallel.
+
+
+
+
+
+
+You said
+
+remember the api and env is locked in a special vhdx and the partitions are specially designed and has spexial security snd it can also function as ai and llm communication and internet comunication local machine communication etc and integration plus optimization, and remember to combine all three of them so they are integrated and merged into one
+Copilot said
+Write Part 1 — Header, params, constants, logging, WPF GUI engine
+Write Part 2 — Resource optimizer, secure VHDX multi-partition engine, AI/LLM comms
+Write Part 3 — Port manager, API guard, IPC, internet relay, data protection, WinRE core
+Write Part 4 — Self-installer, orchestrator, entry point; concatenate all parts
+Comprehensively upgraded the WinRE Health Dashboard to v3.0.0
+Planning the complete integrated PowerShell script
+Export final single .txt deliverable
+Writing all four parts simultaneously now — the biggest, most integrated build yet.
+
+Concatenation confirmed — 1,902 lines, 63 functions, 19 regions. Now finishing the final export and upgrading the dashboard app simultaneously.
+
+WinRE-Complete.txt
+
+Plain Text
+
+
+Everything is done and ready, John. Here's a full wrap-up:
+
+✅ WinRE Auto-Verify — Delivery Complete
+📄 WinRE-Complete.txt (attached above — rename to .ps1)
+Metric    Value
+Total lines    1,902
+Functions    63
+Regions / sections    19
+File size    ~94 KB
+
+
+Usage:
+
+powershell
+
+
+Copy
+# 1. Rename the file
+Rename-Item WinRE-Complete.txt WinRE-Complete.ps1
+
+# 2. Deploy everything
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\WinRE-Complete.ps1 -Mode Install
+
+# 3. Run manually anytime
+.\WinRE-Complete.ps1 -Mode Run
+
+# 4. Start the API + Dashboard
+.\WinRE-Complete.ps1 -Mode APIStart
+.\WinRE-Complete.ps1 -Mode Dashboard
+
+# 5. Interactive AI chat
+.\WinRE-Complete.ps1 -Mode AIChat
+All 9 -Mode values: Install · Run · Uninstall · Audit · Repair · Dashboard · APIStart · Monitor · AIChat
+
+🖥️ Health Dashboard v3.0.0 (above — live app)
+Three new panels added on top of the original six:
+
+Panel    What's inside
+AI / LLM    Live chat interface, endpoint health table (Ollama/LM Studio), query log, DPAPI credential status, "Analyse Health Now" button
+Secure VHDX Internals    4-partition visual layout (P1 META · P2 API · P3 AI · P4 WINRE), BitLocker per-partition shields, VSS snapshot table with restore, hash sentinel, health gauge
+IPC & Communications    Named pipe status + message feed, webhook relay (Teams/Slack), local WMI/COM status, one-click Ping/Test buttons
+
+
+Plus: notification bell with alert badge, ⚙️ API URL config modal, core-affinity grid in Resources, process throttle list, and v3.0.0 version tag in the header.
+
+🔄 Auto-Execution Flow (what happens after every Windows Update)
+Code
+
+
+Copy
+WU Event 19/20/43 fires → 5-min delay
+  │
+  ├─ 1. Resource optimizer (CPU/RAM/GPU throttle + memory flush)
+  ├─ 2. Data protection checkpoint (winre.wim + BCD + SHA-256 hashes)
+  ├─ 3. VHDX sentinel check + VSS snapshot
+  ├─ 4. WinRE status (reagentc /info)
+  ├─ 5. DISM integrity check + auto-repair
+  ├─ 6. AI health analysis → LLM query → webhook notification
+  ├─ 7. Migration if needed (3 retries → media restore → data restore)
+  └─ 8. Post-migration verify + sentinel update + port audit
+If you'd like, I can schedule a weekly email digest of your WinRE event log entries so you always know the health status without opening the dashboard — just say the word!
+
+
+WinRE Health Dashboard
+Open app
+Open
+
+
+
+
+
+You said
+
+and remember cleaning out bad files and junk files and permission and ones that are nested, and using the special multiple vhdxes to make it harder for bad files that get through to get out, but make sure to move and delete them and check for doubles and even a special quarantine folder and vhdx for unsure ones
+You said
+
+and have actual control and do things about the ports be smart and deal with issues and show that and sane with leeching cpu or memory or vms or gpu or power or internet
+You said
+
+and have actual control and do things about the ports be smart and deal with issues and show that and sane with leeching cpu or memory or vms or gpu or power or internet
+You said
+
+and have actual control and do things about the ports be smart and deal with issues and show that and sane with leeching cpu or memory or vms or gpu or power or internet
+You said
+
+and have actual control and do things about the ports be smart and deal with issues and show that and sane with leeching cpu or memory or vms or gpu or power or internet
+You said
+
+yes do those both and have it automatically do it all and set it up
+You said
+
+yes do those both and have it automatically do it all and set it up
+You said
+
+yes do those both and have it automatically do it all and set it up
+You said
+
+yes do those both and have it automatically do it all and set it up
+Copilot said
+Write Part 5 — File sanitizer, junk cleaner, permission fixer, duplicate detector, multi-VHDX quarantine containment
+Write Part 6 — Active smart port controller: risk scoring, process kill, auto-block, continuous watch loop
+Write Part 7 — Active resource enforcer: CPU/RAM/VM/GPU/power/internet leech detection and termination + updated orchestrator and entry point
+Assemble final WinRE-Complete v3.1 by stripping old entry point, appending new parts, re-exporting
+Writing all three parts simultaneously now — no waiting between them.
+
+Parts 6 and 7 writing in parallel now.
+
+Assembling the final script and upgrading the dashboard in parallel now.
+
+All 15 new functions verified ✔ — script assembles cleanly at 3,537 lines / 105 functions. Now upgrading the dashboard with the 3 new panels.
+
+WinRE Auto-Verify v3.1.0 is fully assembled and ready. Here's what was built and merged in this pass:
+
+✅ What's New in v3.1.0
+Script: WinRE-Complete.ps1
+Metric    v3.0.0    v3.1.0
+Lines    1,902    3,537
+Functions    63    105
+Sections/Regions    14    19
+Pipeline Stages    8    12
+Modes    9    13
+
+
+Part 5 — File Sanitizer & Multi-VHDX Quarantine (Section 15)
+Junk cleaner — scans Temp, CBS logs, SoftwareDistribution, WER, prefetch, thumbcache; auto-deletes with sizing report
+
+Deep suspicious file scanner — scoring system (double extensions, unsigned user-space EXEs, hash-like filenames, zero-byte executables) — score ≥30 = quarantined, ≥60 = contained
+
+Permission fixer — strips Everyone/Users Write/FullControl from System32 and program paths, restores SYSTEM+Admins-only ACLs
+
+Duplicate detector — SHA-256 hash grouping across WinRE paths, keeps newest, removes wasted copies
+
+Quarantine VHDX (1 GB BitLocker) + Containment VHDX (2 GB BitLocker, sealed) — files escalate through the containment chain
+
+Outputs: FileSanitizerReport.json, QuarantineManifest.json, DuplicateReport.json
+
+Part 6 — Active Smart Port Controller (Section 16)
+Risk scoring engine — 8 risk factors (known-bad port, unsigned process, user-space executable, fan-out connections, suspicious binary name, approved-list membership)
+
+Auto-block via New-NetFirewallRule both inbound + outbound for ports scoring ≥65
+
+Process kill for ports scoring ≥80 (with protected-process guard for lsass/csrss/svchost etc.)
+
+Continuous 30-second watch loop running in a background MTA runspace
+
+Exfiltration detection — flags processes with >10 MB/s sustained outbound I/O not on the approved list
+
+Port history — rolling 500-entry PortControlLog.json
+
+Part 7 — Active Resource Enforcer (Section 17)
+Three-strike system — Warned → BelowNormal priority → Stop-Process -Force after third offence
+
+CPU leech — any non-system process holding >80% of a core for >60s enters the strike system
+
+RAM leech — >500 MB growth in 60s triggers immediate strike
+
+VM detection — hypervisor identification (Hyper-V/VMware/QEMU/VirtualBox), VMs-on-host enumeration, vmmem overhead calculation
+
+GPU leech — nvidia-smi + WMI GPU Engine counters; flags crypto miners and unauthorized compute processes
+
+Power drain — powercfg /requests sleep-blocker detection, high-performance plan detection
+
+Bandwidth leech — per-process I/O rate via Win32_PerfRawData_PerfProc_Process; kills unapproved processes exceeding 5 MB/s
+
+Outputs: ResourceEnforcerLog.json, StrikeTable.json, VMDetectionReport.json, PowerDrainReport.json
+
+12-Stage Pipeline (Section 18) + Updated Entry Point (Section 19)
+Four new modes: Sanitize, Quarantine, Enforce, PortControl
+
+Stages 2, 4, 10, 12 are the new additions (enforcer, file sanitizer, port control, final sweep)
+
+Dashboard — 3 New Panels
+File Health & Quarantine — junk table, quarantine/containment VHDX contents, permission fix log, duplicate report, animated "Scan Now" button
+
+Active Port Control — live risk-scored colour-coded port table (green → red), actions log, connection tracker with exfil alert highlighting
+
+Resource Enforcer — three-strike tracker with pip indicators, kill log, VM detection card, GPU miner alerts, bandwidth/power drain sections; all auto-refresh every 30 s
+
+If you'd like, I can export the final WinRE-Complete.ps1 as a downloadable .txt file, or wire up a scheduled task registration so v3.1.0 auto-deploys itself after the next Windows Update event fires.
+
+
+WinRE Health Dashboard
+Open app
+Open
+
+
+
+
+
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+You said
+
+yes do those both and have it automatically do it all and set it up and add it so its even faster with moving programs and setting up and removing junk and reducing c stuff and optimizng it all and moving and setting up automatically, and remember that all three of you will be combined into a massive program that is automaticand optimized an d integrated and clean and reuires no human inout and fixes itself, and has loading bars
+Copilot said
+Verify assembled script is intact and export as downloadable file
+Write a self-bootstrapping auto-deploy launcher that registers everything on first run
+WinRE-Complete.txt
+
+Plain Text
+
+
+Deploy-WinRE.txt
+
+Plain Text
+
+
+Both files are ready for download above — here's exactly what to do with them:
+
+📦 What You Got
+File    Size    Purpose
+WinRE-Complete.txt    172 KB · 3,537 lines    The full v3.1.0 script — 105 functions, 19 sections
+Deploy-WinRE.txt    16 KB · 295 lines    One-shot bootstrap launcher
+
+
+🚀 How to Deploy — One Command
+powershell
+
+
+Copy
+# 1. Rename both files (Windows Explorer or PowerShell):
+Rename-Item .\WinRE-Complete.txt  .\WinRE-Complete.ps1
+Rename-Item .\Deploy-WinRE.txt    .\Deploy-WinRE.ps1
+
+# 2. Put both in the same folder, then run:
+.\Deploy-WinRE.ps1
+The launcher self-elevates to Administrator automatically — no extra steps needed.
+
+⚙️ What Happens Automatically
+Step    What it does
+Install    Creates the 4-partition secure VHDX, registers event-log source, deploys Quarantine + Containment VHDXes, sets firewall rules, generates DPAPI API token, starts API Guard + IPC pipe + port-watch loop
+Run (immediate)    Executes the full 12-stage pipeline right now — sanitizes junk, checks WinRE, audits ports, enforces resources
+Bootstrap task    Registers a one-shot scheduled task that fires on the very next Windows Update event and then self-deletes
+Permanent tasks    UpdateTrigger (fires 5 min after every WU event) and StartupCheck (fires 3 min after every boot) stay registered forever
+Dashboard    Opens WinREHealthDashboard.html in your browser automatically
+
+
+After that first run, you never touch it again — every future update triggers it automatically.
+

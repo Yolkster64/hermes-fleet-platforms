@@ -84,6 +84,7 @@ services:
       streamlit run runtime/hermes/apps/gui_control_center.py --server.port 8501 --server.address 0.0.0.0"
     environment:
       HERMES_API_BASE_URL: http://hermes-gateway:8788
+      HERMES_AIHUB_CONTROL_URL: http://aihub-control:8789
       HERMES_GUI_API_KEY: "local-hermes-ui-key"
       HERMES_VOLUME_DATA_PATH: "/workspace/runtime/hermes_persist"
       HERMES_TELEMETRY_DB_PATH: "/workspace/runtime/hermes_persist/hermes_super_orchestrator.db"
@@ -211,6 +212,44 @@ services:
           memory: 3G
         reservations:
           memory: 1G
+
+  aihub-control:
+    image: "docker.io/yolkster1/dev_workflow:latest"
+    pull_policy: build
+    build:
+      context: ../..
+      dockerfile: runtime/hermes/Dockerfile
+    container_name: aihub-control
+    command: >
+      sh -lc "python python/x-tier/aihub_control_server.py --config config/x-tier/aihub-control.json --port 8789"
+    environment:
+      AIHUB_POLYGLOT_REPORT: "/workspace/artifacts/polyglot/super_integrated_report.json"
+      AIHUB_CONVERSATION_REPORT: "/workspace/artifacts/polyglot/python_conversation_map.json"
+      AIHUB_FLEET_AGENTS_PATH: "/workspace/runtime/hermes_persist/agents/simple_agents.json"
+      AIHUB_SETUP_TRACKER_PATH: "/workspace/config/x-tier/unified-super-system-tracker.json"
+      AIHUB_CUDA_ENABLED: "true"
+      HERMES_GATEWAY_URL: "http://hermes-gateway:8788"
+      HERMES_GUI_URL: "http://hermes-gui:8501"
+      HERMES_API_URL: "http://hermes-api:8787"
+    depends_on:
+      hermes-gateway:
+        condition: service_started
+      hermes-gui:
+        condition: service_started
+    ports:
+      - "${AIHUB_CONTROL_PORT:-8789}:8789"
+    volumes:
+      - ../../:/workspace
+      - ../auto:/workspace/runtime/auto
+      - hermes-data:/workspace/runtime/hermes_persist
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: "8.0"
+          memory: 1G
+        reservations:
+          memory: 512M
 
 volumes:
   hermes-data:

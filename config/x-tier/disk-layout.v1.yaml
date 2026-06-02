@@ -1,0 +1,41 @@
+version: 1
+profile: x-tier
+
+drives:
+  c:
+    role: os_only
+    allow_dev_payload: false
+  d:
+    role: devdrive
+    filesystem: refs
+    cluster_size_kb: 64
+    root: D:\DevDrive
+  e:
+    role: optional_heavy_models
+    enabled: true
+    models_root: E:\models
+
+paths:
+  ai_hub: D:\DevDrive\ai-hub
+  hermes: D:\DevDrive\hermes
+  data: D:\DevDrive\data
+  postgres: D:\DevDrive\postgres
+  qdrant: D:\DevDrive\qdrant
+  wsl2_distros: D:\DevDrive\wsl2\distros
+  wsl2_vhdx: D:\DevDrive\wsl2\vhdx
+  hyperv_vms: D:\DevDrive\hyperv\vms
+  hyperv_vhdx: D:\DevDrive\hyperv\vhdx
+  docker_data_root: D:\DevDrive\docker\data-root
+
+wsl2:
+  swap_file: D:\DevDrive\wsl2\vhdx\swap.vhdx
+  memory: 32GB
+  processors: 16
+  nested_virtualization: true
+
+security:
+  default_mode: B
+  no_remote_access_default: true
+  disable_rdp: true
+  disable_ssh_server: true
+

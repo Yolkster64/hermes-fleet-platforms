@@ -1,0 +1,1430 @@
+2.4 — Autoencoder Shape and Compression Pipeline
+YAML: autoencoder config block
+autoencoder:
+  input_dim:                 1024
+  latent_dim:                128
+  hidden_dims:               [512, 256]
+  dropout:                   0.2
+  batch_size:                512
+  epochs:                    100
+  learning_rate:             0.001
+  weight_decay:              0.0001
+  early_stopping_patience:   10
+  device:                    cuda
+  checkpoint_dir:            D:/DevDrive/ai-hub/checkpoints
+MODULE: autoencoder_pipeline.py
+# autoencoder_pipeline.py — Hermes XCore Autoencoder + Compression Pipeline
+# Pseudo-code: review and implement before use.
+
+from __future__ import annotations
+import logging
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Optional
+
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+from qdrant_client import QdrantClient
+from qdrant_client.models import PointStruct
+
+from feature_pipeline import FeatureSet
+
+logger = logging.getLogger("hermes.autoencoder")
+
+@dataclass
+class CompressedFeatures:
+    latent_vectors: np.ndarray   # shape (N, latent_dim)
+    original_ids:   list
+    metadata:       dict
+
+# -----------------------------------------------------------
+# HermesAutoencoder: Encoder-Decoder Architecture
+# -----------------------------------------------------------
+class HermesAutoencoder(nn.Module):
+    """
+    Symmetric encoder-decoder network for unsupervised feature compression.
+    Encoder: input_dim -> hidden_dims -> latent_dim
+    Decoder: latent_dim -> hidden_dims[::-1] -> input_dim
+    """
+
+    def __init__(
+        self,
+        input_dim:   int,
+        latent_dim:  int,
+        hidden_dims: list[int] = None,
+        dropout:     float     = 0.2
+    ):
+        super().__init__()
+        if hidden_dims is None:
+            hidden_dims = [512, 256]
+
+        # Build encoder
+        enc_layers = []
+        in_dim = input_dim
+        for h in hidden_dims:
+            enc_layers += [
+                nn.Linear(in_dim, h),
+                nn.BatchNorm1d(h),
+                nn.ReLU(),
+                nn.Dropout(dropout)
+            ]
+            in_dim = h
+        enc_layers.append(nn.Linear(in_dim, latent_dim))
+        self.encoder = nn.Sequential(*enc_layers)
+
+        # Build decoder (mirror)
+        dec_layers = []
+        in_dim = latent_dim
+        for h in reversed(hidden_dims):
+            dec_layers += [
+                nn.Linear(in_dim, h),
+                nn.BatchNorm1d(h),
+                nn.ReLU(),
+                nn.Dropout(dropout)
+            ]
+            in_dim = h
+        dec_layers += [nn.Linear(in_dim, input_dim), nn.Sigmoid()]
+        self.decoder = nn.Sequential(*dec_layers)
+
+    def encode(self, x: torch.Tensor) -> torch.Tensor:
+        return self.encoder(x)
+
+    def decode(self, z: torch.Tensor) -> torch.Tensor:
+        return self.decoder(z)
+
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        z    = self.encode(x)
+        recon = self.decode(z)
+        return recon, z
+
+# -----------------------------------------------------------
+# AutoencoderTrainer
+# -----------------------------------------------------------
+class AutoencoderTrainer:
+    def __init__(
+        self,
+        model:     HermesAutoencoder,
+        optimizer: torch.optim.Optimizer,
+        loss_fn,
+        device:    torch.device,
+        db_conn
+    ):
+        self.model     = model.to(device)
+        self.optimizer = optimizer
+        self.loss_fn   = loss_fn
+        self.device    = device
+        self.db_conn   = db_conn
+        self.best_val_loss = float("inf")
+        self.patience_counter = 0
+
+    def train_epoch(self, dataloader: DataLoader) -> float:
+        self.model.train()
+        total_loss = 0.0
+        for batch in dataloader:
+            x = batch.to(self.device)
+            self.optimizer.zero_grad()
+            recon, z = self.model(x)
+            loss = self.loss_fn(recon, x)
+            loss.backward()
+            self.optimizer.step()
+            total_loss += loss.item() * x.size(0)
+        return total_loss / len(dataloader.dataset)
+
+    def validate(self, dataloader: DataLoader) -> dict:
+        self.model.eval()
+        total_loss = 0.0
+        latent_vecs = []
+        with torch.no_grad():
+            for batch in dataloader:
+                x = batch.to(self.device)
+                recon, z = self.model(x)
+                total_loss += self.loss_fn(recon, x).item() * x.size(0)
+                latent_vecs.append(z.cpu().numpy())
+        avg_loss  = total_loss / len(dataloader.dataset)
+        latents   = np.vstack(latent_vecs)
+        var_ratio = float(np.var(latents, axis=0).sum())
+        return {
+            "val_loss":              avg_loss,
+            "latent_variance_total": var_ratio
+        }
+
+    def fit(
+        self,
+        train_dl: DataLoader,
+        val_dl:   DataLoader,
+        epochs:   int = 50,
+        early_stopping_patience: int = 5
+    ):
+        for epoch in range(1, epochs + 1):
+            train_loss = self.train_epoch(train_dl)
+            val_metrics = self.validate(val_dl)
+            val_loss = val_metrics["val_loss"]
+            logger.info("Epoch %d/%d — train_loss=%.4f, val_loss=%.4f",
+                        epoch, epochs, train_loss, val_loss)
+            if val_loss < self.best_val_loss - 1e-5:
+                self.best_val_loss    = val_loss
+                self.patience_counter = 0
+                self.save_checkpoint(
+                    path=f"D:/DevDrive/ai-hub/checkpoints/ae_best.pt",
+                    epoch=epoch, metrics=val_metrics
+                )
+            else:
+                self.patience_counter += 1
+                if self.patience_counter >= early_stopping_patience:
+                    logger.info("Early stopping at epoch %d (patience=%d)",
+                                epoch, early_stopping_patience)
+                    break
+
+    def save_checkpoint(self, path: str, epoch: int, metrics: dict):
+        ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        versioned_path = path.replace(".pt", f"_{ts}.pt")
+        torch.save({
+            "epoch":       epoch,
+            "model_state": self.model.state_dict(),
+            "optim_state": self.optimizer.state_dict(),
+            "metrics":     metrics
+        }, versioned_path)
+        logger.info("Checkpoint saved: %s", versioned_path)
+
+    def load_checkpoint(self, path: str):
+        ckpt = torch.load(path, map_location=self.device)
+        self.model.load_state_dict(ckpt["model_state"])
+        self.optimizer.load_state_dict(ckpt["optim_state"])
+        logger.info("Checkpoint loaded from %s (epoch=%d)", path, ckpt.get("epoch", "?"))
+
+# -----------------------------------------------------------
+# CompressionPipeline
+# -----------------------------------------------------------
+class CompressionPipeline:
+    def __init__(self, model: HermesAutoencoder, qdrant: QdrantClient,
+                 device: torch.device, collection: str = "embeddings_v1"):
+        self.model      = model.eval()
+        self.qdrant     = qdrant
+        self.device     = device
+        self.collection = collection
+
+    def compress(self, feature_set: FeatureSet) -> CompressedFeatures:
+        """Encodes all numeric features into unified 128-dim latent space."""
+        x = torch.tensor(
+            feature_set.numeric_features.fillna(0).values,
+            dtype=torch.float32
+        ).to(self.device)
+        with torch.no_grad():
+            z = self.model.encode(x).cpu().numpy()
+        return CompressedFeatures(
+            latent_vectors = z,
+            original_ids   = list(range(len(z))),
+            metadata       = {"run_id": feature_set.run_id}
+        )
+
+    def index_in_qdrant(self, compressed: CompressedFeatures, metadata: dict):
+        """Batch upsert latent vectors into Qdrant embeddings_v1 collection."""
+        points = [
+            PointStruct(
+                id      = f"{compressed.metadata.get('run_id','')}-{i}",
+                vector  = compressed.latent_vectors[i].tolist(),
+                payload = {**compressed.metadata, **metadata, "vector_index": i}
+            )
+            for i in range(len(compressed.latent_vectors))
+        ]
+        self.qdrant.upsert(collection_name=self.collection, points=points)
+        logger.info("Upserted %d vectors into Qdrant collection '%s'",
+                    len(points), self.collection)
+
+    def retrieve_similar(
+        self, query_latent: np.ndarray, top_k: int = 10
+    ) -> list:
+        results = self.qdrant.search(
+            collection_name = self.collection,
+            query_vector    = query_latent.tolist(),
+            limit           = top_k
+        )
+        return results
+2.5 — Contextual Bandit Meta-Learning Routing Policy
+YAML: routing_policy config block
+routing_policy:
+  algorithm:  linucb
+  alpha:      1.0
+  context_dim: 128
+  arms:
+    - node_01_inference
+    - node_02_feature_eng
+    - node_03_training
+    - local_llm
+    - azure_openai
+  update_interval_seconds: 300
+  meta_learning:
+    enabled:         true
+    inner_lr:        0.01
+    outer_lr:        0.001
+    task_batch_size: 8
+  policy_path: D:/DevDrive/hermes/configs/routing_policy.json
+MODULE: routing_policy.py
+# routing_policy.py — Hermes XCore Contextual Bandit Routing Policy
+# LinUCB algorithm with MAML-style meta-learning wrapper.
+# Pseudo-code: review and implement before use.
+
+from __future__ import annotations
+import json
+import logging
+import uuid
+from dataclasses import dataclass
+from typing import Optional
+
+import numpy as np
+import httpx
+
+logger = logging.getLogger("hermes.routing_policy")
+
+@dataclass
+class TaskEpisode:
+    support_contexts: np.ndarray   # (K, context_dim)
+    support_rewards:  np.ndarray   # (K,)
+    arm_selected:     list[str]
+
+@dataclass
+class Experience:
+    context: np.ndarray
+    arm:     str
+    reward:  float
+
+# -----------------------------------------------------------
+# ContextualBanditRouter (LinUCB)
+# -----------------------------------------------------------
+class ContextualBanditRouter:
+    """
+    LinUCB contextual bandit. Maintains per-arm ridge regression
+    parameters (A matrix, b vector) for upper confidence bound selection.
+    Sherman-Morrison rank-1 update for efficient online learning.
+    """
+
+    def __init__(
+        self,
+        arms:        list[str],
+        context_dim: int,
+        db_conn,
+        qdrant_client,
+        alpha:       float = 1.0
+    ):
+        self.arms        = arms
+        self.d           = context_dim
+        self.alpha       = alpha
+        self.db_conn     = db_conn
+        self.qdrant      = qdrant_client
+        # Per-arm parameters
+        self.A      = {arm: np.eye(self.d, dtype=np.float64)        for arm in arms}
+        self.A_inv  = {arm: np.eye(self.d, dtype=np.float64)        for arm in arms}
+        self.b      = {arm: np.zeros((self.d, 1), dtype=np.float64) for arm in arms}
+        logger.info("ContextualBanditRouter initialized: %d arms, context_dim=%d", len(arms), context_dim)
+
+    def select_arm(self, context: np.ndarray) -> tuple[str, float]:
+        """
+        Computes UCB score for each arm:
+            theta_hat = A^-1 @ b
+            p_t(a) = theta_hat.T @ x + alpha * sqrt(x.T @ A^-1 @ x)
+        Returns (arm_name, confidence).
+        """
+        x = context.reshape(-1, 1).astype(np.float64)
+        ucb_scores = {}
+        for arm in self.arms:
+            theta_hat  = self.A_inv[arm] @ self.b[arm]
+            mean       = float(theta_hat.T @ x)
+            variance   = float(x.T @ self.A_inv[arm] @ x)
+            ucb_scores[arm] = mean + self.alpha * np.sqrt(max(variance, 0.0))
+        best_arm    = max(ucb_scores, key=ucb_scores.__getitem__)
+        confidence  = float(ucb_scores[best_arm])
+        logger.debug("UCB selected arm=%s confidence=%.4f", best_arm, confidence)
+        return best_arm, confidence
+
+    def update(self, arm: str, context: np.ndarray, reward: float):
+        """
+        Online update using Sherman-Morrison rank-1 formula for A_inv.
+        A <- data-id="192" A + x x^T
+        b <- b + r x
+        A_inv <- A_inv - (A_inv x)(A_inv x)^T / (1 + x^T A_inv x)
+        """
+        x   = context.reshape(-1, 1).astype(np.float64)
+        Ax  = self.A_inv[arm] @ x
+        denom = 1.0 + float(x.T @ Ax)
+        self.A_inv[arm] -= (Ax @ Ax.T) / denom
+        self.b[arm]     += reward * x
+        logger.debug("Updated arm=%s reward=%.4f", arm, reward)
+
+    def log_decision(
+        self, session_id: str, context: np.ndarray,
+        arm: str, confidence: float, reward: Optional[float] = None
+    ):
+        cursor = self.db_conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO hermes_routing_decisions
+                (session_id, input_context, selected_arm, confidence, actual_reward)
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (session_id, json.dumps(context.tolist()), arm, confidence, reward)
+        )
+        self.db_conn.commit()
+
+    def save_policy(self, path: str):
+        state = {
+            "arms":  self.arms,
+            "alpha": self.alpha,
+            "d":     self.d,
+            "A_inv": {k: v.tolist() for k, v in self.A_inv.items()},
+            "b":     {k: v.tolist() for k, v in self.b.items()}
+        }
+        with open(path, "w") as f:
+            json.dump(state, f, indent=2)
+        logger.info("Policy saved to %s", path)
+
+    def load_policy(self, path: str):
+        with open(path) as f:
+            state = json.load(f)
+        self.arms   = state["arms"]
+        self.alpha  = state["alpha"]
+        self.d      = state["d"]
+        self.A_inv  = {k: np.array(v) for k, v in state["A_inv"].items()}
+        self.b      = {k: np.array(v) for k, v in state["b"].items()}
+        logger.info("Policy loaded from %s", path)
+
+    def export_for_deployment(self) -> dict:
+        return {
+            "arms":  self.arms,
+            "alpha": self.alpha,
+            "d":     self.d,
+            "A_inv": {k: v.tolist() for k, v in self.A_inv.items()},
+            "b":     {k: v.tolist() for k, v in self.b.items()}
+        }
+
+def deploy_policy(policy_dict: dict, node_endpoints: list[str]):
+    """
+    POST updated policy to each node's /policy/update endpoint.
+    Rolls back if any node returns non-200.
+    """
+    successful = []
+    for endpoint in node_endpoints:
+        url = f"{endpoint}/policy/update"
+        try:
+            r = httpx.post(url, json=policy_dict, timeout=10.0)
+            r.raise_for_status()
+            successful.append(endpoint)
+            logger.info("Policy deployed to %s", endpoint)
+        except Exception as e:
+            logger.error("Policy deployment FAILED for %s: %s", endpoint, e)
+            logger.warning("Rolling back successfully deployed nodes: %s", successful)
+            # Rollback: POST previous policy (caller should pass previous_policy_dict)
+            raise RuntimeError(f"Policy deployment failed at {endpoint}. Rollback required.") from e
+
+# -----------------------------------------------------------
+# MetaLearningWrapper (MAML-style)
+# -----------------------------------------------------------
+class MetaLearningWrapper:
+    """
+    Wraps ContextualBanditRouter with MAML-style fast adaptation.
+    Inner loop: few-step gradient on support set.
+    Outer loop: meta-gradient over task batch.
+    """
+
+    def __init__(self, base_router: ContextualBanditRouter, inner_lr=0.01, outer_lr=0.001):
+        self.base_router = base_router
+        self.inner_lr    = inner_lr
+        self.outer_lr    = outer_lr
+
+    def meta_update(self, task_batch: list[TaskEpisode]):
+        """
+        For each task episode: compute fast-adapted policy params,
+        evaluate on query set, accumulate meta-gradient, apply outer update.
+        (Simplified placeholder — full MAML requires differentiable inner loop.)
+        """
+        meta_grads = {arm: np.zeros_like(self.base_router.b[arm])
+                      for arm in self.base_router.arms}
+        for episode in task_batch:
+            for i, arm in enumerate(episode.arm_selected):
+                ctx    = episode.support_contexts[i]
+                reward = episode.support_rewards[i]
+                meta_grads[arm] += self.outer_lr * reward * ctx.reshape(-1, 1)
+        for arm in self.base_router.arms:
+            self.base_router.b[arm] += meta_grads[arm]
+        logger.info("Meta-update applied over %d task episodes.", len(task_batch))
+
+    def adapt(self, support_set: list[Experience]) -> ContextualBanditRouter:
+        """Few-shot adapts a copy of the base policy to the support set distribution."""
+        import copy
+        adapted = copy.deepcopy(self.base_router)
+        for exp in support_set:
+            adapted.update(exp.arm, exp.context, exp.reward)
+        logger.info("Policy adapted on %d support experiences.", len(support_set))
+        return adapted
+2.6 — Continuous Retraining Loop
+YAML: retraining config block
+retraining:
+  drift_psi_threshold:       0.20
+  reward_decline_threshold:  0.10
+  schedule_interval_hours:   24
+  lookback_days:             30
+  champion_challenger_margin: 0.02
+  max_concurrent_jobs:       2
+  training_backend:          wsl2
+  gpu_passthrough:           true
+  model_checkpoint_dir:      D:/DevDrive/ai-hub/checkpoints
+  rollback_enabled:          true
+  rollback_versions_to_keep: 3
+MODULE: retraining_loop.py
+# retraining_loop.py — Hermes XCore Continuous Retraining Orchestrator
+# Pseudo-code: review and implement before use.
+
+from __future__ import annotations
+import logging
+import signal
+import subprocess
+import time
+from dataclasses import dataclass
+from typing import Optional
+
+import numpy as np
+import pandas as pd
+
+logger = logging.getLogger("hermes.retraining_loop")
+
+@dataclass
+class DriftReport:
+    feature_psi_scores:   dict[str, float]
+    categorical_chi2:     dict[str, float]
+    embedding_drift:      float
+    overall_drift_detected: bool
+
+@dataclass
+class DataSplit:
+    X_train: pd.DataFrame
+    X_val:   pd.DataFrame
+    X_test:  pd.DataFrame
+    y_train: pd.Series
+    y_val:   pd.Series
+    y_test:  pd.Series
+
+@dataclass
+class TrainingResult:
+    model_id:      str
+    artifact_path: str
+    train_loss:    float
+    val_loss:      float
+    eval_score:    float
+
+@dataclass
+class EvalReport:
+    champion_score:   float
+    challenger_score: float
+    improvement:      float
+    promote:          bool
+
+class ContinuousRetrainingOrchestrator:
+    """
+    Monitors for data drift and reward decline; triggers retraining
+    when conditions are met; promotes or rejects challenger models.
+    """
+
+    def __init__(self, config: dict, db_conn, model_registry):
+        self.config         = config
+        self.db_conn        = db_conn
+        self.model_registry = model_registry
+        self._shutdown      = False
+        signal.signal(signal.SIGTERM, self._handle_shutdown)
+        signal.signal(signal.SIGINT,  self._handle_shutdown)
+        logger.info("ContinuousRetrainingOrchestrator initialized.")
+
+    def _handle_shutdown(self, signum, frame):
+        logger.info("Shutdown signal received — completing current iteration then stopping.")
+        self._shutdown = True
+
+    def check_drift(
+        self,
+        new_data:        pd.DataFrame,
+        reference_stats: dict
+    ) -> DriftReport:
+        """
+        PSI for numeric features, Chi-square for categorical,
+        cosine drift for text embeddings.
+        PSI formula: PSI = sum((actual% - expected%) * ln(actual% / expected%))
+        """
+        psi_scores = {}
+        for col, ref_dist in reference_stats.get("numeric", {}).items():
+            if col not in new_data.columns:
+                continue
+            bins   = ref_dist["bins"]
+            ref_pct = np.array(ref_dist["pct"]) + 1e-8
+            act_counts, _ = np.histogram(new_data[col].dropna(), bins=bins)
+            act_pct = act_counts / (act_counts.sum() + 1e-8) + 1e-8
+            psi = float(np.sum((act_pct - ref_pct) * np.log(act_pct / ref_pct)))
+            psi_scores[col] = psi
+
+        chi2_scores = {}
+        for col, ref_freq in reference_stats.get("categorical", {}).items():
+            if col not in new_data.columns:
+                continue
+            from scipy.stats import chi2_contingency
+            actual_freq = new_data[col].value_counts()
+            cats = list(set(list(ref_freq.keys()) + list(actual_freq.index)))
+            obs  = np.array([actual_freq.get(c, 0) for c in cats])
+            exp  = np.array([ref_freq.get(c, 1e-6)  for c in cats])
+            exp  = exp / exp.sum() * obs.sum()
+            stat, p, *_ = chi2_contingency(np.vstack([obs, exp]))
+            chi2_scores[col] = float(stat)
+
+        emb_drift = reference_stats.get("embedding_cosine_drift", 0.0)
+        psi_threshold = self.config.get("drift_psi_threshold", 0.20)
+        drift_detected = any(v > psi_threshold for v in psi_scores.values())
+
+        return DriftReport(
+            feature_psi_scores     = psi_scores,
+            categorical_chi2       = chi2_scores,
+            embedding_drift        = emb_drift,
+            overall_drift_detected = drift_detected
+        )
+
+    def trigger_condition(
+        self, drift_report: DriftReport, feedback_stats: dict
+    ) -> bool:
+        psi_trigger    = drift_report.overall_drift_detected
+        reward_trigger = feedback_stats.get("mean_reward", 1.0) < (
+            1.0 - self.config.get("reward_decline_threshold", 0.10)
+        )
+        return psi_trigger or reward_trigger
+
+    def prepare_training_data(self, lookback_days: int = 30) -> DataSplit:
+        """
+        Queries Postgres for recent features + feedback.
+        Performs stratified train/val/test split (70/15/15).
+        """
+        from sklearn.model_selection import train_test_split
+        cursor = self.db_conn.cursor()
+        cursor.execute(
+            """
+            SELECT fl.feature_name, fl.correlation_score, fb.reward_signal
+            FROM hermes_feature_log fl
+            JOIN hermes_feedback_log fb ON fl.run_id = fb.session_id
+            WHERE fl.created_at >= NOW() - INTERVAL '%s days'
+            """,
+            (lookback_days,)
+        )
+        rows = cursor.fetchall()
+        df   = pd.DataFrame(rows, columns=["feature_name", "correlation_score", "reward"])
+        X    = df.drop(columns=["reward"])
+        y    = df["reward"]
+        X_tr, X_tmp, y_tr, y_tmp = train_test_split(X, y, test_size=0.30, random_state=42)
+        X_va, X_te, y_va, y_te   = train_test_split(X_tmp, y_tmp, test_size=0.50, random_state=42)
+        return DataSplit(X_train=X_tr, X_val=X_va, X_test=X_te,
+                         y_train=y_tr, y_val=y_va,   y_test=y_te)
+
+    def run_training_job(
+        self, data: DataSplit, model_config: dict
+    ) -> TrainingResult:
+        """
+        Launches training subprocess in WSL2 or Hyper-V VM with GPU passthrough.
+        Monitors exit code; returns TrainingResult on success.
+        """
+        training_script = "D:/DevDrive/hermes/scripts/train_job.py"
+        backend = self.config.get("training_backend", "wsl2")
+        if backend == "wsl2":
+            cmd = ["wsl", "python3", training_script,
+                   "--config", model_config.get("config_path", ""),
+                   "--run-id", model_config.get("run_id", "")]
+        else:
+            cmd = ["powershell", "-Command",
+                   f"Start-VM HermesTrainer; Invoke-Command ..."]  # Hyper-V variant
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
+        if result.returncode != 0:
+            logger.error("Training job FAILED: %s", result.stderr)
+            raise RuntimeError("Training job failed.")
+        return TrainingResult(
+            model_id      = model_config.get("run_id", ""),
+            artifact_path = f"D:/DevDrive/ai-hub/checkpoints/{model_config.get('run_id','')}.pt",
+            train_loss    = 0.0,  # parsed from stdout in real implementation
+            val_loss      = 0.0,
+            eval_score    = 0.0
+        )
+
+    def evaluate_candidate(self, result: TrainingResult) -> EvalReport:
+        """
+        Compares challenger to current champion on holdout set.
+        Promotes if challenger beats champion by champion_challenger_margin.
+        """
+        cursor = self.db_conn.cursor()
+        cursor.execute(
+            "SELECT eval_score FROM hermes_model_registry WHERE is_active = TRUE LIMIT 1"
+        )
+        row = cursor.fetchone()
+        champion_score   = row[0] if row else 0.0
+        challenger_score = result.eval_score
+        margin           = self.config.get("champion_challenger_margin", 0.02)
+        improvement      = challenger_score - champion_score
+        return EvalReport(
+            champion_score   = champion_score,
+            challenger_score = challenger_score,
+            improvement      = improvement,
+            promote          = improvement >= margin
+        )
+
+    def promote_or_reject(self, eval_report: EvalReport, result: TrainingResult):
+        if eval_report.promote:
+            cursor = self.db_conn.cursor()
+            cursor.execute("UPDATE hermes_model_registry SET is_active=FALSE WHERE is_active=TRUE")
+            cursor.execute(
+                """
+                UPDATE hermes_model_registry SET is_active=TRUE, deployed_at=NOW()
+                WHERE model_id=%s
+                """,
+                (result.model_id,)
+            )
+            self.db_conn.commit()
+            logger.info("Challenger PROMOTED: model_id=%s improvement=%.4f",
+                        result.model_id, eval_report.improvement)
+        else:
+            logger.info("Challenger REJECTED: improvement=%.4f below margin=%.4f",
+                        eval_report.improvement,
+                        self.config.get("champion_challenger_margin", 0.02))
+
+    def rollback(self, to_model_id: str):
+        cursor = self.db_conn.cursor()
+        cursor.execute("UPDATE hermes_model_registry SET is_active=FALSE WHERE is_active=TRUE")
+        cursor.execute(
+            "UPDATE hermes_model_registry SET is_active=TRUE WHERE model_id=%s",
+            (to_model_id,)
+        )
+        self.db_conn.commit()
+        logger.info("ROLLBACK: restored champion model_id=%s", to_model_id)
+
+    def run_loop(self, interval_seconds: int = 3600):
+        """Main scheduling loop. Runs until shutdown signal received."""
+        logger.info("Retraining loop started. Interval: %ds", interval_seconds)
+        while not self._shutdown:
+            try:
+                logger.info("--- Retraining loop tick ---")
+                # (1) Pull reference stats from last known good run
+                # (2) Fetch recent serving data
+                # (3) Check drift + feedback
+                # (4) If trigger: prepare data, run job, evaluate, promote/reject
+                # Abbreviated here — full implementation follows module design above
+            except Exception as e:
+                logger.error("Retraining loop error: %s", e, exc_info=True)
+            time.sleep(interval_seconds)
+        logger.info("Retraining loop shut down gracefully.")
+2.7 — Model Scoring and Feedback Ingestion
+MODULE: scoring_feedback.py
+# scoring_feedback.py — Hermes XCore Scoring and Feedback Ingestion
+# Pseudo-code: review and implement before use.
+
+from __future__ import annotations
+import hashlib
+import json
+import logging
+from dataclasses import dataclass
+from typing import Optional
+
+import numpy as np
+
+from feature_pipeline import FeatureSet
+
+logger = logging.getLogger("hermes.scoring_feedback")
+
+@dataclass
+class ScoringResult:
+    model_id:    str
+    output:      dict
+    confidence:  float
+    input_hash:  str
+    output_hash: str
+
+@dataclass
+class FeedbackStats:
+    mean_reward_per_model: dict[str, float]
+    mean_reward_per_arm:   dict[str, float]
+    total_feedback_count:  int
+    lookback_hours:        int
+
+class HermesScorer:
+    def __init__(self, model_registry, device: str = "cuda"):
+        self.model_registry = model_registry
+        self.device         = device
+        self._cache         = {}
+
+    def _load_model(self, model_id: str):
+        if model_id not in self._cache:
+            artifact_path = self.model_registry.get_artifact_path(model_id)
+            import torch
+            model = torch.load(artifact_path, map_location=self.device)
+            model.eval()
+            self._cache[model_id] = model
+        return self._cache[model_id]
+
+    def hash_io(self, input_features: FeatureSet, output: dict) -> tuple[str, str]:
+        """SHA-256 of serialized input and output for audit trail."""
+        in_bytes  = json.dumps(
+            input_features.numeric_features.to_dict(), sort_keys=True
+        ).encode()
+        out_bytes = json.dumps(output, sort_keys=True).encode()
+        in_hash   = hashlib.sha256(in_bytes).hexdigest()
+        out_hash  = hashlib.sha256(out_bytes).hexdigest()
+        return in_hash, out_hash
+
+    def score(self, input_features: FeatureSet, model_id: str) -> ScoringResult:
+        import torch
+        model = self._load_model(model_id)
+        x     = torch.tensor(
+            input_features.numeric_features.fillna(0).values,
+            dtype=torch.float32
+        ).to(self.device)
+        with torch.no_grad():
+            raw_output = model(x)
+        output     = {"predictions": raw_output.cpu().numpy().tolist()}
+        confidence = float(raw_output.softmax(dim=-1).max().item()) if raw_output.ndim > 1 else 1.0
+        in_h, out_h = self.hash_io(input_features, output)
+        return ScoringResult(
+            model_id   = model_id,
+            output     = output,
+            confidence = confidence,
+            input_hash = in_h,
+            output_hash= out_h
+        )
+
+    def batch_score(
+        self, batch: list[FeatureSet], model_id: str
+    ) -> list[ScoringResult]:
+        return [self.score(fs, model_id) for fs in batch]
+
+class FeedbackIngester:
+    def __init__(self, db_conn, bandit_router):
+        self.db_conn      = db_conn
+        self.bandit_router = bandit_router
+
+    def validate_reward(self, reward: float) -> bool:
+        import math
+        return isinstance(reward, (int, float)) and not math.isnan(reward) and -1.0 <= data-id="201" reward <= 1.0
+
+    def ingest(
+        self,
+        session_id:     str,
+        model_id:       str,
+        input_hash:     str,
+        output_hash:    str,
+        reward_signal:  float,
+        context_vector: list
+    ):
+        if not self.validate_reward(reward_signal):
+            raise ValueError(f"Invalid reward signal: {reward_signal}")
+        cursor = self.db_conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO hermes_feedback_log
+                (session_id, model_id, input_hash, output_hash, reward_signal, context_vector)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (session_id, model_id, input_hash, output_hash,
+             reward_signal, json.dumps(context_vector))
+        )
+        self.db_conn.commit()
+        logger.info("Feedback ingested: session=%s reward=%.4f", session_id, reward_signal)
+
+    def aggregate_feedback(self, lookback_hours: int = 24) -> FeedbackStats:
+        cursor = self.db_conn.cursor()
+        cursor.execute(
+            """
+            SELECT model_id, AVG(reward_signal), COUNT(*)
+            FROM hermes_feedback_log
+            WHERE created_at >= NOW() - INTERVAL '%s hours'
+            GROUP BY model_id
+            """,
+            (lookback_hours,)
+        )
+        rows = cursor.fetchall()
+        mean_by_model = {str(r[0]): float(r[1]) for r in rows}
+        cursor.execute(
+            """
+            SELECT rd.selected_arm, AVG(fb.reward_signal)
+            FROM hermes_routing_decisions rd
+            JOIN hermes_feedback_log fb ON rd.session_id = fb.session_id
+            WHERE rd.ts >= NOW() - INTERVAL '%s hours'
+            GROUP BY rd.selected_arm
+            """,
+            (lookback_hours,)
+        )
+        arm_rows = cursor.fetchall()
+        mean_by_arm = {r[0]: float(r[1]) for r in arm_rows}
+        return FeedbackStats(
+            mean_reward_per_model = mean_by_model,
+            mean_reward_per_arm   = mean_by_arm,
+            total_feedback_count  = sum(int(r[2]) for r in rows),
+            lookback_hours        = lookback_hours
+        )
+
+    def trigger_policy_update(self, stats: FeedbackStats):
+        """
+        Calls ContextualBanditRouter.update() for each recent arm decision
+        with its resolved reward signal.
+        """
+        cursor = self.db_conn.cursor()
+        cursor.execute(
+            """
+            SELECT rd.selected_arm, fb.reward_signal, fb.context_vector
+            FROM hermes_routing_decisions rd
+            JOIN hermes_feedback_log fb ON rd.session_id = fb.session_id
+            WHERE rd.actual_reward IS NULL
+            LIMIT 500
+            """
+        )
+        rows = cursor.fetchall()
+        for arm, reward, ctx_json in rows:
+            ctx = np.array(json.loads(ctx_json))
+            self.bandit_router.update(arm, ctx, reward)
+        logger.info("Policy update triggered for %d unresolved decisions.", len(rows))
+2.8 — Vector DB Indexing and Retrieval (Qdrant)
+YAML: Qdrant collection schema — embeddings_v1
+collection: embeddings_v1
+vectors:
+  size:     128
+  distance: Cosine
+payload_schema:
+  run_id:        keyword
+  node_id:       keyword
+  feature_type:  keyword
+  created_at:    datetime
+  model_version: keyword
+MODULE: vector_store.py
+# vector_store.py — Hermes XCore Vector Store (Qdrant)
+# Pseudo-code: review and implement before use.
+
+from __future__ import annotations
+import logging
+import time
+import uuid
+from dataclasses import dataclass
+from typing import Optional
+
+import numpy as np
+from qdrant_client import QdrantClient
+from qdrant_client.models import (
+    Distance, VectorParams, PointStruct,
+    Filter, FieldCondition, MatchValue
+)
+
+logger = logging.getLogger("hermes.vector_store")
+
+@dataclass
+class SearchResult:
+    id:      str
+    score:   float
+    payload: dict
+
+class HermesVectorStore:
+    """
+    Manages all Qdrant interactions for the Hermes fleet:
+    upsert, ANN search, soft delete, and collection management.
+    """
+
+    def __init__(self, qdrant_url: str, collection_name: str, vector_size: int):
+        self.client          = QdrantClient(url=qdrant_url)
+        self.collection_name = collection_name
+        self.vector_size     = vector_size
+        self.create_collection_if_missing(vector_size)
+
+    def create_collection_if_missing(
+        self, vector_size: int, distance_metric: str = "Cosine"
+    ):
+        existing = [c.name for c in self.client.get_collections().collections]
+        if self.collection_name not in existing:
+            dist = Distance.COSINE if distance_metric == "Cosine" else Distance.DOT
+            self.client.create_collection(
+                collection_name = self.collection_name,
+                vectors_config  = VectorParams(size=vector_size, distance=dist)
+            )
+            logger.info("Created Qdrant collection '%s' (dim=%d, metric=%s)",
+                        self.collection_name, vector_size, distance_metric)
+        else:
+            logger.debug("Collection '%s' already exists.", self.collection_name)
+
+    def upsert_embeddings(
+        self,
+        ids:      list,
+        vectors:  np.ndarray,
+        payloads: list[dict],
+        max_retries: int = 3
+    ):
+        """Batch upsert with exponential backoff retry on failure."""
+        points = [
+            PointStruct(
+                id      = str(ids[i]),
+                vector  = vectors[i].tolist(),
+                payload = payloads[i]
+            )
+            for i in range(len(ids))
+        ]
+        for attempt in range(max_retries):
+            try:
+                self.client.upsert(collection_name=self.collection_name, points=points)
+                logger.info("Upserted %d vectors into '%s'", len(points), self.collection_name)
+                return
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait = 2 ** attempt
+                    logger.warning("Upsert attempt %d failed (%s) — retrying in %ds", attempt+1, e, wait)
+                    time.sleep(wait)
+                else:
+                    logger.error("Upsert FAILED after %d attempts: %s", max_retries, e)
+                    raise
+
+    def search(
+        self,
+        query_vector:   np.ndarray,
+        top_k:          int = 10,
+        filter_payload: Optional[dict] = None
+    ) -> list[SearchResult]:
+        query_filter = None
+        if filter_payload:
+            conditions = [
+                FieldCondition(key=k, match=MatchValue(value=v))
+                for k, v in filter_payload.items()
+            ]
+            query_filter = Filter(must=conditions)
+        hits = self.client.search(
+            collection_name = self.collection_name,
+            query_vector    = query_vector.tolist(),
+            limit           = top_k,
+            query_filter    = query_filter
+        )
+        return [SearchResult(id=str(h.id), score=h.score, payload=h.payload) for h in hits]
+
+    def delete_by_id(self, ids: list):
+        """Soft delete: set deleted=True in payload rather than physical removal."""
+        for pid in ids:
+            self.client.set_payload(
+                collection_name = self.collection_name,
+                payload         = {"deleted": True},
+                points          = [str(pid)]
+            )
+        logger.info("Soft-deleted %d vectors from '%s'", len(ids), self.collection_name)
+
+    def get_collection_stats(self) -> dict:
+        info = self.client.get_collection(self.collection_name)
+        return {
+            "vectors_count":     info.vectors_count,
+            "indexed_vectors":   info.indexed_vectors_count,
+            "segments_count":    info.segments_count,
+            "status":            str(info.status)
+        }
+2.9 — Orchestration Across Hermes Fleet Nodes
+MODULE: orchestrator.py (expanded)
+# orchestrator.py — Hermes XCore Orchestrator (Full Design)
+# Pseudo-code: review and implement before use.
+
+from __future__ import annotations
+import asyncio
+import logging
+import uuid
+from dataclasses import dataclass, field
+from typing import Optional
+
+import httpx
+
+from routing_policy import ContextualBanditRouter
+
+logger = logging.getLogger("hermes.orchestrator")
+
+@dataclass
+class HermesTask:
+    task_id:         str = field(default_factory=lambda: str(uuid.uuid4()))
+    task_type:       str = "inference"   # "inference" | "training" | "feature_eng"
+    payload:         dict = field(default_factory=dict)
+    priority:        int  = 5            # 1 (highest) to 10 (lowest)
+    timeout_seconds: int  = 60
+
+@dataclass
+class DispatchResult:
+    task_id:      str
+    node_id:      str
+    node_endpoint: str
+    sent_at:      float
+
+@dataclass
+class TaskResult:
+    task_id:   str
+    node_id:   str
+    status:    str          # "success" | "failed" | "timeout"
+    output:    Optional[dict] = None
+    error:     Optional[str]  = None
+
+class HermesOrchestrator:
+    """
+    Central coordination point for the Hermes fleet.
+    Maintains node registry, dispatches tasks via bandit policy,
+    aggregates results, and triggers retraining on schedule.
+    """
+
+    def __init__(
+        self,
+        config_path:   str,
+        db_conn,
+        qdrant_client,
+        policy:        ContextualBanditRouter
+    ):
+        import yaml
+        with open(config_path) as f:
+            self.config   = yaml.safe_load(f)
+        self.db_conn       = db_conn
+        self.qdrant        = qdrant_client
+        self.policy        = policy
+        self.node_registry = {}      # node_id -> {endpoint, capabilities, healthy}
+        self.task_queue    = asyncio.Queue()
+        self.running       = False
+
+    def register_node(self, node_id: str, endpoint: str, capabilities: dict):
+        self.node_registry[node_id] = {
+            "endpoint":     endpoint,
+            "capabilities": capabilities,
+            "healthy":      True,
+            "failure_count": 0
+        }
+        logger.info("Node registered: %s at %s (caps=%s)", node_id, endpoint, capabilities)
+
+    async def health_check_all(self) -> dict[str, bool]:
+        results = {}
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            for node_id, info in self.node_registry.items():
+                try:
+                    r = await client.get(f"{info['endpoint']}/health")
+                    healthy = r.status_code == 200
+                except Exception:
+                    healthy = False
+                self.node_registry[node_id]["healthy"] = healthy
+                results[node_id] = healthy
+                if not healthy:
+                    logger.warning("Node %s is UNHEALTHY", node_id)
+        return results
+
+    async def dispatch_task(self, task: HermesTask) -> DispatchResult:
+        import numpy as np, time
+        # Build context vector from task payload
+        context = np.zeros(self.policy.d, dtype=np.float64)
+        context[0] = {"inference": 0, "training": 1, "feature_eng": 2}.get(task.task_type, 0)
+        context[1] = task.priority / 10.0
+        arm, confidence = self.policy.select_arm(context)
+        node_id  = arm.split("_inference")[0].split("_training")[0].split("_feature_eng")[0]
+        node_info = self.node_registry.get(node_id, {})
+        endpoint  = node_info.get("endpoint", "")
+        async with httpx.AsyncClient(timeout=task.timeout_seconds) as client:
+            r = await client.post(
+                f"{endpoint}/v1/{task.task_type}",
+                json={"task_id": task.task_id, "payload": task.payload}
+            )
+            r.raise_for_status()
+        self.policy.log_decision(
+            session_id = task.task_id,
+            context    = context,
+            arm        = arm,
+            confidence = confidence
+        )
+        return DispatchResult(
+            task_id       = task.task_id,
+            node_id       = node_id,
+            node_endpoint = endpoint,
+            sent_at       = time.time()
+        )
+
+    async def handle_node_failure(self, node_id: str, task: HermesTask) -> DispatchResult:
+        self.node_registry[node_id]["failure_count"] += 1
+        self.node_registry[node_id]["healthy"] = False
+        logger.error("Node %s FAILED for task %s — re-routing.", node_id, task.task_id)
+        # Exclude failed node by zeroing its arm's confidence
+        return await self.dispatch_task(task)
+
+    async def run_orchestration_loop(self):
+        self.running = True
+        logger.info("Orchestration loop started.")
+        while self.running:
+            try:
+                task = await asyncio.wait_for(self.task_queue.get(), timeout=5.0)
+                try:
+                    result = await self.dispatch_task(task)
+                    logger.info("Task %s dispatched to node %s", task.task_id, result.node_id)
+                except Exception as e:
+                    logger.error("Dispatch error for task %s: %s", task.task_id, e)
+            except asyncio.TimeoutError:
+                await self.health_check_all()
+Deliverable 3 — Security Mode Scripts (C / B / A)
+3.1 — Security Philosophy and Mode Definitions
+The Hermes workstation operates across three security modes. Mode selection is driven by operational context: full air-gap-like lockdown for sensitive data handling (Mode C), normal developer workflow with curated outbound access (Mode B), and full cloud integration for Azure/GitHub operations (Mode A). All three modes maintain local-only inbound access at all times — no RDP, WinRM, or inbound SSH is permitted under any mode.
+
+Feature    Mode C — Locked    Mode B — Balanced (Default)    Mode A — Active
+Outbound Network    Windows Update + Defender only    Curated allowlist (GitHub, Azure, PyPI, Docker)    Standard outbound (allow established)
+Inbound Network    Blocked (all)    Localhost + WSL2 adapter only    Localhost only; no public inbound
+WSL2    Shutdown + adapter disabled    Running, internal network only    Running, full localhost forwarding
+Docker    Stopped; network=none    Running, internal bridge only    Running, bridge + localhost port exposure
+Hyper-V VMs    Powered off or no NIC    HermesInternal vSwitch only    HermesNet (external) for Azure testing
+BitLocker    TPM + PIN (startup PIN required)    TPM-only unlock    TPM-only unlock
+Windows Sandbox    Disabled    Enabled (restricted folders)    Enabled (full config)
+GitHub / Azure CLI    Tokens revoked and cleared    Authenticated, outbound only    Fully active
+Purview / Entra    Offline (no cloud reach)    Read-only context cached    Fully active
+Defender    Maximum protection + maximum audit    Default + enhanced real-time    Default protection
+3.2 — Mode Toggle Script
+FILE: set_security_mode.ps1
+#Requires -Version 7.0
+#Requires -RunAsAdministrator
+# =============================================================
+# set_security_mode.ps1
+# Usage: .\set_security_mode.ps1 -Mode C|B|A
+# Toggles Hermes workstation between security operating modes.
+# NOT FOR BLIND EXECUTION — Review all firewall rules before use.
+# =============================================================
+
+param(
+    [Parameter(Mandatory=$true)]
+    [ValidateSet("C","B","A")]
+    [string]$Mode
+)
+
+$ErrorActionPreference = "Stop"
+$LogPath = "D:\DevDrive\logs\security_mode_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss")
+function Log($msg) { $line = "[$(Get-Date -Format 's')] $msg"; Write-Host $line; $line | Tee-Object -FilePath $LogPath -Append }
+
+# -----------------------------------------------------------
+# SNAPSHOT CURRENT STATE BEFORE ANY CHANGE
+# -----------------------------------------------------------
+Log "Snapshotting current firewall and service state..."
+Get-NetFirewallRule | Where-Object Enabled -eq True | Select-Object DisplayName,Direction,Action |
+    Out-File "D:\DevDrive\logs\firewall_snapshot_{0}.txt" -f (Get-Date -Format "yyyyMMdd_HHmmss")
+Get-Service | Where-Object Status -eq Running | Select-Object Name,Status |
+    Out-File "D:\DevDrive\logs\services_snapshot_{0}.txt" -f (Get-Date -Format "yyyyMMdd_HHmmss")
+Log "Snapshot complete."
+
+# -----------------------------------------------------------
+function Set-ModeC {
+    Log "Entering Mode C — Maximum Security (Locked)"
+
+    # Block all outbound firewall rules except Windows Update and Defender
+    Get-NetFirewallRule -Direction Outbound -Action Allow | Where-Object {
+        $_.DisplayName -notmatch "Windows Update|Windows Defender|MpsSvc"
+    } | Disable-NetFirewallRule
+    Log "All non-system outbound firewall rules DISABLED."
+
+    # Allow only Windows Update FQDN list (create explicit rules if not present)
+    New-NetFirewallRule -DisplayName "Allow-WindowsUpdate-ModeC" `
+        -Direction Outbound -Action Allow -Protocol TCP `
+        -RemoteAddress "13.107.4.50","13.107.5.88","13.107.9.79","40.73.5.206" `
+        -ErrorAction SilentlyContinue
+
+    # Shutdown WSL2
+    wsl --shutdown
+    Log "WSL2 shut down."
+
+    # Disable HermesNet external vSwitch (blocks VM external access)
+    Set-VMSwitch -Name "HermesNet" -NetAdapterName "" -ErrorAction SilentlyContinue
+    Log "HermesNet external vSwitch disconnected."
+
+    # Stop Docker Desktop
+    Stop-Service "com.docker.service" -ErrorAction SilentlyContinue
+    Stop-Process -Name "Docker Desktop" -Force -ErrorAction SilentlyContinue
+    Log "Docker Desktop stopped."
+
+    # Enforce BitLocker TPM+PIN on C:
+    # manage-bde -protectors -add C: -TPMAndPIN
+    Log "PSEUDO: manage-bde -protectors -add C: -TPMAndPIN  (requires interactive PIN entry)"
+
+    # Revoke GitHub CLI token
+    gh auth logout --hostname github.com -ErrorAction SilentlyContinue
+    Log "GitHub CLI token revoked."
+
+    # Revoke Azure CLI token
+    az account clear -ErrorAction SilentlyContinue
+    Log "Azure CLI context cleared."
+
+    # Disable Windows Sandbox
+    Disable-WindowsOptionalFeature -Online -FeatureName Containers-DisposableClientVM -NoRestart -ErrorAction SilentlyContinue
+    Log "Windows Sandbox disabled."
+
+    # Set Defender to high protection
+    Set-MpPreference -MAPSReporting Advanced
+    Set-MpPreference -SubmitSamplesConsent SendSafeSamples
+    Set-MpPreference -RealTimeProtectionEnabled $true
+    Log "Defender set to maximum protection."
+
+    # Enable maximum audit policies
+    auditpol /set /category:"Logon/Logoff" /success:enable /failure:enable
+    auditpol /set /category:"Account Logon" /success:enable /failure:enable
+    auditpol /set /category:"Policy Change" /success:enable /failure:enable
+    auditpol /set /category:"Privilege Use"  /success:enable /failure:enable
+    Log "Audit policies maximized."
+
+    Log "Mode C APPLIED. System is in LOCKED state."
+}
+
+# -----------------------------------------------------------
+function Set-ModeB {
+    Log "Entering Mode B — Balanced Developer (Default)"
+
+    # Reset all firewall rules to Mode B allowlist
+    Get-NetFirewallRule -DisplayName "Allow-*-ModeC" | Remove-NetFirewallRule -ErrorAction SilentlyContinue
+
+    $allowedDomains = @(
+        "github.com", "*.github.com",
+        "*.microsoft.com", "*.azure.com",
+        "pypi.org", "*.pypi.org",
+        "registry-1.docker.io", "*.docker.io",
+        "*.huggingface.co", "*.anaconda.org"
+    )
+    # PSEUDO: Create outbound allow rules per domain group
+    # (Windows Firewall does not natively filter by FQDN; use DNS-based filtering or Windows Defender Application Control)
+    Log "PSEUDO: Apply Mode B outbound allowlist (GitHub, Azure, PyPI, Docker, Hugging Face)"
+
+    # Block all inbound except localhost and WSL2 adapter
+    New-NetFirewallRule -DisplayName "Block-Inbound-ModeB" `
+        -Direction Inbound -Action Block -Protocol Any `
+        -RemoteAddress "0.0.0.0-127.0.0.0","128.0.0.0-255.255.255.255" `
+        -ErrorAction SilentlyContinue
+    Log "Inbound blocked except localhost."
+
+    # Ensure WSL2 running with internal networking
+    wsl --distribution Ubuntu-22.04 -- echo "WSL2 active" 2>&1 | Out-Null
+    Log "WSL2 running."
+
+    # Set Hyper-V VMs to HermesInternal only (disconnect HermesNet)
+    Get-VM | ForEach-Object { Set-VMNetworkAdapter -VMName $_.Name -SwitchName "HermesInternal" -ErrorAction SilentlyContinue }
+    Log "Hyper-V VMs set to HermesInternal vSwitch."
+
+    # BitLocker TPM-only on C:
+    # manage-bde -protectors -add C: -TPM
+    Log "PSEUDO: manage-bde -protectors -add C: -TPM"
+
+    # Enable Windows Sandbox with restricted config
+    Enable-WindowsOptionalFeature -Online -FeatureName Containers-DisposableClientVM -NoRestart -ErrorAction SilentlyContinue
+    Log "Windows Sandbox enabled."
+
+    # Re-authenticate if tokens missing
+    $ghStatus = gh auth status 2>&1
+    if ($ghStatus -match "not logged") {
+        Log "GitHub CLI not authenticated — run: gh auth login --web"
+    }
+    $azStatus = az account show 2>&1
+    if ($azStatus -match "error") {
+        Log "Azure CLI not authenticated — run: az login --use-device-code"
+    }
+
+    Log "Mode B APPLIED. Developer mode active."
+}
+
+# -----------------------------------------------------------
+function Set-ModeA {
+    Log "Entering Mode A — Active Cloud-Connected"
+
+    # Reset firewall to default Windows profile
+    netsh advfirewall reset
+    Log "Windows Firewall reset to defaults."
+
+    # Enable full WSL2 networking
+    # Update .wslconfig: localhostForwarding=true (already set in Phase 1)
+    Log "WSL2 full networking with localhost forwarding enabled."
+
+    # Re-enable HermesNet external vSwitch for Azure integration testing
+    # manage-bde should already be TPM-only from Mode B
+    Set-VMSwitch -Name "HermesNet" -NetAdapterName "{your-physical-nic}" -ErrorAction SilentlyContinue
+    Log "HermesNet external vSwitch re-enabled."
+
+    # Verify Entra device compliance
+    dsregcmd /status | Out-File "D:\DevDrive\logs\entra_status_modeA.txt"
+    Log "Entra device status written to logs."
+
+    # Confirm Azure CLI subscription context
+    az account show | Out-File "D:\DevDrive\logs\azure_subscription_modeA.txt"
+    Log "Azure CLI subscription context confirmed."
+
+    # Activate Purview DLP policies (via Azure CLI or Purview CLI)
+    Log "PSEUDO: az purview account show --name hermes-purview --resource-group hermes-rg"
+
+    Log "Mode A APPLIED. Cloud integration fully active."
+}
+
+# -----------------------------------------------------------
+# DISPATCH
+# -----------------------------------------------------------
+switch ($Mode) {
+    "C" { Set-ModeC }
+    "B" { Set-ModeB }
+    "A" { Set-ModeA }
+}
+Log "Security mode script complete. Mode=$Mode. Log at $LogPath"
+3.3 — BitLocker Configuration Script
+FILE: configure_bitlocker.ps1
+#Requires -Version 7.0
+#Requires -RunAsAdministrator
+# =============================================================
+# configure_bitlocker.ps1
+# Configures BitLocker on C:, D:, and optionally E:.
+# Recovery keys are stored in Azure AD/Entra — NOT local files.
+# NOT FOR BLIND EXECUTION — Review mode and drive letters first.
+# =============================================================
+
+$ErrorActionPreference = "Stop"
+$LogFile = "D:\DevDrive\logs\bitlocker_{0}.log" -f (Get-Date -Format "yyyyMMdd_HHmmss")
+function Log($msg) { $line = "[$(Get-Date -Format 's')] $msg"; Write-Host $line; $line | Out-File $LogFile -Append }
+
+param(
+    [ValidateSet("C","B","A")]
+    [string]$SecurityMode = "B"
+)
+
+Log "=== BITLOCKER CONFIGURATION — Security Mode $SecurityMode ==="
+
+# -----------------------------------------------------------
+# CHECK TPM 2.0
+# -----------------------------------------------------------
+$tpm = Get-Tpm
+if (-not $tpm.TpmPresent -or -not $tpm.TpmReady) {
+    throw "FATAL: TPM 2.0 not present or not ready. Enable in BIOS firmware settings."
+}
+Log "TPM 2.0 present and ready: SpecVersion=$($tpm.ManufacturerVersionFull)"
+
+# -----------------------------------------------------------
+# CONFIGURE C:
+# -----------------------------------------------------------
+Log "Configuring BitLocker on C:..."
+if ($SecurityMode -eq "C") {
+    # Mode C: TPM + PIN
+    Log "PSEUDO: manage-bde -on C: -UsedSpaceOnly -TpmAndPin"
+    Log "PSEUDO: manage-bde -protectors -add C: -TPMAndPIN  (will prompt for PIN)"
+} else {
+    # Mode B / A: TPM only
+    manage-bde -on C: -UsedSpaceOnly -TpmOnly 2>&1 | Out-File $LogFile -Append -ErrorAction SilentlyContinue
+    Log "BitLocker TPM-only enabled on C:"
+}
+# Save recovery key to Azure AD (Entra) — NOT to local file
+# PSEUDO: BackupToAAD-BitLockerKeyProtector -MountPoint C: -KeyProtectorId (Get-BitLockerVolume C:).KeyProtector[0].KeyProtectorId
+Log "PSEUDO: BackupToAAD-BitLockerKeyProtector C: — saves recovery key to Entra (not local)"
+
+# -----------------------------------------------------------
+# CONFIGURE D: (DevDrive)
+# -----------------------------------------------------------
+Log "Configuring BitLocker on D: (DevDrive)..."
+manage-bde -on D: -UsedSpaceOnly -TpmOnly 2>&1 | Out-File $LogFile -Append -ErrorAction SilentlyContinue
+Log "PSEUDO: BackupToAAD-BitLockerKeyProtector D: — saves recovery key to Entra"
+
+# -----------------------------------------------------------
+# CONFIGURE E: (if present)
+# -----------------------------------------------------------
+if (Test-Path "E:\") {
+    Log "E: drive detected — configuring BitLocker on E:..."
+    manage-bde -on E: -UsedSpaceOnly -TpmOnly 2>&1 | Out-File $LogFile -Append -ErrorAction SilentlyContinue
+    Log "PSEUDO: BackupToAAD-BitLockerKeyProtector E:"
+}
+
+# -----------------------------------------------------------
+# VERIFY STATUS
+# -----------------------------------------------------------
+Log "=== BITLOCKER STATUS ==="
+manage-bde -status | Out-File $LogFile -Append
+Log "Full status written to $LogFile. Reboot to verify TPM unlock."
+
+# Store recovery key ID (NOT the key) in hermes_run_log for audit
+$keyId = (Get-BitLockerVolume C:).KeyProtector |
+    Where-Object { $_.KeyProtectorType -eq "RecoveryPassword" } |
+    Select-Object -First 1 -ExpandProperty KeyProtectorId
+Log "C: Recovery Key Protector ID: $keyId  (logged for audit — key stored in Entra onl

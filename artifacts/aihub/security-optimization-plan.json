@@ -1,0 +1,7 @@
+{
+  "profile": "balanced",
+  "cpu_policy": "adaptive-priority",
+  "memory_policy": "high-throughput-guarded",
+  "egress_policy": "smart-allowlist",
+  "training_policy": "checkpoint+drift-guard"
+}

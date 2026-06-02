@@ -1,0 +1,73 @@
+{
+  "source": "artifacts\\polyglot\\cpp_master_brief.json",
+  "ui_panels": [
+    "Security Watch Center",
+    "Internet \u002B Port Guard",
+    "Quarantine and Isolation",
+    "Folder Permission Governance",
+    "Compression and Sorting",
+    "Fleetwide Alert Bus"
+  ],
+  "runtime_decision": {
+    "allow": false,
+    "reason": "risk threshold exceeded, lock high-risk egress and throttle non-critical workloads",
+    "score": 100
+  },
+  "security_watch_plan": {
+    "internet_watch_interval_seconds": 8,
+    "port_watch_interval_seconds": 5,
+    "permission_drift_scan_seconds": 45,
+    "quarantine_trigger_score": 58,
+    "alert_escalation_threshold": 52,
+    "auto_isolation_level": 0.92,
+    "egress_lockdown_factor": 0.82
+  },
+  "folder_governance_plan": {
+    "sort_priority_score": 0.84,
+    "compression_level": 0.78,
+    "dedupe_intensity": 0.88,
+    "permission_enforcement_level": 0.96,
+    "suspicious_folder_quarantine_level": 0.93,
+    "readonly_guard_ratio": 0.91,
+    "filesystem_watch_depth": 0.95
+  },
+  "cpp_resource_telemetry": {
+    "cpu_utilization": 35.5,
+    "memory_mb": 5805.76,
+    "gpu_utilization": 16.2,
+    "net_egress_mb_s": 100.4,
+    "compression_pressure": 0.0939039,
+    "multitask_pressure": 0.234168,
+    "lightweight_score": 0.813135,
+    "kernel_cpu_clamp": 0.82,
+    "kernel_memory_compaction": 0.9,
+    "kernel_gpu_scheduling": 0.74,
+    "kernel_network_throttle": 0.58,
+    "kernel_parallel_lane_utilization": 0.68
+  },
+  "alert_channels": [
+    "cpp_runtime_watchdog",
+    "fleet_security_bus",
+    "aihub_knowledge_alerts",
+    "quarantine_signal_stream",
+    "folder_permission_guard"
+  ],
+  "major_parallelization_types": [
+    "task-parallel",
+    "data-parallel",
+    "pipeline-parallel",
+    "tensor-parallel",
+    "model-parallel",
+    "fleet-swarm-parallel",
+    "multi-llm-routing-parallel",
+    "subagent-specialist-parallel",
+    "hybrid-mesh-parallel",
+    "async-event-parallel"
+  ],
+  "scopes": [
+    "hermes",
+    "xcore",
+    "aihub",
+    "fleet_global"
+  ]
+}

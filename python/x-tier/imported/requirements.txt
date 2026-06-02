@@ -1,0 +1,95 @@
+# Hermes XCore — Python Dependencies Manifest
+# Install into D:\DevDrive\ai-hub\venvs\hermes-core
+# pip install -r requirements.txt
+# Generated: 2026-06-02 | Python 3.12.x | CUDA 12.4
+
+# --- PyTorch (install separately for CUDA support) ---
+# pip install torch>=2.2.0 torchvision>=0.17.0 --index-url https://download.pytorch.org/whl/cu124
+
+# --- Core ML / Data Science ---
+torch>=2.2.0
+torchvision>=0.17.0
+transformers>=4.40.0
+sentence-transformers>=3.0.0
+scikit-learn>=1.4.0
+pandas>=2.2.0
+numpy>=1.26.0
+scipy>=1.13.0
+
+# --- Vector Database ---
+qdrant-client>=1.9.0
+
+# --- Database ---
+psycopg2-binary>=2.9.9
+
+# --- Azure / Copilot / OpenAI ---
+azure-ai-inference>=1.0.0
+azure-identity>=1.16.0
+azure-keyvault-secrets>=4.8.0
+openai>=1.30.0
+semantic-kernel>=1.0.0
+
+# --- API / Web ---
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+httpx>=0.27.0
+
+# --- Configuration / Secrets ---
+pydantic>=2.7.0
+pydantic-settings>=2.2.0
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
+
+# --- Logging / Observability ---
+structlog>=24.1.0
+rich>=13.7.0
+
+# --- Development / Quality ---
+pytest>=8.2.0
+pytest-asyncio>=0.23.0
+pytest-cov>=5.0.0
+mypy>=1.10.0
+ruff>=0.4.0
+Appendix C — Glossary
+Term    Definition
+Arm    In the contextual bandit context, one selectable action — here, one Hermes node or model endpoint (e.g., node_01_inference). LinUCB maintains separate regression parameters per arm.
+Champion Model    The currently deployed, production-active model in the hermes_model_registry (is_active = TRUE). Only one champion per model_name can be active at a time.
+Challenger Model    A newly trained candidate model being evaluated against the champion. Promoted only if its eval_score exceeds champion by the configured margin.
+Cluster Size (ReFS)    The allocation unit size for the ReFS file system on D:. Set to 64 KB (65,536 bytes) to optimize large-file sequential I/O for model weight files and checkpoint archives.
+Context Vector    A 128-dimensional floating-point vector representing the current task context, derived from the latent space of the HermesAutoencoder. Used as input to the LinUCB routing policy.
+DevDrive    Windows 11 feature enabling a ReFS-formatted volume with antivirus filter bypass for trusted paths, optimized for developer I/O. Requires Windows 11 22621+ and Developer Mode.
+Drift (Data)    Statistical change in the distribution of input features between training time and serving time. Measured by PSI (numeric), Chi-square (categorical), and cosine similarity (embeddings).
+DKMS    Dynamic Kernel Module Support — Linux framework allowing kernel modules (e.g., NVIDIA drivers) to automatically rebuild when the kernel is updated, maintaining CUDA on WSL2 across kernel upgrades.
+Entra ID    Microsoft's cloud identity and access management platform (formerly Azure Active Directory). Used for device registration, conditional access, and service principal authentication.
+Feature Signature    A compact representation of a feature set's statistical properties, stored in Qdrant's feature_signatures collection for fast similarity lookup during drift detection.
+Fleet    The collective set of Hermes nodes (node_01, node_02, node_03, etc.) managed by the HermesOrchestrator. Each node is a specialized compute unit.
+GPU Passthrough    Mechanism by which a physical NVIDIA GPU is accessible inside a Hyper-V VM or WSL2 environment, enabling GPU-accelerated training within virtualized compute.
+Hermes    The custom multi-node AI orchestration framework that routes inference, training, and feature engineering tasks across named compute nodes using a contextual bandit policy.
+HermesInternal vSwitch    Hyper-V internal virtual network switch used to interconnect Hermes nodes in isolation, without external network access. Used in Mode B and Mode C.
+HermesNet vSwitch    Hyper-V external virtual network switch bound to the physical NIC, providing full internet/Azure access for VMs. Used in Mode A only.
+Latent Space    The compressed representation produced by the HermesAutoencoder encoder; a 128-dimensional space capturing the essential structure of raw feature inputs.
+LinUCB    Linear Upper Confidence Bound — a contextual bandit algorithm that models reward as a linear function of context features, selecting arms with the highest upper confidence bound on predicted reward.
+MAML    Model-Agnostic Meta-Learning — a meta-learning algorithm that optimizes model initialization parameters for fast adaptation to new tasks with few gradient steps.
+Mode A / B / C    The three security operating modes of the Hermes workstation: A (Active/Cloud), B (Balanced/Developer, default), C (Locked/Air-gap-like). Toggled via set_security_mode.ps1.
+PSI    Population Stability Index — a metric quantifying distributional shift between two samples. PSI > 0.20 indicates significant drift and triggers retraining in the Hermes pipeline.
+Purview    Microsoft Purview — cloud-based data governance platform used to catalog, classify, and enforce compliance policies on data assets in the D:\DevDrive\data\ and model artifact directories.
+Qdrant    Open-source vector database engine providing ANN (approximate nearest neighbor) similarity search over dense float vectors. Used by Hermes for embedding storage and retrieval.
+ReFS    Resilient File System — Microsoft's modern file system used for the DevDrive. Supports large cluster sizes, data integrity checksums, and virtual disk scenarios, but does not support all NTFS features.
+Reward Signal    A scalar value in [-1.0, 1.0] representing the quality of a model output as judged by downstream evaluation or user action. Used to update the LinUCB policy and trigger retraining.
+SecretManagement    PowerShell module (Microsoft.PowerShell.SecretManagement) providing a unified API for storing and retrieving secrets from various vaults (SecretStore, Windows Credential Manager, Azure Key Vault).
+Sherman-Morrison    Matrix identity used for efficient rank-1 updates of the inverse of A in the LinUCB algorithm, avoiding full matrix inversion on each update step.
+VHD / VHDX    Virtual Hard Disk format used by Hyper-V and WSL2 to store VM disk images. WSL2 distros are stored as VHDX files relocated to D:\DevDrive\wsl2\ in this build.
+Workload Identity Federation    Entra ID feature that allows a service principal to authenticate using a trusted external OIDC token (e.g., from GitHub Actions), eliminating the need for a client secret.
+WSL2    Windows Subsystem for Linux 2 — a Hyper-V-backed, full Linux kernel environment on Windows. Used for GPU-accelerated Python training and inference workloads in Hermes nodes.
+XCore    The Hermes variant described in this document: the cross-core continuous training loop integrating feature pipeline, autoencoder compression, contextual bandit routing, and feedback-driven retraining.
+Appendix D — Change Log
+Version    Date    Author    Description
+1.0    02 June 2026    John    Initial release. All 7 deliverables complete.
+Phase 0–7 rollout plan with checkpoints and rollback steps.
+Full pseudo-script bundle (Phases 1–3).
+Hermes XCore pipeline design (Sections 2.1–2.9).
+Security mode framework (Modes A, B, C) with toggle script.
+ASCII wiring diagrams for all major data flows.
+Hardware checklist with BIOS, driver, and Windows settings.
+Error handling standards, backup procedures, and integrity checks.
+Appendices A–D: directory structure, requirements, glossary, change log.

@@ -1,0 +1,25 @@
+{
+  "data-root": "D:\\DevDrive\\docker",
+  "userns-remap": "default",
+  "no-new-privileges": true,
+  "live-restore": true,
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m",
+    "max-file": "3"
+  },
+  "default-runtime": "nvidia",
+  "runtimes": {
+    "nvidia": {
+      "path": "nvidia-container-runtime",
+      "runtimeArgs": []
+    }
+  },
+  "features": {
+    "buildkit": true
+  },
+  "ip": "127.0.0.1",
+  "ipv6": false,
+  "fixed-cidr": "172.20.0.0/16"
+}
+3.6 — Windows Sandbox Config for Hermes Testing

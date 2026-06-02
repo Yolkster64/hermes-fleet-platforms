@@ -29,6 +29,12 @@ git checkout integration/helios-website-consolidation
 git pull
 ```
 
+Enable Azure DevOps MCP domain default via Python:
+
+```bash
+python scripts/enable_azure_devops_domain.py --domain core
+```
+
 To open a PR with GitHub CLI:
 
 ```bash

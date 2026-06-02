@@ -12,6 +12,28 @@ def _gateway_base() -> str:
     return os.getenv("HERMES_API_BASE_URL", "http://hermes-gateway:8788").strip()
 
 
+def _aihub_control_base() -> str:
+    return os.getenv("HERMES_AIHUB_CONTROL_URL", "http://aihub-control:8789").strip()
+
+
+def _fetch_json(url: str, timeout: int = 8) -> tuple[bool, dict | str]:
+    try:
+        r = requests.get(url, timeout=timeout)
+        r.raise_for_status()
+        return True, r.json()
+    except requests.RequestException as exc:
+        return False, str(exc)
+
+
+def _post_json(url: str, timeout: int = 10) -> tuple[bool, dict | str]:
+    try:
+        r = requests.post(url, timeout=timeout)
+        r.raise_for_status()
+        return True, r.json()
+    except requests.RequestException as exc:
+        return False, str(exc)
+
+
 def _key_path() -> Path:
     volume_root = os.getenv("HERMES_VOLUME_DATA_PATH", "/workspace/runtime/hermes_persist").strip()
     return Path(volume_root) / "auth" / "gui_api_key.txt"
@@ -231,9 +253,9 @@ def _llm_optimization_factor(
     return max(0.35, min(0.99, score))
 
 
-st.set_page_config(page_title="Hermes Simple GUI", layout="centered")
-st.title("Hermes Simple GUI")
-st.caption("Simple mode: Hermes or X, clear choices, fast deploy.")
+st.set_page_config(page_title="Hermes Unified Control Center", layout="wide")
+st.title("Hermes Unified Control Center")
+st.caption("Unified AIHub + Hermes + XCore fleets + SQL learning + security/optimization operations.")
 
 if "api_key" not in st.session_state:
     st.session_state["api_key"] = _load_saved_key() or "local-hermes-ui-key"
@@ -927,3 +949,264 @@ elif st.session_state["last_error"]:
 else:
     st.info("Not logged in yet.")
 st.caption(f"UTC: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}")
+st.divider()
+st.subheader("Ultimate Unified AIHub + Docker + Hermes/XCore")
+st.caption("Single clean control surface for runtime, AIHub knowledge, token/cost/power/speed metrics, fleets, training, and live security posture.")
+control_base = _aihub_control_base()
+st.markdown(f"- Gateway: `{_gateway_base()}`")
+st.markdown(f"- AIHub Control: `{control_base}`")
+st.markdown(f"- Hermes GUI URL: `http://127.0.0.1:8501`")
+
+ok_health, health_payload = _fetch_json(f"{control_base}/api/health")
+ok_docker, docker_payload = _fetch_json(f"{control_base}/api/docker/status")
+ok_summary, summary_payload = _fetch_json(f"{control_base}/api/knowledge/summary")
+ok_fleet, fleet_payload = _fetch_json(f"{control_base}/api/fleet/live")
+ok_security, security_payload = _fetch_json(f"{control_base}/api/security/live")
+ok_engines, engines_payload = _fetch_json(f"{control_base}/api/engines/catalog")
+ok_reco, reco_payload = _fetch_json(f"{control_base}/api/engines/recommend")
+ok_tracker, tracker_payload = _fetch_json(f"{control_base}/api/setup/tracker")
+ok_autoboot, autoboot_payload = _fetch_json(f"{control_base}/api/setup/autoboot-plan")
+ok_report, report_payload = _fetch_json(f"{control_base}/api/report")
+ok_conv, conv_payload = _fetch_json(f"{control_base}/api/conversation/report")
+
+tabs = st.tabs(
+    [
+        "Overview",
+        "LLM Cost/Power/Speed",
+        "Fleets + Training",
+        "Security + Optimization",
+        "Deep Engines + Meta-Learning",
+        "Unified Setup Tracker",
+        "Knowledge Mesh",
+        "Docker + Runtime Control",
+    ]
+)
+
+with tabs[0]:
+    if ok_health and isinstance(health_payload, dict):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric("Service", str(health_payload.get("service", "unknown")))
+        with c2:
+            st.metric("Security Profile", str(health_payload.get("security_profile", "n/a")))
+        with c3:
+            st.metric("Status", str(health_payload.get("status", "unknown")))
+    else:
+        st.error(f"Health endpoint unavailable: {health_payload}")
+
+    if ok_summary and isinstance(summary_payload, dict):
+        llm = summary_payload.get("llm_token_optimization", {})
+        perf = summary_payload.get("performance", {})
+        m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            st.metric("Token Efficiency", llm.get("token_efficiency_score", "n/a"))
+        with m2:
+            st.metric("Speed Score", perf.get("speed_score", "n/a"))
+        with m3:
+            st.metric("Power Efficiency", perf.get("power_efficiency_score", "n/a"))
+        with m4:
+            st.metric("Security Score", perf.get("security_score", "n/a"))
+
+with tabs[1]:
+    if ok_summary and isinstance(summary_payload, dict):
+        llm = summary_payload.get("llm_token_optimization", {})
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.metric("Estimated Tokens/Cycle", llm.get("estimated_tokens_per_cycle", 0))
+        with c2:
+            st.metric("Estimated Cost/Cycle (USD)", llm.get("estimated_cost_usd_per_cycle", 0.0))
+        with c3:
+            st.metric("Optimization Score", llm.get("token_efficiency_score", 0.0))
+        st.caption("These values are live heuristic rollups from AIHub artifacts and transcript-derived learning demand.")
+    else:
+        st.warning("LLM economics data unavailable.")
+
+with tabs[2]:
+    if ok_fleet and isinstance(fleet_payload, dict):
+        f1, f2, f3, f4 = st.columns(4)
+        with f1:
+            st.metric("Total Agents", fleet_payload.get("total_agents", 0))
+        with f2:
+            st.metric("Deployed", fleet_payload.get("deployed_agents", 0))
+        with f3:
+            st.metric("Hermes", fleet_payload.get("hermes_agents", 0))
+        with f4:
+            st.metric("XCore", fleet_payload.get("xcore_agents", 0))
+        st.json({"profiles": fleet_payload.get("profiles", {})})
+    else:
+        st.warning("Fleet live data unavailable.")
+
+    t1, t2 = st.columns(2)
+    with t1:
+        if st.button("Trigger Unified AIHub Training", use_container_width=True):
+            ok, payload = _post_json(f"{control_base}/api/train/trigger")
+            if ok:
+                st.success("Training trigger queued.")
+                st.json(payload)
+            else:
+                st.error(f"Training trigger failed: {payload}")
+    with t2:
+        if ok_summary and isinstance(summary_payload, dict):
+            training = summary_payload.get("training", {})
+            st.metric("Training Events (Recent)", training.get("training_events_recent_window", 0))
+
+with tabs[3]:
+    if ok_security and isinstance(security_payload, dict):
+        live = security_payload.get("live_scores", {})
+        s1, s2, s3 = st.columns(3)
+        with s1:
+            st.metric("Firewall Posture", live.get("firewall_posture", 0))
+        with s2:
+            st.metric("Quarantine Readiness", live.get("quarantine_readiness", 0))
+        with s3:
+            st.metric("Zero-Trust Alignment", live.get("zero_trust_alignment", 0))
+        watch_plan = security_payload.get("cpp_watch_plan", {})
+        folder_plan = security_payload.get("cpp_folder_governance", {})
+        alert_channels = security_payload.get("cpp_alert_channels", [])
+        st.json(
+            {
+                "coverage": security_payload.get("coverage", {}),
+                "cpp_watch_plan": watch_plan,
+                "cpp_folder_governance": folder_plan,
+                "cpp_alert_channels": alert_channels,
+            }
+        )
+        if isinstance(watch_plan, dict) and watch_plan:
+            w1, w2, w3 = st.columns(3)
+            with w1:
+                st.metric("Internet Watch Interval (s)", watch_plan.get("internet_watch_interval_seconds", 0))
+            with w2:
+                st.metric("Port Watch Interval (s)", watch_plan.get("port_watch_interval_seconds", 0))
+            with w3:
+                st.metric("Quarantine Trigger Score", watch_plan.get("quarantine_trigger_score", 0))
+        if isinstance(folder_plan, dict) and folder_plan:
+            f1, f2, f3 = st.columns(3)
+            with f1:
+                st.metric("Folder Compression Level", folder_plan.get("compression_level", 0))
+            with f2:
+                st.metric("Permission Enforcement", folder_plan.get("permission_enforcement_level", 0))
+            with f3:
+                st.metric("Dedupe Intensity", folder_plan.get("dedupe_intensity", 0))
+    else:
+        st.warning("Security live data unavailable.")
+
+with tabs[4]:
+    if ok_engines and isinstance(engines_payload, dict):
+        e1, e2, e3 = st.columns(3)
+        with e1:
+            st.metric("Engine Catalog", engines_payload.get("total_engines", 0))
+        with e2:
+            st.metric("CUDA Enabled", "yes" if engines_payload.get("cuda_enabled", False) else "no")
+        with e3:
+            st.metric("Backend Families", len(engines_payload.get("backends", {})))
+        st.json({"families": engines_payload.get("families", {}), "backends": engines_payload.get("backends", {})})
+        sources = engines_payload.get("github_learning_sources", [])
+        if isinstance(sources, list) and sources:
+            st.caption("Free GitHub engine ecosystems wired into the learning fabric reference set:")
+            st.table(pd.DataFrame({"github_sources": sources}))
+    else:
+        st.warning("Engine catalog unavailable.")
+
+    if ok_reco and isinstance(reco_payload, dict):
+        r1, r2 = st.columns(2)
+        with r1:
+            st.metric("Selected Engines", reco_payload.get("selected_count", 0))
+        with r2:
+            st.metric("Expected Memory Efficiency", reco_payload.get("expected_memory_efficiency_score", 0.0))
+        with st.expander("Recommended Engine Mix", expanded=False):
+            st.json(reco_payload)
+    else:
+        st.warning("Engine recommendation unavailable.")
+
+    if ok_summary and isinstance(summary_payload, dict):
+        cpp = summary_payload.get("cpp_source_of_truth", {})
+        if isinstance(cpp, dict):
+            st.caption(f"C++ source-of-truth mode: {cpp.get('generated_by', 'cpp_native')}")
+            cpp_data = cpp.get("security_optimization_data", {})
+            if isinstance(cpp_data, dict) and cpp_data:
+                c1, c2, c3, c4 = st.columns(4)
+                with c1:
+                    st.metric("C++ CPU Clamp", cpp_data.get("kernel_cpu_clamp", 0.0))
+                with c2:
+                    st.metric("C++ Memory Compaction", cpp_data.get("kernel_memory_compaction", 0.0))
+                with c3:
+                    st.metric("C++ GPU Scheduling", cpp_data.get("kernel_gpu_scheduling", 0.0))
+                with c4:
+                    st.metric("C++ Lightweight Score", cpp_data.get("lightweight_score", 0.0))
+                st.json({"cpp_security_optimization_data": cpp_data, "major_parallelization_types": cpp.get("major_parallelization_types", [])})
+
+with tabs[5]:
+    if ok_tracker and isinstance(tracker_payload, dict):
+        st.subheader(str(tracker_payload.get("name", "Unified Setup Tracker")))
+        st.caption(str(tracker_payload.get("goal", "")))
+        phases = tracker_payload.get("phases", [])
+        if isinstance(phases, list):
+            for phase in phases:
+                if not isinstance(phase, dict):
+                    continue
+                with st.expander(f"{phase.get('id', '?')} - {phase.get('title', 'phase')}", expanded=False):
+                    p1, p2 = st.columns(2)
+                    with p1:
+                        st.metric("Difficulty", phase.get("difficulty", "n/a"))
+                    with p2:
+                        st.metric("Commands", len(phase.get("commands", [])) if isinstance(phase.get("commands", []), list) else 0)
+                    st.markdown(f"**Objective:** {phase.get('objective', '')}")
+                    commands = phase.get("commands", [])
+                    if isinstance(commands, list):
+                        for cmd in commands:
+                            st.code(str(cmd), language="powershell")
+                    st.markdown(f"**Upgrade path:** {phase.get('upgrade_path', '')}")
+
+        st.markdown("**Future stubs:**")
+        st.json({"stubs_for_later": tracker_payload.get("stubs_for_later", [])})
+    else:
+        st.warning("Setup tracker is unavailable.")
+
+    if ok_autoboot and isinstance(autoboot_payload, dict):
+        with st.expander("Autoboot + Self-Heal Plan", expanded=False):
+            st.json(autoboot_payload)
+
+with tabs[6]:
+    if ok_summary and isinstance(summary_payload, dict):
+        mesh = summary_payload.get("knowledge_mesh", {})
+        k1, k2, k3 = st.columns(3)
+        with k1:
+            st.metric("Requirements", mesh.get("requirements_count", 0))
+        with k2:
+            st.metric("Unique Requirements", mesh.get("unique_requirements_count", 0))
+        with k3:
+            st.metric("Milestones", mesh.get("milestones_count", 0))
+
+    if ok_report:
+        with st.expander("Merged Polyglot/AIHub Report", expanded=False):
+            st.json(report_payload)
+    else:
+        st.caption(f"Report endpoint unavailable: {report_payload}")
+
+    if ok_conv:
+        with st.expander("WinRE Conversation Integration Map", expanded=False):
+            st.json(conv_payload)
+    else:
+        st.caption(f"Conversation report endpoint unavailable: {conv_payload}")
+
+with tabs[7]:
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("Refresh AIHub Health", use_container_width=True):
+            ok, payload = _fetch_json(f"{control_base}/api/health")
+            if ok:
+                st.success("AIHub control healthy.")
+                st.json(payload)
+            else:
+                st.error(f"AIHub health fetch failed: {payload}")
+    with c2:
+        if st.button("Refresh Docker Stack View", use_container_width=True):
+            ok, payload = _fetch_json(f"{control_base}/api/docker/status")
+            if ok:
+                st.success("Docker stack status loaded.")
+                st.json(payload)
+            else:
+                st.error(f"Docker view fetch failed: {payload}")
+
+    if ok_docker:
+        st.json(docker_payload)

@@ -21,3 +21,8 @@ This folder contains architecture notes, setup guides, and operations playbooks 
 ## Supporting References
 
 - [`llm-usage.md`](./llm-usage.md) - provider usage and prompt/runtime practices.
+- [`x-tier/DISK_LAYOUT_AND_VHDX_ARCHITECTURE.md`](./x-tier/DISK_LAYOUT_AND_VHDX_ARCHITECTURE.md) - integrated disk layout correction and VHDX architecture package.
+- [`x-tier/POLYGLOT_PHASE_INTEGRATION.md`](./x-tier/POLYGLOT_PHASE_INTEGRATION.md) - Python/C#/C++ phase runtime integration.
+- [`x-tier/AIHUB_UPGRADE_INTEGRATION.md`](./x-tier/AIHUB_UPGRADE_INTEGRATION.md) - AIHub orchestration + local control web app integration.
+- [`x-tier/SUPER_DEEP_AIHUB_SYSTEM_GUIDE.md`](./x-tier/SUPER_DEEP_AIHUB_SYSTEM_GUIDE.md) - deep architecture for C++ security core, C# host integration, Python AI/ML orchestration, and PowerShell operations.
+- [`x-tier/WINRE_AIHUB_TRANSCRIPT_DEEP_INTEGRATION_GUIDE.md`](./x-tier/WINRE_AIHUB_TRANSCRIPT_DEEP_INTEGRATION_GUIDE.md) - detailed mapping of WinRE transcript requests into integrated Hermes/AIHub artifacts and runtime wiring.
