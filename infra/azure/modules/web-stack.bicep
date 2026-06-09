@@ -19,6 +19,9 @@ param storageAccountName string
 @description('Cosmos DB endpoint exposed to the web tier through configuration.')
 param cosmosEndpoint string
 
+@description('Cosmos DB account name used for API managed identity data-plane RBAC.')
+param cosmosAccountName string
+
 @description('Cosmos DB database name exposed to the web tier through configuration.')
 param cosmosDatabaseName string
 
@@ -30,6 +33,16 @@ var workspaceName = '${namePrefix}-law'
 var appInsightsName = '${namePrefix}-appi'
 var apiSiteName = take(replace('${namePrefix}-api', '-', ''), 60)
 var portalSiteName = take(replace('${namePrefix}-portal', '-', ''), 60)
+var storageBlobDataContributorRoleDefinitionId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe')
+var cosmosDbBuiltInDataContributorRoleDefinitionId = '${cosmos.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002'
+
+resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
+  name: storageAccountName
+}
+
+resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' existing = {
+  name: cosmosAccountName
+}
 
 resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: workspaceName
@@ -120,6 +133,26 @@ resource apiSite 'Microsoft.Web/sites@2023-12-01' = {
         }
       ]
     }
+  }
+}
+
+resource apiStorageBlobDataContributorAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(storage.id, apiSite.identity.principalId, storageBlobDataContributorRoleDefinitionId)
+  scope: storage
+  properties: {
+    principalId: apiSite.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: storageBlobDataContributorRoleDefinitionId
+  }
+}
+
+resource apiCosmosDataContributorAssignment 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15' = {
+  name: guid(cosmos.id, apiSite.identity.principalId, cosmosDbBuiltInDataContributorRoleDefinitionId)
+  parent: cosmos
+  properties: {
+    principalId: apiSite.identity.principalId
+    roleDefinitionId: cosmosDbBuiltInDataContributorRoleDefinitionId
+    scope: cosmos.id
   }
 }
 

@@ -93,6 +93,7 @@ module web './modules/web-stack.bicep' = {
     linuxFxVersion: linuxFxVersion
     storageAccountName: data.outputs.storageAccountName
     cosmosEndpoint: data.outputs.cosmosEndpoint
+    cosmosAccountName: data.outputs.cosmosAccountName
     cosmosDatabaseName: data.outputs.cosmosDatabaseName
     tags: defaultTags
   }

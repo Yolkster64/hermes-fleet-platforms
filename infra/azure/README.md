@@ -38,7 +38,7 @@ az deployment group create \
 ## Design assumptions
 
 - Runtime matches the repo's active .NET 8 direction.
-- Web apps use system-assigned managed identities so secrets do not need to be baked into code.
+- Web apps use system-assigned managed identities so secrets do not need to be baked into code. The API identity is granted Storage Blob Data Contributor and Cosmos DB SQL built-in Data Contributor data-plane access during deployment.
 - Data services are private by default and scoped to the `data` subnet.
 - The VM is optional because the repo mixes desktop, agent, and service concerns; most environments should start without it.
 
@@ -48,7 +48,7 @@ az deployment group create \
 2. Use the `app` subnet only for App Service integration because it is delegated to `Microsoft.Web/serverFarms`.
 3. Keep the `data` subnet for service endpoints and later private endpoints if you want to harden further.
 4. If the jumpbox VM is enabled, lock RDP source ranges before production use.
-5. Assign RBAC to the web app managed identities for Storage Blob Data Contributor and Cosmos DB built-in data roles after deployment.
+5. Verify the API web app identity keeps its generated Storage Blob Data Contributor and Cosmos DB SQL built-in Data Contributor assignments before enabling production traffic.
 
 ## Next hardening steps
 
