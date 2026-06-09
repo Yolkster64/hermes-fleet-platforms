@@ -76,6 +76,7 @@ module data './modules/data-stack.bicep' = {
   params: {
     location: location
     namePrefix: namePrefix
+    appSubnetId: network.outputs.appSubnetId
     dataSubnetId: network.outputs.dataSubnetId
     cosmosDbConsistency: cosmosDbConsistency
     tags: defaultTags

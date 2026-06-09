@@ -5,6 +5,9 @@ param location string
 @minLength(1)
 param namePrefix string
 
+@description('Subnet used by App Service VNet integration and allowed to access data resources.')
+param appSubnetId string
+
 @description('Subnet allowed to access data resources.')
 param dataSubnetId string
 
@@ -37,6 +40,10 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
       defaultAction: 'Deny'
       bypass: 'AzureServices'
       virtualNetworkRules: [
+        {
+          id: appSubnetId
+          action: 'Allow'
+        }
         {
           id: dataSubnetId
           action: 'Allow'
@@ -105,7 +112,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
   kind: 'GlobalDocumentDB'
   properties: {
     databaseAccountOfferType: 'Standard'
-    publicNetworkAccess: 'Disabled'
+    publicNetworkAccess: 'Enabled'
     enableAutomaticFailover: false
     enableFreeTier: false
     isVirtualNetworkFilterEnabled: true
@@ -120,6 +127,10 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
       }
     ]
     virtualNetworkRules: [
+      {
+        id: appSubnetId
+        ignoreMissingVNetServiceEndpoint: false
+      }
       {
         id: dataSubnetId
         ignoreMissingVNetServiceEndpoint: false

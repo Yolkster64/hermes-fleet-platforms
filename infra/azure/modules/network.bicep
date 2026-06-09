@@ -34,6 +34,14 @@ resource vnet 'Microsoft.Network/virtualNetworks@2023-11-01' = {
         name: 'app'
         properties: {
           addressPrefix: appSubnetPrefix
+          serviceEndpoints: [
+            {
+              service: 'Microsoft.Storage'
+            }
+            {
+              service: 'Microsoft.AzureCosmosDB'
+            }
+          ]
           delegations: [
             {
               name: 'appservice'
