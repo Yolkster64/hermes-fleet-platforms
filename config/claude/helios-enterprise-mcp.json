@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "azure": {
+      "command": "npx",
+      "args": ["-y", "@azure/mcp@latest", "server", "start"]
+    },
+    "azure-devops": {
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp@latest", "${AZURE_DEVOPS_ORG}", "-d", "core", "work-items", "repositories", "pipelines"]
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp"
+    },
+    "linear": {
+      "type": "sse",
+      "url": "https://mcp.linear.app/sse"
+    },
+    "foundry": {
+      "type": "http",
+      "url": "https://mcp.ai.azure.com"
+    }
+  }
+}
